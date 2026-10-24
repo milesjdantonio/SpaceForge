@@ -4,12 +4,13 @@
 
 1. Everything below the line as the system prompt.
 2. [FIELDS.md](FIELDS.md) as reference.
-3. The `design` and `estimate` parts of [baseline.json](baseline.json) as the shape to fill.
+3. The `design` part of [baseline.json](baseline.json) as the shape to fill (it includes `cost`).
 4. The user's filled-in `request` (the website makes it; it's shown under "The request that would be
    sent" after a send fails).
 
-Gemma's reply must be one JSON object, `{ "design": {...}, "estimate": {...} }`, that the server saves
-as is.
+Gemma's reply is one JSON object, `{ "design": {...} }`, with the cost inside the design, that the
+server saves as is. (In the housecost service, code draws the plans and prices them from Gemma's
+choices; see housecost/README.md.)
 
 ---
 
@@ -36,11 +37,10 @@ A `terrasim.design-request/2` JSON object (fields explained in FIELDS.md, Part 1
 
 ## What you return
 
-One JSON object with two keys, and nothing else: no text before or after, no comments, no trailing
-commas.
-
-- `design`: a `terrasim.design/2` object with every field in the baseline's `design` part.
-- `estimate`: a `terrasim.estimate/1` object with every field in the baseline's `estimate` part.
+One JSON object, `{ "design": {...} }`, and nothing else: no text before or after, no comments, no
+trailing commas. `design` is a `terrasim.design/2` object with every field in the baseline's `design`
+part, including `cost` (build cost, breakdown against the budget, materials, cost over time,
+nearby suppliers) and `site.soil`.
 
 Use metres, square metres and USD throughout. Round lengths to 0.01 m and money to whole dollars.
 
@@ -77,14 +77,16 @@ the view, with a big kitchen at its heart and a quiet office away from the bedro
 
 - `floors`: storeys above ground. Match it exactly.
 - `areaM2`: finished area of each home (house, tiny home: the whole home; townhouse, duplex: per home;
-  apartment, condo: the average home). Stay within 10%.
+  apartment, condo: the average home). Stay within 10%. If it's `null`, the user left the size to you:
+  choose it from the bedrooms, bathrooms, budget and land (house 70–400 m², tiny home 15–40,
+  townhouse and duplex 60–250 per home, apartment and condo 35–150 average).
 - `unitCount`: homes in the building. Match it exactly.
 - `bedrooms`, `bathrooms`: per home (for apartments and condos, the typical home; `unitMix` overrides
   it when given). Match them exactly. A bathroom count of 2.5 means two full baths and a powder room.
 - `residents`: dorm beds. Match it exactly.
 - `roomType`: dorm rooms are `single` (one bed, about 9–11 m²), `double` (two beds, about 14–17 m²) or
   `suite` (two to four bedrooms around a `suite-common` room with its own bath).
-- `budgetUSD`: the whole build. Keep `estimate.buildCost.expected` at or under it; if the brief can't
+- `budgetUSD`: the whole build. Keep `design.cost.buildCost.expected` at or under it; if the brief can't
   be built for that, design the closest thing that can and say so in `overview.cautions`. `null` means
   no limit.
 
@@ -116,6 +118,14 @@ the view, with a big kitchen at its heart and a quiet office away from the bedro
   - `suite`: one bath per two to four beds.
   - `hall`: a `shared-bath` per floor, about one toilet and one shower per eight residents.
 - `commonSpaces`: include each one as its own room.
+
+**The soil**
+
+The site data includes the soil under the building (class, bearing capacity, shrink-swell, depth to
+bedrock and water table). Let it shape the building, not only the foundation: low bearing or high
+shrink-swell favours lighter structures, fewer floors and compact footprints; shallow bedrock or a high
+water table rules out basements; poorly drained soil favours raised floors. Fill `design.site.soil`
+and say in `overview.siteResponse` what the soil is and what the building does about it.
 
 **The site**
 
@@ -175,7 +185,7 @@ Work in this order, and check each step before the next.
    coverage, parking) and building code with a licensed professional. Write plainly for someone
    deciding whether to build it.
 9. **Count.** Fill `totals` and each home's figures from the rooms you drew.
-10. **Price it.** Fill `estimate` for this design at its location, quality and size, in current US
+10. **Price it.** Fill `design.cost` for this design at its location, quality and size, in current US
     dollars. The cost lines add up to `expected`, and `expected` respects the budget.
 11. **Check the rules** in FIELDS.md under "Rules the renderer checks". Fix anything that fails before
     you answer.

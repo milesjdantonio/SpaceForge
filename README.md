@@ -40,6 +40,21 @@ to go there, or search for a place. Use **Outline land**, choose what to build, 
 own words, fill in the boxes and send. Until a design service is connected, sending says so and offers
 to place the one sample house on your land.
 
+### Run the whole thing: website + Gemma design service
+
+The Go design service in [housecost/](housecost/) also serves the website, so one command runs both
+(Go 1.22 or newer):
+
+```bash
+cd housecost
+go run . -serve        # open http://localhost:8000
+```
+
+Put your Gemini API key in `housecost/APIKey.txt` (free at https://aistudio.google.com/apikey); it's
+read for each design, so no restart is needed, and it's in `.gitignore`. Designs take a few
+minutes (site data plus three Gemma calls); the sending panel shows each step. Finished results are
+saved in `housecost/results/`.
+
 ### Test the AI (Gemma) in the website
 
 The contract between the website and Gemma is in [contracts/](contracts/): the blank

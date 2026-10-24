@@ -1,17 +1,16 @@
 # TerraSim contract v2: field guide
 
-[baseline.json](baseline.json) is the blank template, with every field present and no values. It has three parts:
+[baseline.json](baseline.json) is the blank template, with every field present and no values. It has two parts:
 
 - **`request`**: what Gemma gets. The website fills it in from the user's outline and answers.
-- **`design`**: what Gemma sends back to be drawn. The website builds the 3D building on the map,
+- **`design`**: what Gemma sends back: the building to draw and, in `design.cost`, what it costs. The website builds the 3D building on the map,
   the floor plans and the walkthrough from this file alone. The same file is saved in the database
   and loaded again later to draw the same building. See [STORAGE.md](STORAGE.md).
-- **`estimate`**: what Gemma sends back about cost: build cost, materials and cost over time.
 
 The flow:
 
 ```
-website ──request──▶ Gemma ──design + estimate──▶ database ──▶ website renderer
+website ──request──▶ Gemma ──design (with its cost)──▶ database ──▶ website renderer
 ```
 
 The renderer draws exactly what the design file says. It does not guess walls, move rooms or fill
@@ -87,7 +86,8 @@ Conventions:
   its heart and a quiet office away from the bedrooms." It is the base of what Gemma is asked for:
   style, feel, and anything to keep or avoid all come from here. The numbers in the other boxes
   are firm requirements; where the text and a box disagree, the box wins.
-- `areaM2` never includes garages or parking.
+- `areaM2` never includes garages or parking. `null` means the user ticked "Let Gemma choose the size": Gemma
+  chooses it (see GEMMA_PROMPT.md), and `aiDecides` includes `"areaM2"`.
 - `budgetUSD` is for the whole building. `null` here means the user ticked "No limit"; the website
   never sends an empty budget otherwise.
 
@@ -170,6 +170,7 @@ The roof, garage, porch, parking and materials are in `exterior`.
 |---|---|
 | `site.outline` | The user's outline, copied from the request, `[lng, lat]` points (not closed). |
 | `site.areaM2` | Its area. |
+| `site.soil` | What the soil survey found under the building and the foundation chosen for it: `{ source, name, uscsClass, bearingPsf, shrinkSwell, depthToBedrockIn, depthToWaterTableIn, foundation, foundationReason, note }`. |
 | `placement.origin` | `[lng, lat]` of the building's `[0, 0]` corner on the ground (front left). |
 | `placement.xAxisBearingDeg` | Compass bearing of the building's x axis (0 = north, 90 = east). The front faces this bearing minus 90°. |
 | `placement.footprint` | The four corners of the `size` rectangle as `[lng, lat]`, in the order (0,0), (W,0), (W,D), (0,D). |
@@ -177,7 +178,9 @@ The roof, garage, porch, parking and materials are in `exterior`.
 | `size.heightM` | Ground to the highest point of the roof. |
 
 The whole `footprint` (and any garage, porch or parking) must lie inside the site outline, at least
-`setbackM` from every boundary. The website does not move or turn a returned building.
+`setbackM` from every boundary. The website checks this (rule 8). Users can drag the building to
+another spot inside the outline; the website then updates `placement.origin` and `footprint` in its
+own copy.
 
 ### `units`: the homes in the building
 
@@ -355,12 +358,14 @@ The website rejects a design that breaks these, and shows the user which rule fa
 
 ---
 
-## Part 3: `estimate` (Gemma → database → website)
+## Part 3: `design.cost` (what it costs, inside the design)
+
+The cost travels in the design file, so one file holds everything the website shows. (Older services
+sent a separate `terrasim.estimate/1` with `buildCost`, `materials` and `overTime`; the website still
+accepts that.)
 
 | Field | Meaning |
 |---|---|
-| `schema` | Always `"terrasim.estimate/1"`. |
-| `designId` | The `design.id` it prices. |
 | `currency` | `"USD"`. |
 | `asOf` | Month the prices are from, `"YYYY-MM"`. |
 | `buildCost.low`, `expected`, `high` | Total to build, as a range. |
@@ -373,3 +378,12 @@ The website rejects a design that breaks these, and shows the user which rule fa
 | `overTime.assumptions.inflation`, `appreciation` | Yearly rates as decimals, for example 0.028. |
 | `overTime.rows` | One per year from 0 to `years`: `{ year, maintenance, energy, replacements, value }`. Year 0 has zero costs and `value` = `expected`. |
 | `overTime.events` | Big one-off costs `{ year, name, amount }`, for example "Replace roof". Their years have `replacements` > 0. |
+| `breakdown` | Where the money goes: `materials`, `installedWork`, `labor`, `siteWork`, `overheadAndProfit`, `permitsAndDesign`, `total`, `perSqFt`, `perM2`, `wageFactor` (local wages against the national average), `budgetUSD` and `overBudgetBy` (`null` when within budget). |
+| `suppliers` | Building suppliers near the land, nearest first: `{ Name, Type, Address, Phone, Website, Miles }`. |
+
+## Where site data reaches
+
+The site data (USDA soil, USGS elevation and seismic, FEMA flood zones, BLS wages) covers the United
+States. The design service answers `GET /api/coverage?lng=…&lat=…` with `{ covered, message }`; the
+website asks as soon as land is outlined and blocks sending, with that message, when it isn't covered.
+`POST /designs` refuses such land with a 422 and the same message.

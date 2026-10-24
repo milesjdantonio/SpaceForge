@@ -14,7 +14,7 @@ import {
 
 export const EMPTY_FORM = {
   housingType: null,
-  answers: { designPrompt: '', floors: null, areaM2: null, unitCount: null, bedrooms: null, bathrooms: null, residents: null, roomType: null, budgetUSD: null, noBudgetLimit: false },
+  answers: { designPrompt: '', floors: null, areaM2: null, unitCount: null, bedrooms: null, bathrooms: null, residents: null, roomType: null, budgetUSD: null, noBudgetLimit: false, areaByAI: false },
   advanced: structuredClone(EMPTY_ADVANCED),
 };
 
@@ -25,7 +25,7 @@ const num = (s) => {
   return t === '' ? null : Number(t);
 };
 
-export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange, onSend }) {
+export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange, onSend, coverage }) {
   const form = structuredClone(EMPTY_FORM);
   if (site.form) {
     form.housingType = site.form.housingType ?? null;
@@ -55,6 +55,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     </dl>
     <p class="note">Buildable area keeps ${fmt.len(3)} back from every boundary. Local setbacks may differ.</p>
     ${siteProblems.length ? `<p class="problem">${siteProblems[0]}</p>` : ''}
+    <div class="coverage-alert" data-coverage role="alert" hidden></div>
     <button type="button" class="text-link edit-outline" data-edit>Adjust the outline</button>
 
     <form class="brief" novalidate>
@@ -181,15 +182,17 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     const shown = a[f] == null ? '' : isArea ? Math.round(fmt.toDisplayArea(a[f])) : a[f];
     const [lo, hi] = BRIEF_RULES[type][f];
     const range = isArea ? `${fmt.area(lo)} to ${fmt.area(hi)}` : `${lo} to ${hi}`;
-    return `<div class="qbox" data-field="${f}">
+    const byAI = isArea && a.areaByAI;
+    return `<div class="qbox${byAI ? ' is-ai' : ''}" data-field="${f}">
       <label class="qlabel" for="q-${f}">${label}</label>
       <div class="qinput">
-        <button type="button" class="qstep" data-step="-1" data-for="${f}" aria-label="Less">${icon('minus')}</button>
-        <input id="q-${f}" name="${f}" class="qcontrol num" inputmode="decimal" autocomplete="off" placeholder="–" value="${shown}" aria-describedby="hint-${f} err-${f}">
+        <button type="button" class="qstep" data-step="-1" data-for="${f}" aria-label="Less" ${byAI ? 'disabled' : ''}>${icon('minus')}</button>
+        <input id="q-${f}" name="${f}" class="qcontrol num" inputmode="decimal" autocomplete="off" placeholder="${byAI ? 'Gemma decides' : '–'}" value="${byAI ? '' : shown}" ${byAI ? 'disabled' : ''} aria-describedby="hint-${f} err-${f}">
         ${isArea ? `<span class="qaffix">${fmt.unitArea()}</span>` : ''}
-        <button type="button" class="qstep" data-step="1" data-for="${f}" aria-label="More">${icon('plus')}</button>
+        <button type="button" class="qstep" data-step="1" data-for="${f}" aria-label="More" ${byAI ? 'disabled' : ''}>${icon('plus')}</button>
       </div>
-      <p class="qhint" id="hint-${f}">${hint ? `${hint} ` : ''}<span class="num">${range}</span></p>
+      ${isArea ? `<label class="check check-small"><input type="checkbox" name="areaByAI" ${byAI ? 'checked' : ''}><span>Let Gemma choose the size</span></label>` : ''}
+      <p class="qhint" id="hint-${f}">${byAI ? 'Gemma sizes it from the bedrooms, budget and land. ' : hint ? `${hint} ` : ''}<span class="num">${range}</span></p>
       ${err}</div>`;
   }
 
@@ -254,7 +257,8 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     for (const f of ['floors', 'unitCount', 'bedrooms', 'bathrooms', 'residents']) {
       if (formEl.elements[f]) a[f] = num(fd.get(f));
     }
-    if (formEl.elements.areaM2) {
+    if (formEl.elements.areaByAI) a.areaByAI = fd.get('areaByAI') === 'on';
+    if (formEl.elements.areaM2 && !a.areaByAI) {
       const v = num(fd.get('areaM2'));
       a.areaM2 = v == null ? null : Math.round(fmt.fromDisplayArea(v) * 10) / 10;
     }
@@ -344,6 +348,11 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       renderAdvanced();
       touched.delete('housingType');
     }
+    if (e.target.name === 'areaByAI') {
+      read();
+      renderBasics();
+      touched.delete('areaM2');
+    }
     if (e.target.name === 'noBudgetLimit') {
       const input = formEl.elements.budgetUSD;
       input.disabled = e.target.checked;
@@ -418,6 +427,16 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   renderBasics();
   renderAdvanced();
   sync();
+
+  // Whether the design service has site data for this land; if not, say so before anything is sent.
+  coverage?.then((c) => {
+    if (!c || c.covered !== false || !el.isConnected) return;
+    const box = el.querySelector('[data-coverage]');
+    box.innerHTML = `${icon('alert')}<div><strong>No site data for this land</strong><p>${esc(c.message)}</p></div>`;
+    box.hidden = false;
+    siteProblems.push('No site data for this land, so it can’t be designed yet.');
+    showProblems(problems());
+  });
 }
 
 function textBox(id, label, value, { autocomplete, type = 'text', optional = false } = {}) {

@@ -1,0 +1,97 @@
+{
+  "schema": "terrasim.design-request/2",
+  "id": "REQ-example-1",
+  "housingType": "house",
+  "site": {
+    "type": "Feature",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            -80.4139724,
+            37.2293972
+          ],
+          [
+            -80.4137108,
+            37.2294534
+          ],
+          [
+            -80.4138276,
+            37.2298028
+          ],
+          [
+            -80.4140892,
+            37.2297466
+          ],
+          [
+            -80.4139724,
+            37.2293972
+          ]
+        ]
+      ]
+    },
+    "properties": {
+      "areaM2": 960,
+      "perimeterM": 128,
+      "centroid": [
+        -80.4139,
+        37.2296
+      ],
+      "setbackM": 3
+    }
+  },
+  "brief": {
+    "floors": 2,
+    "areaM2": 170,
+    "unitCount": 1,
+    "bedrooms": 3,
+    "bathrooms": 2.5,
+    "residents": null,
+    "roomType": null,
+    "budgetUSD": 450000
+  },
+  "advanced": {
+    "style": null,
+    "quality": "standard",
+    "garage": 1,
+    "parkingSpaces": null,
+    "structure": null,
+    "cladding": null,
+    "roofing": null,
+    "priorities": [
+      "efficiency"
+    ],
+    "extras": [
+      "porch",
+      "deck"
+    ],
+    "unitMix": {
+      "studio": null,
+      "oneBed": null,
+      "twoBed": null,
+      "threeBed": null
+    },
+    "bathroomSharing": null,
+    "commonSpaces": [],
+    "notes": "Family of four; would like a bright kitchen."
+  },
+  "aiDecides": [
+    "style",
+    "structure",
+    "cladding",
+    "roofing"
+  ],
+  "mode": "dream",
+  "builder": {
+    "name": null,
+    "company": null,
+    "email": null,
+    "landowner": null,
+    "permission": null
+  },
+  "client": {
+    "displayUnits": "imperial",
+    "createdAt": "2026-10-24T15:40:00Z"
+  }
+}

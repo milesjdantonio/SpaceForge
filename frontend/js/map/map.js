@@ -31,7 +31,12 @@ maplibregl.addProtocol('sat', async (params, abort) => {
     const bmp = await createImageBitmap(new Blob([buf]));
     const empty = isPlaceholder(bmp);
     bmp.close?.();
-    if (empty) return { data: EMPTY_TILE };
+    if (empty) {
+      // Tell the page, so it can say the imagery is missing rather than leave the visitor guessing.
+      const z = Number(params.url.replace('sat://', '').split('/')[0]);
+      dispatchEvent(new CustomEvent('terrasim:no-imagery', { detail: { z } }));
+      return { data: EMPTY_TILE };
+    }
   } catch {}
   return { data: buf };
 });
