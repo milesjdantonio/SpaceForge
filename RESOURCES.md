@@ -1,7 +1,7 @@
-# SpaceForge Resources and Tooling
+# TerraSim Resources and Tooling
 
 What Claude Code (or a teammate) can use on this project, its real status, and when to use it. The tool
-list started from the Shroud/SurferStopper RESOURCES.md; the ideas and rules here are SpaceForge's own.
+list started from the Shroud/SurferStopper RESOURCES.md; the ideas and rules here are TerraSim's own.
 Last checked 2026-10-24.
 
 ## Ground rules

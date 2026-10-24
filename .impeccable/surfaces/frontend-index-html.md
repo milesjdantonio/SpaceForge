@@ -7,7 +7,7 @@ related_targets: []
 
 ## Scope
 
-The SpaceForge web frontend: landing (Persuade) plus the Forge studio, Catalog and Design sheet (Operate). Runs on a mock API layer until the backend exists.
+The TerraSim web frontend: landing (Persuade) plus the Forge studio, Catalog and Design sheet (Operate). Runs on a mock API layer until the backend exists.
 
 ## Audience and job
 

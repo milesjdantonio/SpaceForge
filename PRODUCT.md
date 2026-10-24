@@ -26,7 +26,7 @@ exist yet: the frontend runs on a mock layer with the same request and response 
 
 ## Product Purpose
 
-SpaceForge turns a patch of land into a house that belongs there. A user outlines a site on a map,
+TerraSim turns a patch of land into a house that belongs there. A user outlines a site on a map,
 describes the house (style, size, rooms, floors, budget, materials), and Gemma generates a design for
 that specific site. Every design carries its predicted build cost, materials list and cost over time
 (maintenance, appreciation, depreciation). Published designs become a catalog that connects buyers to
@@ -61,7 +61,7 @@ the design rather than as an afterthought.
 
 ## Brand Commitments
 
-- Name: **SpaceForge**.
+- Name: **TerraSim** (renamed from SpaceForge on 2026-10-24; the GitHub repo is milesjdantonio/TerraSim).
 - The user chose a "Blueprint + Forge" direction for the web frontend; recorded here as a binding
   constraint, detailed in DESIGN.md.
 

@@ -1,6 +1,8 @@
-# SpaceForge
+# TerraSim
 
-SpaceForge lets a user draw/highlight an area on a map — an empty city lot, a hillside, any plot of land — and uses an AI model (Gemma, via Google's hosted AI API) to generate a house design for that site. Each generated design is stored along with predicted cost, materials, and cost-over-time projections, so other users can browse past designs, see the numbers behind them, and message the developer directly if they want to buy or build one.
+_Formerly SpaceForge._
+
+TerraSim lets a user draw/highlight an area on a map — an empty city lot, a hillside, any plot of land — and uses an AI model (Gemma, via Google's hosted AI API) to generate a house design for that site. Each generated design is stored along with predicted cost, materials, and cost-over-time projections, so other users can browse past designs, see the numbers behind them, and message the developer directly if they want to buy or build one.
 
 ## Core idea
 
