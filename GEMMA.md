@@ -4,7 +4,8 @@
 > [baseline.json](contracts/baseline.json) is the blank request, design (render file) and estimate;
 > [FIELDS.md](contracts/FIELDS.md) explains every field; [GEMMA_PROMPT.md](contracts/GEMMA_PROMPT.md)
 > is the instruction text to give Gemma; [STORAGE.md](contracts/STORAGE.md) is the plan for storing
-> designs. The v1 shapes below describe only the current sample house.
+> designs. Everything below is the old v1 contract, kept for history; the sample house in
+> frontend/fixtures/mock-house/ is now a v2 file.
 
 TerraSim's Gemma system designs the houses. The web interface only collects the site and brief,
 sends them, and shows what comes back. This file is the contract between the two.

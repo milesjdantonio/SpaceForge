@@ -1,0 +1,434 @@
+{
+ "schema": "terrasim.estimate/1",
+ "designId": "sample-0001",
+ "sample": true,
+ "currency": "USD",
+ "asOf": "2026-10",
+ "buildCost": {
+  "low": 446044,
+  "expected": 513661,
+  "high": 601564,
+  "perSqFt": 233,
+  "confidence": "low",
+  "lines": [
+   {
+    "id": "site",
+    "name": "Site work and utilities",
+    "amount": 40038
+   },
+   {
+    "id": "foundation",
+    "name": "Foundation",
+    "amount": 56072
+   },
+   {
+    "id": "structure",
+    "name": "Framing and structure",
+    "amount": 72309
+   },
+   {
+    "id": "roof",
+    "name": "Roof",
+    "amount": 27116
+   },
+   {
+    "id": "envelope",
+    "name": "Cladding, windows and doors",
+    "amount": 63271
+   },
+   {
+    "id": "mep",
+    "name": "Plumbing, electrical, heating and cooling",
+    "amount": 76829
+   },
+   {
+    "id": "interior",
+    "name": "Interior finishes and cabinetry",
+    "amount": 94906
+   },
+   {
+    "id": "fees",
+    "name": "Permits, design and fees",
+    "amount": 22597
+   },
+   {
+    "id": "garage",
+    "name": "Garage",
+    "amount": 31449
+   },
+   {
+    "id": "contingency",
+    "name": "Contingency",
+    "amount": 29075
+   }
+  ],
+  "assumptions": [
+   "Regional cost index 0.93 (Southeast)",
+   "Standard finishes, wood frame (2×6 walls)",
+   "Excludes land, landscaping and furniture"
+  ]
+ },
+ "materials": [
+  {
+   "id": "concrete",
+   "name": "Ready-mix concrete (slab and footings)",
+   "quantity": 32,
+   "unit": "yd³",
+   "unitCost": 185,
+   "cost": 6003
+  },
+  {
+   "id": "rebar",
+   "name": "Rebar and mesh",
+   "quantity": 3082,
+   "unit": "lb",
+   "unitCost": 1.1,
+   "cost": 3391
+  },
+  {
+   "id": "lumber",
+   "name": "Framing lumber",
+   "quantity": 14122,
+   "unit": "board ft",
+   "unitCost": 1.05,
+   "cost": 14828
+  },
+  {
+   "id": "sheathing",
+   "name": "OSB sheathing, walls and roof",
+   "quantity": 200,
+   "unit": "sheets",
+   "unitCost": 24,
+   "cost": 4808
+  },
+  {
+   "id": "roofing",
+   "name": "Standing-seam metal",
+   "quantity": 22,
+   "unit": "squares",
+   "unitCost": 1150,
+   "cost": 25639
+  },
+  {
+   "id": "cladding",
+   "name": "Board-and-batten siding",
+   "quantity": 3305,
+   "unit": "sq ft",
+   "unitCost": 8.2,
+   "cost": 27104
+  },
+  {
+   "id": "windows",
+   "name": "Windows (double-glazed, low-e)",
+   "quantity": 12,
+   "unit": "units",
+   "unitCost": 1450,
+   "cost": 17400
+  },
+  {
+   "id": "doors",
+   "name": "Exterior doors",
+   "quantity": 3,
+   "unit": "units",
+   "unitCost": 1600,
+   "cost": 4800
+  },
+  {
+   "id": "insulation",
+   "name": "Insulation, walls and roof",
+   "quantity": 4702,
+   "unit": "sq ft",
+   "unitCost": 2.9,
+   "cost": 13635
+  },
+  {
+   "id": "drywall",
+   "name": "Drywall",
+   "quantity": 295,
+   "unit": "sheets",
+   "unitCost": 16,
+   "cost": 4719
+  },
+  {
+   "id": "flooring",
+   "name": "Flooring",
+   "quantity": 2207,
+   "unit": "sq ft",
+   "unitCost": 6.5,
+   "cost": 14343
+  },
+  {
+   "id": "garage-door",
+   "name": "Garage door (2-car)",
+   "quantity": 1,
+   "unit": "unit",
+   "unitCost": 2600,
+   "cost": 2600
+  }
+ ],
+ "overTime": {
+  "years": 30,
+  "assumptions": {
+   "inflation": 0.028,
+   "appreciation": 0.034,
+   "energyPricePerKWh": 0.17,
+   "intensityKWhPerM2": 53.36
+  },
+  "rows": [
+   {
+    "year": 0,
+    "maintenance": 0,
+    "energy": 0,
+    "replacements": 0,
+    "value": 513661
+   },
+   {
+    "year": 1,
+    "maintenance": 4752,
+    "energy": 1912,
+    "replacements": 0,
+    "value": 528735
+   },
+   {
+    "year": 2,
+    "maintenance": 4885,
+    "energy": 1965,
+    "replacements": 0,
+    "value": 544241
+   },
+   {
+    "year": 3,
+    "maintenance": 5022,
+    "energy": 2020,
+    "replacements": 0,
+    "value": 560190
+   },
+   {
+    "year": 4,
+    "maintenance": 5163,
+    "energy": 2077,
+    "replacements": 0,
+    "value": 576594
+   },
+   {
+    "year": 5,
+    "maintenance": 5307,
+    "energy": 2135,
+    "replacements": 0,
+    "value": 593466
+   },
+   {
+    "year": 6,
+    "maintenance": 5456,
+    "energy": 2195,
+    "replacements": 0,
+    "value": 610819
+   },
+   {
+    "year": 7,
+    "maintenance": 5609,
+    "energy": 2256,
+    "replacements": 0,
+    "value": 628666
+   },
+   {
+    "year": 8,
+    "maintenance": 5766,
+    "energy": 2319,
+    "replacements": 11669,
+    "value": 649705
+   },
+   {
+    "year": 9,
+    "maintenance": 5927,
+    "energy": 2384,
+    "replacements": 0,
+    "value": 668672
+   },
+   {
+    "year": 10,
+    "maintenance": 6093,
+    "energy": 2451,
+    "replacements": 0,
+    "value": 688178
+   },
+   {
+    "year": 11,
+    "maintenance": 6264,
+    "energy": 2520,
+    "replacements": 0,
+    "value": 708237
+   },
+   {
+    "year": 12,
+    "maintenance": 6439,
+    "energy": 2590,
+    "replacements": 3343,
+    "value": 731933
+   },
+   {
+    "year": 13,
+    "maintenance": 6620,
+    "energy": 2663,
+    "replacements": 0,
+    "value": 753249
+   },
+   {
+    "year": 14,
+    "maintenance": 6805,
+    "energy": 2737,
+    "replacements": 0,
+    "value": 775168
+   },
+   {
+    "year": 15,
+    "maintenance": 6995,
+    "energy": 2814,
+    "replacements": 0,
+    "value": 797707
+   },
+   {
+    "year": 16,
+    "maintenance": 7191,
+    "energy": 2893,
+    "replacements": 14554,
+    "value": 824391
+   },
+   {
+    "year": 17,
+    "maintenance": 7393,
+    "energy": 2974,
+    "replacements": 0,
+    "value": 848339
+   },
+   {
+    "year": 18,
+    "maintenance": 7600,
+    "energy": 3057,
+    "replacements": 0,
+    "value": 872963
+   },
+   {
+    "year": 19,
+    "maintenance": 7812,
+    "energy": 3143,
+    "replacements": 0,
+    "value": 898281
+   },
+   {
+    "year": 20,
+    "maintenance": 8031,
+    "energy": 3231,
+    "replacements": 27900,
+    "value": 928322
+   },
+   {
+    "year": 21,
+    "maintenance": 8256,
+    "energy": 3321,
+    "replacements": 0,
+    "value": 955220
+   },
+   {
+    "year": 22,
+    "maintenance": 8487,
+    "energy": 3414,
+    "replacements": 42436,
+    "value": 987161
+   },
+   {
+    "year": 23,
+    "maintenance": 8725,
+    "energy": 3510,
+    "replacements": 0,
+    "value": 1015738
+   },
+   {
+    "year": 24,
+    "maintenance": 8969,
+    "energy": 3608,
+    "replacements": 22808,
+    "value": 1054284
+   },
+   {
+    "year": 25,
+    "maintenance": 9220,
+    "energy": 3709,
+    "replacements": 0,
+    "value": 1084797
+   },
+   {
+    "year": 26,
+    "maintenance": 9479,
+    "energy": 3813,
+    "replacements": 0,
+    "value": 1116167
+   },
+   {
+    "year": 27,
+    "maintenance": 9744,
+    "energy": 3920,
+    "replacements": 0,
+    "value": 1148415
+   },
+   {
+    "year": 28,
+    "maintenance": 10017,
+    "energy": 4029,
+    "replacements": 0,
+    "value": 1181567
+   },
+   {
+    "year": 29,
+    "maintenance": 10297,
+    "energy": 4142,
+    "replacements": 0,
+    "value": 1215645
+   },
+   {
+    "year": 30,
+    "maintenance": 10586,
+    "energy": 4258,
+    "replacements": 0,
+    "value": 1250674
+   }
+  ],
+  "events": [
+   {
+    "year": 8,
+    "name": "Repaint or reseal exterior",
+    "amount": 11669
+   },
+   {
+    "year": 12,
+    "name": "Replace water heater",
+    "amount": 3343
+   },
+   {
+    "year": 16,
+    "name": "Repaint or reseal exterior",
+    "amount": 14554
+   },
+   {
+    "year": 20,
+    "name": "Replace heating and cooling",
+    "amount": 27900
+   },
+   {
+    "year": 22,
+    "name": "Refresh kitchen and floors",
+    "amount": 42436
+   },
+   {
+    "year": 24,
+    "name": "Repaint or reseal exterior",
+    "amount": 18152
+   },
+   {
+    "year": 24,
+    "name": "Replace water heater",
+    "amount": 4656
+   }
+  ]
+ }
+}
