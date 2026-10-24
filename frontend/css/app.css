@@ -18,7 +18,7 @@
 .brand-mark canvas { width: 28px; height: 28px; }
 .brand-name { font-family: var(--display); font-weight: 300; font-size: 1.375rem; letter-spacing: -0.02em; line-height: 1; }
 .bar-nav { display: flex; gap: 4px; margin-left: auto; padding: 4px; border-radius: 999px; background: var(--panel); box-shadow: var(--shadow); }
-.bar-link { border: 0; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 500; }
+.bar-link { border: 0; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 500; white-space: nowrap; }
 .bar-link:hover { color: var(--ink); background: var(--panel-2); }
 .units { display: inline-flex; padding: 4px; gap: 2px; background: var(--panel); border-radius: 999px; box-shadow: var(--shadow); }
 .units button { min-width: 36px; min-height: 32px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; font-weight: 500; }
@@ -140,7 +140,7 @@ body:has(.panel.is-open) .toolbar { left: calc((100vw - var(--panel-w) - var(--m
 /* Sending */
 .forge { position: relative; aspect-ratio: 800 / 520; border-radius: var(--radius); background: var(--panel-2); overflow: hidden; }
 .forge canvas { width: 100%; height: 100%; }
-.forge-fallback { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 31px, rgba(255, 255, 255, 0.05) 31px 32px), repeating-linear-gradient(0deg, transparent 0 31px, rgba(255, 255, 255, 0.05) 31px 32px); }
+.forge-fallback { position: absolute; inset: 0; }
 .forge.has-rive .forge-fallback { display: none; }
 .log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 0.9375rem; color: var(--muted); }
 .log li::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--control); margin-right: 10px; vertical-align: middle; }
@@ -254,7 +254,9 @@ tfoot td { font-weight: 600; }
 @media (max-width: 760px) {
   .bar { top: 10px; left: 10px; right: 10px; gap: 6px; }
   .brand-name { font-size: 1.125rem; }
-  .bar-link { padding: 8px 10px; font-size: 0.875rem; }
+  .bar-link { padding: 8px 8px; font-size: 0.8125rem; }
+  .brand { padding-right: 10px; }
+  .units button { min-width: 30px; }
   .panel { top: auto; left: 10px; right: 10px; bottom: 10px; width: auto; max-height: 72svh; transform: translateY(24px); border-radius: 16px; }
   .panel.is-open { transform: none; }
   body:has(.panel.is-open) .toolbar { display: none; }

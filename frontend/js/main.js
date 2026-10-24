@@ -50,11 +50,15 @@ map.addLayer(house.layer);
 window.__terrasim = { map, app, house, stopSpin };
 
 const marker = { current: null };
+if (location.hash.startsWith('#s=')) await openShared(location.hash);
+else if (location.hash.startsWith('#l=')) {
+  setTimeout(() => document.querySelector('[data-open="catalog"]').click(), 300);
+}
 getLocation().then((you) => {
   app.you = you;
   if (you) {
     marker.current = locationMarker(map, you);
-    introHint.textContent = 'Click anywhere to fly to where you are.';
+    introHint.textContent = `${matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click'} anywhere to fly to where you are.`;
   } else {
     introHint.textContent = 'Your location wasn’t shared. Spin the globe and click the place you want to see.';
   }
@@ -86,6 +90,40 @@ async function arrive(lngLat) {
   intro.hidden = true;
   setMode('explore');
   toast(app.you ? 'You’re here. Pan around, then outline the land you want to build on.' : 'Pan around, then outline the land you want to build on.');
+}
+
+// ---- share links ------------------------------------------------------------------------------
+// A shared link carries the outline and brief (never builder details) in the URL hash, so a dreamer's
+// design can be shown to someone else without being stored anywhere.
+function encodeShare(data) {
+  const json = JSON.stringify(data);
+  return btoa(String.fromCharCode(...new TextEncoder().encode(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeShare(str) {
+  try {
+    const bin = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+  } catch { return null; }
+}
+function shareLink({ preview = false } = {}) {
+  if (!app.site) return location.href.split('#')[0];
+  const data = { v: 1, r: app.site.ring.map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]), b: app.site.brief, p: preview ? 1 : 0 };
+  return `${location.href.split('#')[0]}#s=${encodeShare(data)}`;
+}
+async function openShared(hash) {
+  const data = decodeShare(hash.slice(3));
+  if (!data?.r || data.r.length < 3) { toast('That link doesn’t contain a site.'); return false; }
+  stopSpin();
+  intro.hidden = true;
+  setGlobe(map, false);
+  app.site = { id: `site-${Date.now().toString(36)}`, ring: data.r, brief: data.b ?? null, mode: 'dream', builder: null, status: 'shared', createdAt: new Date().toISOString() };
+  const c = measure(data.r).centroid;
+  map.jumpTo({ center: c, zoom: 18, pitch: 55, bearing: -20, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+  outliner.load(data.r);
+  setMode('explore');
+  if (data.p) await previewSample();
+  else openBrief();
+  return true;
 }
 
 // ---- toolbar -----------------------------------------------------------------------------------
@@ -136,9 +174,11 @@ function updateHint({ ring, closed }) {
   if (!outliner.active && !closed) return;
   const m = measure(ring);
   const n = ring.length;
-  const msg = n === 0 ? 'Click the first corner of the land.'
-    : n < 3 ? 'Click the next corner.'
-    : 'Keep clicking corners. Click the first corner, or press Enter, to finish.';
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const verb = touch ? 'Tap' : 'Click';
+  const msg = n === 0 ? `${verb} the first corner of the land.`
+    : n < 3 ? `${verb} the next corner.`
+    : touch ? 'Keep tapping corners. Tap the first corner, or Finish, when you’re done.' : 'Keep clicking corners. Click the first corner, or press Enter, to finish.';
   hint.innerHTML = `
     <p class="hint-msg">${msg}</p>
     <dl class="hint-facts num">
@@ -259,9 +299,23 @@ async function previewSample() {
   closePanel();
   if (!placement.fits) toast('The sample house is bigger than this lot, so it hangs over the outline.');
   else toast('Sample house placed on your lot. Click it for details.');
-  const c = measure(app.site.ring).centroid;
-  map.easeTo({ center: c, zoom: Math.max(map.getZoom(), 18.2), pitch: 60, duration: 1600 });
+  frameHouse(placement);
   setTimeout(() => openHouse(), 2900);
+}
+
+// Frames the house in the part of the screen the side panel leaves free.
+function panelPadding() {
+  const wide = innerWidth > 760;
+  return wide
+    ? { top: 80, bottom: 90, left: 40, right: Math.min(460, innerWidth * 0.4) + 40 }
+    : { top: 70, bottom: Math.round(innerHeight * 0.55), left: 20, right: 20 };
+}
+function frameHouse(placement, { duration = 1800 } = {}) {
+  const fp = placement.footprint;
+  const c = [fp.reduce((s, p) => s + p[0], 0) / fp.length, fp.reduce((s, p) => s + p[1], 0) / fp.length];
+  // Look at the front of the house, a little from the side.
+  const bearing = (placement.xAxisBearingDeg + 90 + 180 + 25) % 360;
+  map.easeTo({ center: c, zoom: 19.1, pitch: 62, bearing, duration, padding: panelPadding() });
 }
 
 async function openHouse() {
@@ -274,6 +328,7 @@ async function openHouse() {
     estimate,
     preview: !!design.previewOn,
     onWalk: () => openWalk(design),
+    shareUrl: () => (design.previewOn ? shareLink({ preview: true }) : `${location.href.split('#')[0]}#l=${design.id}`),
     onNight: (on) => { app.night = on; house.setNight(on); renderToolbar(); },
   }));
 }
@@ -302,7 +357,7 @@ document.querySelector('[data-open="catalog"]').addEventListener('click', async 
       setMode('house');
       const c = l.design.placement.footprint[0];
       map.flyTo({ center: c, zoom: 18.3, pitch: 60, bearing: -30, duration: 4500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
-      map.once('moveend', () => { setGlobe(map, false); house.show(l.design, placement); setTimeout(openHouse, 2600); });
+      map.once('moveend', () => { setGlobe(map, false); house.show(l.design, placement); frameHouse(placement); setTimeout(openHouse, 2600); });
     },
   }));
 });

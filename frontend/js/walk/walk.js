@@ -77,8 +77,8 @@ function buildLevel(design, levelIndex) {
   const group = new THREE.Group();
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xefeae2, roughness: 0.92 });
   const extMat = new THREE.MeshStandardMaterial({ color: 0xe5dfd4, roughness: 0.92 });
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0xb08a62, roughness: 0.7 });
-  const wetMat = new THREE.MeshStandardMaterial({ color: 0xc9ccce, roughness: 0.5 });
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0xb08a62, roughness: 0.7, side: THREE.DoubleSide });
+  const wetMat = new THREE.MeshStandardMaterial({ color: 0xc9ccce, roughness: 0.5, side: THREE.DoubleSide });
   const ceilMat = new THREE.MeshStandardMaterial({ color: 0xf7f5f1, roughness: 1, side: THREE.DoubleSide });
   const glassMat = new THREE.MeshStandardMaterial({ color: 0xbfd6ea, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.25 });
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x2b2f33, roughness: 0.6 });
@@ -209,7 +209,8 @@ export function openWalkthrough(host, design) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xa9c3dc);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7a66, 1.6));
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xd9cfc0, 1.5));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
   const sun = new THREE.DirectionalLight(0xfff3e0, 1.4);
   sun.position.set(-6, 12, -10);
   scene.add(sun);
@@ -224,7 +225,6 @@ export function openWalkthrough(host, design) {
   let levelIndex = 0;
   let colliders = [];
 
-  const entry = design.levels[0].openings.find((o) => o.kind === 'entry');
   function setLevel(i, { keepPosition = true } = {}) {
     if (current) scene.remove(current.group);
     levelIndex = i;
@@ -232,13 +232,14 @@ export function openWalkthrough(host, design) {
     scene.add(current.group);
     colliders = current.colliders;
     if (!keepPosition) {
-      if (entry && i === 0) camera.position.set((entry.x1 + entry.x2) / 2, EYE, Math.max(entry.y1, entry.y2) - 1.2);
-      else {
-        const r = design.levels[i].rooms[0];
-        const xs = r.polygon.map((p) => p[0]), ys = r.polygon.map((p) => p[1]);
-        camera.position.set((Math.min(...xs) + Math.max(...xs)) / 2, EYE, (Math.min(...ys) + Math.max(...ys)) / 2);
-      }
-      camera.lookAt(camera.position.x, EYE, camera.position.z - 3);
+      // Start in the biggest room, at its back edge, looking across it toward the front windows.
+      const rooms = design.levels[i].rooms;
+      const r = rooms.reduce((a, b) => (b.areaM2 > a.areaM2 ? b : a), rooms[0]);
+      const xs = r.polygon.map((p) => p[0]), ys = r.polygon.map((p) => p[1]);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const y0 = Math.min(...ys), y1 = Math.max(...ys);
+      camera.position.set(cx, EYE, y1 - Math.min(0.8, (y1 - y0) * 0.25));
+      camera.lookAt(cx, EYE * 0.95, y0);
     }
     host.querySelectorAll('[data-level]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.level) === i)));
   }

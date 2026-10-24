@@ -8,7 +8,7 @@ import { toast } from '../ui/toast.js';
 
 const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['materials', 'Materials'], ['time', 'Over time']];
 
-export function renderHousePanel(el, { design, estimate, preview, onWalk }) {
+export function renderHousePanel(el, { design, estimate, preview, onWalk, shareUrl }) {
   let tab = 'overview';
   let level = 0;
   const cost = estimate.buildCost;
@@ -122,7 +122,9 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk }) {
     if (l) { level = Number(l.dataset.level); draw(); return; }
     if (e.target.closest('[data-walk]')) onWalk();
     if (e.target.closest('[data-share]')) {
-      try { await navigator.clipboard.writeText(location.href); toast('Link copied.'); } catch { toast('Couldn’t copy the link.'); }
+      const url = shareUrl ? shareUrl() : location.href;
+      try { await navigator.clipboard.writeText(url); toast('Link copied. Anyone with it sees this land and the house.'); }
+      catch { prompt('Copy this link:', url); }
     }
     if (e.target.closest('[data-contact]')) toast('Messages to builders arrive once the TerraSim API is connected.');
   });

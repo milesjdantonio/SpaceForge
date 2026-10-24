@@ -7,29 +7,31 @@ import { withBrowser } from './browser.mjs';
 const args = process.argv.slice(2);
 const oi = args.indexOf('--out');
 const out = resolve(oi >= 0 ? args[oi + 1] : join(process.env.TEMP || '.', 'terrasim-flow'));
+const mobile = args.includes('--mobile');
+const VW = mobile ? 390 : 1440, VH = mobile ? 844 : 900;
 mkdirSync(out, { recursive: true });
 const base = 'http://127.0.0.1:5173';
 
 await withBrowser(async (browser) => {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, geolocation: { latitude: 35.6402, longitude: -82.5925 }, permissions: ['geolocation'] });
+  const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, hasTouch: mobile, isMobile: mobile, geolocation: { latitude: 35.6402, longitude: -82.5925 }, permissions: ['geolocation'] });
   const page = await ctx.newPage();
   const logs = [];
   page.on('console', (m) => { if (m.type() === 'error') logs.push(m.text()); });
   page.on('pageerror', (e) => logs.push('pageerror: ' + e.message));
-  const shot = async (name) => { await page.screenshot({ path: join(out, name + '.png') }); console.log('shot', name); };
+  const shot = async (name) => { await page.screenshot({ path: join(out, (mobile ? 'm-' : '') + name + '.png') }); console.log('shot', name); };
   await page.goto(base + '/');
   await page.waitForTimeout(5000);
   await shot('01-globe');
-  await page.mouse.click(720, 300);
+  await page.mouse.click(VW / 2, VH * 0.3);
   await page.waitForTimeout(9000);
   await shot('02-arrived');
   await page.click('[data-act="outline"]');
   await page.waitForTimeout(1200);
   // A lot around the map centre.
-  const pts = [[620, 420], [820, 400], [860, 560], [640, 590]];
+  const pts = mobile ? [[110, 300], [280, 290], [300, 470], [120, 480]] : [[620, 420], [820, 400], [860, 560], [640, 590]];
   for (const [x, y] of pts) { await page.mouse.click(x, y); await page.waitForTimeout(250); }
   await shot('03-drawing');
-  await page.keyboard.press('Enter');
+  if (mobile) await page.click('[data-h="finish"]'); else await page.keyboard.press('Enter');
   await page.waitForTimeout(1200);
   await shot('04-brief');
   await page.click('[data-send]');

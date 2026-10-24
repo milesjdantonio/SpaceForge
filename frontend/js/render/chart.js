@@ -15,6 +15,6 @@ export function renderOverTime(overTime) {
     const h = H - padB - y(cost[i]);
     return `<rect x="${(padL + i * bw + 1).toFixed(1)}" y="${y(cost[i]).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${h.toFixed(1)}" class="${big ? 'bar-hot' : 'bar'}"><title>Year ${r.year}: ${fmt.money(cost[i])}${big ? ' (replacements)' : ''}</title></rect>`;
   }).join('');
-  const ticks = [1, 10, 20, 30].map((yr) => `<text x="${(padL + (yr - 0.5) * bw).toFixed(1)}" y="${H - 6}" class="tick" text-anchor="middle">${yr === 1 ? 'Year 1' : yr}</text>`).join('');
+  const ticks = [1, 10, 20, rows.length].map((yr) => `<text x="${(padL + (yr === 1 ? 0 : yr === rows.length ? yr * bw : (yr - 0.5) * bw)).toFixed(1)}" y="${H - 6}" class="tick" text-anchor="${yr === 1 ? 'start' : yr === rows.length ? 'end' : 'middle'}">${yr === 1 ? 'Year 1' : yr}</text>`).join('');
   return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Yearly cost of ownership over ${rows.length} years">${bars}${ticks}</svg>`;
 }

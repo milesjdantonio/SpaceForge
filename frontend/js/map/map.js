@@ -54,6 +54,8 @@ export async function createMap(container) {
   map.touchZoomRotate.enableRotation();
 
   await new Promise((ok) => map.once('load', ok));
+  // Start with the attribution folded into its (i) button.
+  container.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show');
   // Lift the globe above the intro text.
   map.setPadding({ top: 0, bottom: Math.round(innerHeight * 0.34), left: 0, right: 0 });
   styleBuildings(map);
