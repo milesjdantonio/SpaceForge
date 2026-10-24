@@ -27,4 +27,24 @@ Early/hackathon stage. Architecture and integrations are still being decided —
 
 ## Getting started
 
-Not yet runnable — no backend/frontend scaffolding exists yet. This section will be filled in once the stack is chosen and the initial scaffold is committed.
+The web interface lives in [frontend/](frontend/). It has no build step; you need Node.js 22 or newer
+to serve it.
+
+```bash
+cd frontend
+npm start            # serves http://localhost:5173
+```
+
+Open http://localhost:5173. The globe asks for your location; click anywhere to fly down. Outline land
+with **Outline land**, fill in the brief and send it. Until the design service is connected, sending
+says so and offers to place the one sample house on your land.
+
+- Connect the backend by setting `apiBaseUrl` in `frontend/js/config.js`. The request and response
+  shapes are in [GEMMA.md](GEMMA.md).
+- `npm install` then `npm run vendor` refreshes the vendored libraries (MapLibre, three.js, Rive, Motion).
+- `npm run rive` rebuilds the Rive animations from `frontend/tools/rive/art/`; open
+  http://localhost:5173/lab/rive.html to see them.
+- `node tools/flow.mjs` (with the server running) drives the whole flow in a headless browser and saves
+  screenshots.
+
+Map tiles and satellite imagery need an internet connection.
