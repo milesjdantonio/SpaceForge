@@ -1,6 +1,8 @@
 /* The map is the ground; everything else floats on it. */
 
-.map { position: fixed; inset: 0; background: var(--space); }
+.stars { position: fixed; inset: 0; width: 100vw; height: 100vh; background: var(--space); transition: opacity 900ms var(--ease-out); }
+.map { position: fixed; inset: 0; background: transparent; }
+body:not([data-mode='globe']):not([data-mode='flying']) .stars { opacity: 0; }
 .maplibregl-ctrl-attrib { font-size: 11px; }
 .maplibregl-ctrl-attrib.maplibregl-compact { background: rgba(13, 19, 28, 0.85); color: var(--muted); }
 .maplibregl-ctrl-attrib a { color: var(--muted); }
@@ -27,13 +29,13 @@ body[data-mode='globe'] .bar-nav, body[data-mode='flying'] .bar-nav { opacity: 0
 
 /* Globe intro */
 .intro {
-  position: fixed; z-index: 30; left: 50%; bottom: 9vh; transform: translateX(-50%);
+  position: fixed; z-index: 30; left: 50%; bottom: 3.5vh; transform: translateX(-50%);
   width: min(620px, calc(100vw - 2 * var(--margin)));
   display: grid; gap: 14px; justify-items: center; text-align: center;
   pointer-events: none;
   transition: opacity 600ms var(--ease-out), transform 900ms var(--ease-out);
 }
-.intro-title { font-family: var(--display); font-weight: 100; font-size: clamp(64px, 10vw, 128px); letter-spacing: -0.045em; line-height: 0.85; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6); }
+.intro-title { font-family: var(--display); font-weight: 100; font-size: clamp(60px, 9vw, 116px); letter-spacing: -0.035em; line-height: 0.85; text-shadow: 0 4px 30px rgba(0, 0, 0, 0.6); }
 .intro-sentence { font-size: clamp(1.0625rem, 1rem + 0.4vw, 1.3125rem); line-height: 1.45; max-width: 34ch; text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8); }
 .intro-hint { padding: 10px 16px; border-radius: 999px; background: var(--panel); color: var(--ink); font-weight: 500; box-shadow: var(--shadow); }
 .intro.is-leaving { opacity: 0; transform: translate(-50%, 24px); }
@@ -264,7 +266,7 @@ tfoot td { font-weight: 600; }
   .toolbar .btn span { display: none; }
   .toolbar .btn-primary span { display: inline; }
   .draw-hint { top: 64px; }
-  .intro { bottom: 6vh; }
+  .intro { bottom: 3vh; }
   .row-3 { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .style-grid { grid-template-columns: 1fr 1fr; }
 }

@@ -14,6 +14,7 @@ import { renderSending } from './panels/send.js';
 import { renderHousePanel } from './panels/house.js';
 import { renderCatalog, renderSites } from './panels/lists.js';
 import { mountRive } from './rive.js';
+import { createStarfield } from './map/stars.js';
 
 const $ = (sel) => document.querySelector(sel);
 const body = document.body;
@@ -39,7 +40,8 @@ function setMode(mode) {
 }
 
 // ---- boot --------------------------------------------------------------------------------------
-const { map, stopSpin } = await createMap($('#map'));
+const { map, stopSpin, startSpin } = await createMap($('#map'));
+createStarfield($('#stars'), map);
 const outliner = createOutliner(map, {
   onChange: (s) => updateHint(s),
   onFinish: (ring, { edited }) => onOutlineDone(ring, edited),
@@ -66,8 +68,14 @@ getLocation().then((you) => {
 
 map.on('click', (e) => {
   if (app.mode === 'globe') {
-    const target = app.you ?? [e.lngLat.lng, e.lngLat.lat];
-    arrive(target);
+    // First visit: fly to the visitor. After they've zoomed back out: fly where they clicked,
+    // but only if the click landed on the globe rather than in space beside it.
+    const flyHome = !app.returned && app.you;
+    if (!flyHome) {
+      const back = map.project(e.lngLat);
+      if (Math.hypot(back.x - e.point.x, back.y - e.point.y) > 4) return;
+    }
+    arrive(flyHome ? app.you : [e.lngLat.lng, e.lngLat.lat], { zoom: flyHome ? 17.6 : 16.2 });
     return;
   }
   if (app.mode === 'house' || app.mode === 'explore' || app.mode === 'failed') {
@@ -82,14 +90,45 @@ map.on('mousemove', (e) => {
   map.getCanvas().style.cursor = over ? 'pointer' : app.mode === 'globe' ? 'pointer' : '';
 });
 
-async function arrive(lngLat) {
+// Zooming far out puts the visitor back in the world: the globe returns, ready for a new place.
+const WORLD_ZOOM = 4.2;
+function worldHint() {
+  introHint.textContent = `${matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click'} a place on the globe to fly there.`;
+}
+function backToWorld() {
+  if (outliner.active) outliner.cancel();
+  closePanel();
+  hint.hidden = true;
+  app.returned = true;
+  setGlobe(map, true);
+  setMode('globe');
+  intro.hidden = false;
+  intro.classList.remove('is-leaving');
+  worldHint();
+  map.easeTo({ zoom: 1.9, pitch: 0, bearing: 0, duration: 1600, padding: { top: 0, bottom: Math.round(innerHeight * 0.26), left: 0, right: 0 } });
+  map.once('moveend', () => { if (app.mode === 'globe') startSpin(); });
+}
+map.on('zoomend', () => {
+  const z = map.getZoom();
+  if (z < WORLD_ZOOM && ['explore', 'house', 'failed', 'brief'].includes(app.mode)) backToWorld();
+  // Zooming in on the globe by hand leaves the intro.
+  if (app.mode === 'globe' && z >= 9) {
+    stopSpin();
+    intro.hidden = true;
+    setGlobe(map, false);
+    setMode('explore');
+  }
+});
+
+async function arrive(lngLat, { zoom = 17.6 } = {}) {
   stopSpin();
   setMode('flying');
   intro.classList.add('is-leaving');
-  await flyToGround(map, lngLat);
+  await flyToGround(map, lngLat, { zoom });
   intro.hidden = true;
   setMode('explore');
-  toast(app.you ? 'You’re here. Pan around, then outline the land you want to build on.' : 'Pan around, then outline the land you want to build on.');
+  const atYou = app.you && Math.abs(lngLat[0] - app.you[0]) < 1e-6 && Math.abs(lngLat[1] - app.you[1]) < 1e-6;
+  toast(atYou ? 'You’re here. Pan around, then outline the land you want to build on.' : 'Pan around, then outline the land you want to build on.');
 }
 
 // ---- share links ------------------------------------------------------------------------------
@@ -401,9 +440,12 @@ document.querySelector('.brand').addEventListener('click', (e) => {
   house.hide();
   intro.hidden = false;
   intro.classList.remove('is-leaving');
+  app.returned = true;
   setMode('globe');
   setGlobe(map, true);
-  map.flyTo({ center: [map.getCenter().lng, 20], zoom: 1.6, pitch: 0, bearing: 0, duration: 4000, padding: { top: 0, bottom: Math.round(innerHeight * 0.34), left: 0, right: 0 } });
+  worldHint();
+  map.flyTo({ center: [map.getCenter().lng, 20], zoom: 1.9, pitch: 0, bearing: 0, duration: 4000, padding: { top: 0, bottom: Math.round(innerHeight * 0.26), left: 0, right: 0 } });
+  map.once('moveend', () => { if (app.mode === 'globe') startSpin(); });
 });
 
 // The brand mark is a Rive file; the text wordmark stands alone if it fails.
