@@ -4,6 +4,7 @@ import { fmt } from '../format.js';
 import { measure } from '../lib/place.js';
 import { icon } from '../ui/icons.js';
 import { renderPlan } from '../render/plan.js';
+import { typeName } from '../lib/housing.js';
 
 export function renderCatalog(el, { listings, onOpen }) {
   el.innerHTML = `
@@ -46,7 +47,7 @@ export function renderSites(el, { sites, onOpen, onDelete }) {
     li.className = 'site-row';
     li.innerHTML = `
       <button type="button" class="site-open">
-        <span class="site-name">${s.brief?.style ? cap(s.brief.style) : 'Outline'} · ${m ? fmt.land(m.areaM2) : ''}</span>
+        <span class="site-name">${s.form?.housingType ? typeName(s.form.housingType) : 'Outline'} · ${m ? fmt.land(m.areaM2) : ''}</span>
         <span class="site-meta">${statusText[s.status] ?? 'Draft'} · ${new Date(s.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}${s.mode === 'build' ? ' · Listing' : ''}</span>
       </button>
       <button type="button" class="btn btn-quiet btn-icon" aria-label="Delete this site">${icon('trash')}</button>`;

@@ -1,34 +1,42 @@
-// The brief: what the house should be, and whether this is a private dream or a builder's listing.
+// The brief: what to build on this land. Each required question is its own box and shows its own
+// error when it's empty or out of range; optional questions sit in the Advanced menu at the bottom,
+// where anything left blank is decided by the design system. Rules live in lib/housing.js.
 
 import { fmt } from '../format.js';
 import { problemsFor } from '../lib/place.js';
 import { icon } from '../ui/icons.js';
+import { mountRive } from '../rive.js';
+import {
+  HOUSING_TYPES, BRIEF_RULES, ROOM_TYPES, requiredFields, fieldLabel, fieldHint, briefProblems,
+  STYLES, QUALITY, STRUCTURE, CLADDING, ROOFING, PRIORITIES, EXTRAS, BATHROOM_SHARING, COMMON_SPACES, UNIT_MIX,
+  EMPTY_ADVANCED, advancedFields, advancedProblems, aiDecides, typeName,
+} from '../lib/housing.js';
 
-export const STYLES = [
-  ['modern', 'Modern', 'Flat roofs, long glass walls'],
-  ['farmhouse', 'Farmhouse', 'Steep gables, a deep porch'],
-  ['craftsman', 'Craftsman', 'Low gables, deep eaves'],
-  ['cabin', 'Cabin', 'Steep roof, timber walls'],
-  ['mediterranean', 'Mediterranean', 'Stucco, low tile hips'],
-  ['prairie', 'Prairie', 'Long, low, wide eaves'],
-];
-const PRIORITIES = [['efficiency', 'Energy efficiency'], ['maintenance', 'Low maintenance'], ['light', 'Daylight'], ['privacy', 'Privacy'], ['accessible', 'Step-free living']];
-const EXTRAS = [['office', 'Home office'], ['porch', 'Porch'], ['deck', 'Deck or terrace'], ['basement', 'Basement']];
+export const EMPTY_FORM = {
+  housingType: null,
+  answers: { floors: null, areaM2: null, unitCount: null, bedrooms: null, bathrooms: null, residents: null, roomType: null, budgetUSD: null, noBudgetLimit: false },
+  advanced: structuredClone(EMPTY_ADVANCED),
+};
 
-export const DEFAULT_BRIEF = {
-  style: 'farmhouse', areaM2: 195, floors: 2, bedrooms: 3, bathrooms: 2, garage: 1,
-  extras: [], priorities: ['light'], quality: 'standard', budget: 650000,
-  structure: null, cladding: null, roofing: null, notes: '',
+const STEP = { floors: 1, unitCount: 1, bedrooms: 1, bathrooms: 0.5, residents: 1 };
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const num = (s) => {
+  const t = String(s ?? '').replace(/[^0-9.]/g, '');
+  return t === '' ? null : Number(t);
 };
 
 export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange, onSend }) {
-  const brief = { ...DEFAULT_BRIEF, ...(site.brief || {}) };
+  const form = structuredClone(EMPTY_FORM);
+  if (site.form) {
+    form.housingType = site.form.housingType ?? null;
+    Object.assign(form.answers, site.form.answers || {});
+    Object.assign(form.advanced, structuredClone(site.form.advanced || {}));
+  }
   const builder = { name: '', company: '', email: '', landowner: '', permission: false, ...(site.builder || {}) };
   let mode = site.mode || 'dream';
-  const problems = problemsFor(m);
-
-  const areaMin = 60, areaMax = 650;
-  const toDisp = (m2) => Math.round(fmt.toDisplayArea(m2) / (fmt.unitArea() === 'm²' ? 5 : 50)) * (fmt.unitArea() === 'm²' ? 5 : 50);
+  let tried = false;           // after the first send attempt, every problem shows
+  const touched = new Set();   // boxes the user has left, which show their own problem
+  const siteProblems = problemsFor(m);
 
   el.innerHTML = `
     <header class="panel-head">
@@ -46,190 +54,367 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       <div><dt>Longest side</dt><dd>${fmt.len(m.longestEdgeM)}, ${fmt.bearing(m.longestEdgeBearing)}</dd></div>
     </dl>
     <p class="note">Buildable area keeps ${fmt.len(3)} back from every boundary. Local setbacks may differ.</p>
-    ${problems.length ? `<p class="problem">${problems[0]}</p>` : ''}
+    ${siteProblems.length ? `<p class="problem">${siteProblems[0]}</p>` : ''}
     <button type="button" class="text-link edit-outline" data-edit>Adjust the outline</button>
 
     <form class="brief" novalidate>
-      <h3 class="group-title">The house</h3>
-
-      <fieldset class="styles">
-        <legend class="label">Style</legend>
-        <div class="style-grid">
-          ${STYLES.map(([id, name, blurb]) => `
-            <label class="style-option">
-              <input type="radio" name="style" value="${id}" ${brief.style === id ? 'checked' : ''}>
-              <span class="style-card"><span class="style-name">${name}</span><span class="style-blurb">${blurb}</span></span>
-            </label>`).join('')}
+      <section class="qgroup" aria-labelledby="g-type">
+        <h3 class="group-title" id="g-type">What are you building?</h3>
+        <div class="qbox qbox-type" data-field="housingType">
+          <div class="type-grid" role="radiogroup" aria-label="Housing type" aria-describedby="err-housingType">
+            ${HOUSING_TYPES.map((t) => `
+              <label class="type-option">
+                <input type="radio" name="housingType" value="${t.id}" ${form.housingType === t.id ? 'checked' : ''}>
+                <span class="type-card">
+                  <span class="type-art" data-type-art="${t.id}">${icon(`type-${t.id}`)}</span>
+                  <span class="type-name">${t.name}</span>
+                  <span class="type-blurb">${t.blurb}</span>
+                </span>
+              </label>`).join('')}
+          </div>
+          <p class="type-said" data-type-said aria-live="polite"></p>
+          <p class="qerror" id="err-housingType" role="alert"></p>
         </div>
-      </fieldset>
+      </section>
 
-      <div class="field">
-        <label for="area">Size <output class="num" id="area-out"></output></label>
-        <input type="range" id="area" name="areaM2" min="${areaMin}" max="${areaMax}" step="5" value="${brief.areaM2}">
-        <p class="note">Finished living space, not counting the garage.</p>
-      </div>
+      <section class="qgroup" aria-labelledby="g-basics" data-basics></section>
 
-      <div class="row-3">
-        ${stepper('floors', 'Floors', brief.floors, 1, 3)}
-        ${stepper('bedrooms', 'Bedrooms', brief.bedrooms, 1, 7)}
-        ${stepper('bathrooms', 'Bathrooms', brief.bathrooms, 1, 6)}
-      </div>
-
-      <div class="field">
-        <span class="label">Garage</span>
-        <div class="seg" role="radiogroup" aria-label="Garage">
-          ${[[0, 'None'], [1, '1 car'], [2, '2 cars'], [3, '3 cars']].map(([v, t]) => `<label><input type="radio" name="garage" value="${v}" ${brief.garage === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+      <section class="qgroup" aria-labelledby="g-mode">
+        <h3 class="group-title" id="g-mode">Who it’s for</h3>
+        <div class="seg mode-seg" role="radiogroup" aria-label="Who it's for">
+          <label><input type="radio" name="mode" value="dream" ${mode === 'dream' ? 'checked' : ''}><span>Just me, privately</span></label>
+          <label><input type="radio" name="mode" value="build" ${mode === 'build' ? 'checked' : ''}><span>A listing I’ll build</span></label>
         </div>
-      </div>
-
-      <div class="field">
-        <span class="label">Finishes</span>
-        <div class="seg" role="radiogroup" aria-label="Finishes">
-          ${[['essential', 'Essential'], ['standard', 'Standard'], ['premium', 'Premium']].map(([v, t]) => `<label><input type="radio" name="quality" value="${v}" ${brief.quality === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+        <p class="note mode-note"></p>
+        <div class="builder" ${mode === 'build' ? '' : 'hidden'}>
+          ${textBox('b-name', 'Your name', builder.name, { autocomplete: 'name' })}
+          ${textBox('b-company', 'Company', builder.company, { autocomplete: 'organization', optional: true })}
+          ${textBox('b-email', 'Email for inquiries', builder.email, { autocomplete: 'email', type: 'email' })}
+          ${textBox('b-owner', 'Landowner’s name', builder.landowner)}
+          <div class="qbox qbox-plain" data-field="b-permission">
+            <label class="check"><input type="checkbox" name="b-permission" ${builder.permission ? 'checked' : ''} aria-describedby="err-b-permission"><span>I have the landowner’s permission to design for this land and list the design.</span></label>
+            <p class="qerror" id="err-b-permission" role="alert"></p>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="field">
-        <label for="budget">Budget for the build</label>
-        <div class="input-money"><span>$</span><input class="input num" id="budget" name="budget" inputmode="numeric" value="${brief.budget ? brief.budget.toLocaleString('en-US') : ''}" placeholder="No limit"></div>
-      </div>
-
-      <fieldset class="chips">
-        <legend class="label">What matters most</legend>
-        ${PRIORITIES.map(([v, t]) => `<label class="chip"><input type="checkbox" name="priorities" value="${v}" ${brief.priorities.includes(v) ? 'checked' : ''}><span>${t}</span></label>`).join('')}
-      </fieldset>
-
-      <fieldset class="chips">
-        <legend class="label">Extras</legend>
-        ${EXTRAS.map(([v, t]) => `<label class="chip"><input type="checkbox" name="extras" value="${v}" ${brief.extras.includes(v) ? 'checked' : ''}><span>${t}</span></label>`).join('')}
-      </fieldset>
-
-      <div class="field">
-        <label for="notes">Anything else</label>
-        <textarea class="input" id="notes" name="notes" maxlength="600" placeholder="A view to keep, a tree to save, a room you need">${brief.notes || ''}</textarea>
-      </div>
-
-      <h3 class="group-title">Who it’s for</h3>
-      <div class="seg mode-seg" role="radiogroup" aria-label="Who it's for">
-        <label><input type="radio" name="mode" value="dream" ${mode === 'dream' ? 'checked' : ''}><span>Just me, privately</span></label>
-        <label><input type="radio" name="mode" value="build" ${mode === 'build' ? 'checked' : ''}><span>A listing I’ll build</span></label>
-      </div>
-      <p class="note mode-note"></p>
-
-      <div class="builder" ${mode === 'build' ? '' : 'hidden'}>
-        <div class="row-2">
-          <div class="field"><label for="b-name">Your name</label><input class="input" id="b-name" name="b-name" autocomplete="name" value="${esc(builder.name)}"></div>
-          <div class="field"><label for="b-company">Company</label><input class="input" id="b-company" name="b-company" autocomplete="organization" value="${esc(builder.company)}"></div>
-        </div>
-        <div class="field"><label for="b-email">Email for inquiries</label><input class="input" id="b-email" name="b-email" type="email" autocomplete="email" value="${esc(builder.email)}"></div>
-        <div class="field"><label for="b-owner">Landowner’s name</label><input class="input" id="b-owner" name="b-owner" value="${esc(builder.landowner)}"></div>
-        <label class="check"><input type="checkbox" name="b-permission" ${builder.permission ? 'checked' : ''}><span>I have the landowner’s permission to design for this land and list the design.</span></label>
-      </div>
+      <details class="advanced" data-advanced>
+        <summary>
+          <span class="adv-title">Advanced</span>
+          <span class="adv-sub">Optional. Anything you leave blank, the design system decides.</span>
+          <span class="adv-count num" data-adv-count></span>
+        </summary>
+        <div class="adv-body" data-adv-body></div>
+      </details>
 
       <div class="send-row">
+        <p class="send-summary" data-summary aria-live="polite"></p>
         <button type="submit" class="btn btn-primary btn-wide" data-send>Send to the design service</button>
-        <p class="note send-note" aria-live="polite"></p>
       </div>
     </form>`;
 
-  const form = el.querySelector('form');
-  const areaOut = el.querySelector('#area-out');
+  const formEl = el.querySelector('form');
+  const basics = el.querySelector('[data-basics]');
+  const advBody = el.querySelector('[data-adv-body]');
   const builderBox = el.querySelector('.builder');
   const modeNote = el.querySelector('.mode-note');
-  const sendBtn = el.querySelector('[data-send]');
-  const sendNote = el.querySelector('.send-note');
+  const summary = el.querySelector('[data-summary]');
 
-  const read = () => {
-    const fd = new FormData(form);
-    const budget = Number(String(fd.get('budget') || '').replace(/[^0-9]/g, '')) || null;
-    return {
-      brief: {
-        style: fd.get('style'),
-        areaM2: Number(fd.get('areaM2')),
-        floors: Number(fd.get('floors')),
-        bedrooms: Number(fd.get('bedrooms')),
-        bathrooms: Number(fd.get('bathrooms')),
-        garage: Number(fd.get('garage')),
-        quality: fd.get('quality'),
-        budget,
-        priorities: fd.getAll('priorities'),
-        extras: fd.getAll('extras'),
-        notes: String(fd.get('notes') || '').trim(),
-        structure: null, cladding: null, roofing: null,
-      },
-      mode: fd.get('mode'),
-      builder: {
-        name: String(fd.get('b-name') || '').trim(),
-        company: String(fd.get('b-company') || '').trim(),
-        email: String(fd.get('b-email') || '').trim(),
-        landowner: String(fd.get('b-owner') || '').trim(),
-        permission: fd.get('b-permission') === 'on',
-      },
-    };
+  // Housing type pictures: Rive when it loads, the icon otherwise.
+  for (const slot of el.querySelectorAll('[data-type-art]')) {
+    const id = slot.dataset.typeArt;
+    const card = slot.closest('.type-option');
+    const h = mountRive(slot, { src: 'assets/rive/types.riv', artboard: typeArtboard(id), stateMachine: 'Type', hoverInput: 'hover', hoverTarget: card });
+    if (h) slot.__rive = h;
+  }
+  const syncTypeArt = () => {
+    for (const slot of el.querySelectorAll('[data-type-art]')) slot.__rive?.set('selected', slot.dataset.typeArt === form.housingType);
   };
 
-  const validate = (v) => {
-    if (problems.length) return problems[0];
-    if (v.mode === 'build') {
-      if (!v.builder.name) return 'Add your name so buyers know who they’re writing to.';
-      if (!/^\S+@\S+\.\S+$/.test(v.builder.email)) return 'Add an email address for inquiries.';
-      if (!v.builder.landowner) return 'Add the landowner’s name.';
-      if (!v.builder.permission) return 'Confirm you have the landowner’s permission to list this design.';
+  // ---- the basics ------------------------------------------------------------------------------
+  function renderBasics() {
+    const type = form.housingType;
+    if (!type) {
+      basics.innerHTML = `<h3 class="group-title" id="g-basics">The basics</h3><p class="note">Choose a type above and its questions appear here.</p>`;
+      return;
     }
-    return '';
-  };
+    const fields = requiredFields(type);
+    basics.innerHTML = `
+      <h3 class="group-title" id="g-basics">${typeName(type)}: the basics</h3>
+      <p class="note">Every box here is needed.</p>
+      <div class="qgrid">${fields.map((f) => basicBox(f, type)).join('')}</div>`;
+  }
 
-  const sync = () => {
-    const v = read();
-    areaOut.textContent = `${fmt.area(v.brief.areaM2)}`;
-    mode = v.mode;
+  function basicBox(f, type) {
+    const a = form.answers;
+    const hint = fieldHint(f, type);
+    const label = fieldLabel(f, type);
+    const err = `<p class="qerror" id="err-${f}" role="alert"></p>`;
+    if (f === 'roomType') {
+      return `<div class="qbox qbox-wide" data-field="roomType">
+        <span class="qlabel" id="l-roomType">${label}</span>
+        <div class="seg" role="radiogroup" aria-labelledby="l-roomType" aria-describedby="err-roomType">
+          ${ROOM_TYPES.map(([v, t]) => `<label><input type="radio" name="roomType" value="${v}" ${a.roomType === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+        </div>${err}</div>`;
+    }
+    if (f === 'budgetUSD') {
+      return `<div class="qbox qbox-wide" data-field="budgetUSD">
+        <label class="qlabel" for="q-budgetUSD">${label}</label>
+        <div class="qinput"><span class="qaffix">$</span><input id="q-budgetUSD" name="budgetUSD" class="qcontrol num" inputmode="numeric" autocomplete="off" placeholder="Amount in US dollars" value="${a.budgetUSD ? a.budgetUSD.toLocaleString('en-US') : ''}" ${a.noBudgetLimit ? 'disabled' : ''} aria-describedby="err-budgetUSD"></div>
+        <label class="check check-small"><input type="checkbox" name="noBudgetLimit" ${a.noBudgetLimit ? 'checked' : ''}><span>No limit</span></label>
+        ${err}</div>`;
+    }
+    const isArea = f === 'areaM2';
+    const shown = a[f] == null ? '' : isArea ? Math.round(fmt.toDisplayArea(a[f])) : a[f];
+    const [lo, hi] = BRIEF_RULES[type][f];
+    const range = isArea ? `${fmt.area(lo)} to ${fmt.area(hi)}` : `${lo} to ${hi}`;
+    return `<div class="qbox" data-field="${f}">
+      <label class="qlabel" for="q-${f}">${label}</label>
+      <div class="qinput">
+        <button type="button" class="qstep" data-step="-1" data-for="${f}" aria-label="Less">${icon('minus')}</button>
+        <input id="q-${f}" name="${f}" class="qcontrol num" inputmode="decimal" autocomplete="off" placeholder="–" value="${shown}" aria-describedby="hint-${f} err-${f}">
+        ${isArea ? `<span class="qaffix">${fmt.unitArea()}</span>` : ''}
+        <button type="button" class="qstep" data-step="1" data-for="${f}" aria-label="More">${icon('plus')}</button>
+      </div>
+      <p class="qhint" id="hint-${f}">${hint ? `${hint} ` : ''}<span class="num">${range}</span></p>
+      ${err}</div>`;
+  }
+
+  // ---- advanced --------------------------------------------------------------------------------
+  function renderAdvanced() {
+    const type = form.housingType;
+    const adv = form.advanced;
+    if (!type) { advBody.innerHTML = '<p class="note">Choose a type first.</p>'; return; }
+    const show = new Set(advancedFields(type));
+    const seg = (name, opts, value, label) => `<div class="qbox qbox-wide" data-field="${name}">
+      <span class="qlabel" id="l-${name}">${label}</span>
+      <div class="seg" role="radiogroup" aria-labelledby="l-${name}">
+        <label><input type="radio" name="${name}" value="" ${value == null ? 'checked' : ''}><span>Decide for me</span></label>
+        ${opts.map(([v, t]) => `<label><input type="radio" name="${name}" value="${v}" ${String(value) === String(v) ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+      </div><p class="qerror" id="err-${name}" role="alert"></p></div>`;
+    const select = (name, opts, value, label) => `<div class="qbox" data-field="${name}">
+      <label class="qlabel" for="a-${name}">${label}</label>
+      <select class="select qcontrol" id="a-${name}" name="${name}">
+        <option value="">Decide for me</option>
+        ${opts.map(([v, t]) => `<option value="${v}" ${value === v ? 'selected' : ''}>${t}</option>`).join('')}
+      </select></div>`;
+    const chips = (name, opts, values, label) => `<fieldset class="qbox qbox-wide chips" data-field="${name}">
+      <legend class="qlabel">${label}</legend>
+      ${opts.map(([v, t]) => `<label class="chip"><input type="checkbox" name="${name}" value="${v}" ${values.includes(v) ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+    </fieldset>`;
+
+    const parts = [];
+    if (show.has('style')) {
+      parts.push(`<fieldset class="qbox qbox-wide styles" data-field="style">
+        <legend class="qlabel">Style</legend>
+        <div class="style-grid">
+          <label class="style-option"><input type="radio" name="style" value="" ${adv.style == null ? 'checked' : ''}><span class="style-card"><span class="style-name">Decide for me</span><span class="style-blurb">Chosen for the land and climate</span></span></label>
+          ${STYLES.map(([id, name, blurb]) => `
+            <label class="style-option"><input type="radio" name="style" value="${id}" ${adv.style === id ? 'checked' : ''}><span class="style-card"><span class="style-name">${name}</span><span class="style-blurb">${blurb}</span></span></label>`).join('')}
+        </div></fieldset>`);
+    }
+    if (show.has('quality')) parts.push(seg('quality', QUALITY, adv.quality, 'Finishes'));
+    if (show.has('garage')) parts.push(seg('garage', [[0, 'None'], [1, '1 car'], [2, '2 cars'], [3, '3 cars']], adv.garage, type === 'townhouse' || type === 'duplex' ? 'Garage for each home' : 'Garage'));
+    if (show.has('parkingSpaces')) {
+      parts.push(`<div class="qbox" data-field="parkingSpaces">
+        <label class="qlabel" for="a-parkingSpaces">Parking spaces</label>
+        <div class="qinput"><input id="a-parkingSpaces" name="parkingSpaces" class="qcontrol num" inputmode="numeric" placeholder="Decide for me" value="${adv.parkingSpaces ?? ''}"></div>
+        <p class="qhint">For the whole site.</p><p class="qerror" id="err-parkingSpaces" role="alert"></p></div>`);
+    }
+    parts.push(`<div class="qgrid qgrid-3">
+      ${select('structure', STRUCTURE, adv.structure, 'Structure')}
+      ${select('cladding', CLADDING, adv.cladding, 'Outside walls')}
+      ${select('roofing', ROOFING, adv.roofing, 'Roof')}
+    </div>`);
+    parts.push(chips('priorities', PRIORITIES, adv.priorities, 'What matters most'));
+    parts.push(chips('extras', EXTRAS, adv.extras, 'Extras'));
+    if (show.has('unitMix')) {
+      parts.push(`<fieldset class="qbox qbox-wide" data-field="unitMix">
+        <legend class="qlabel">Mix of homes</legend>
+        <div class="qgrid qgrid-4">
+          ${UNIT_MIX.map(([k, t]) => `<label class="mini"><span>${t}</span><input class="qcontrol num" name="mix-${k}" inputmode="numeric" placeholder="–" value="${adv.unitMix?.[k] ?? ''}"></label>`).join('')}
+        </div>
+        <p class="qhint">Leave all blank to let the design system choose. If you fill any, they should add up to the number of homes.</p>
+        <p class="qerror" id="err-unitMix" role="alert"></p></fieldset>`);
+    }
+    if (show.has('bathroomSharing')) parts.push(seg('bathroomSharing', BATHROOM_SHARING, adv.bathroomSharing, 'Bathrooms'));
+    if (show.has('commonSpaces')) parts.push(chips('commonSpaces', COMMON_SPACES, adv.commonSpaces, 'Shared spaces'));
+    parts.push(`<div class="qbox qbox-wide" data-field="notes">
+      <label class="qlabel" for="a-notes">Anything else</label>
+      <textarea class="input qcontrol" id="a-notes" name="notes" maxlength="600" placeholder="A view to keep, a tree to save, a room you need">${esc(adv.notes)}</textarea>
+    </div>`);
+    advBody.innerHTML = parts.join('');
+  }
+
+  // ---- reading and checking --------------------------------------------------------------------
+  function read() {
+    const fd = new FormData(formEl);
+    form.housingType = fd.get('housingType') || null;
+    const a = form.answers;
+    for (const f of ['floors', 'unitCount', 'bedrooms', 'bathrooms', 'residents']) {
+      if (formEl.elements[f]) a[f] = num(fd.get(f));
+    }
+    if (formEl.elements.areaM2) {
+      const v = num(fd.get('areaM2'));
+      a.areaM2 = v == null ? null : Math.round(fmt.fromDisplayArea(v) * 10) / 10;
+    }
+    if (formEl.elements.roomType) a.roomType = fd.get('roomType') || null;
+    if (formEl.elements.noBudgetLimit) {
+      a.noBudgetLimit = fd.get('noBudgetLimit') === 'on';
+      a.budgetUSD = num(fd.get('budgetUSD'));
+    }
+    const adv = form.advanced;
+    if (advBody.querySelector('[name]')) {
+      const one = (k) => (formEl.elements[k] ? (fd.get(k) || null) : adv[k]);
+      adv.style = one('style');
+      adv.quality = one('quality');
+      adv.garage = formEl.elements.garage ? (fd.get('garage') === '' || fd.get('garage') == null ? null : Number(fd.get('garage'))) : adv.garage;
+      adv.parkingSpaces = formEl.elements.parkingSpaces ? num(fd.get('parkingSpaces')) : adv.parkingSpaces;
+      adv.structure = one('structure');
+      adv.cladding = one('cladding');
+      adv.roofing = one('roofing');
+      adv.priorities = fd.getAll('priorities');
+      adv.extras = fd.getAll('extras');
+      if (formEl.elements['mix-studio']) for (const [k] of UNIT_MIX) adv.unitMix[k] = num(fd.get(`mix-${k}`));
+      adv.bathroomSharing = formEl.elements.bathroomSharing ? one('bathroomSharing') : adv.bathroomSharing;
+      if (formEl.elements.commonSpaces || advBody.querySelector('[name="commonSpaces"]')) adv.commonSpaces = fd.getAll('commonSpaces');
+      adv.notes = String(fd.get('notes') ?? adv.notes ?? '').trim() || null;
+    }
+    mode = fd.get('mode');
+    Object.assign(builder, {
+      name: String(fd.get('b-name') || '').trim(),
+      company: String(fd.get('b-company') || '').trim(),
+      email: String(fd.get('b-email') || '').trim(),
+      landowner: String(fd.get('b-owner') || '').trim(),
+      permission: fd.get('b-permission') === 'on',
+    });
+  }
+
+  function problems() {
+    const p = { ...briefProblems(form.housingType, form.answers, fmt.area) };
+    if (form.housingType) Object.assign(p, advancedProblems(form.housingType, form.advanced, form.answers.unitCount));
+    if (mode === 'build') {
+      if (!builder.name) p['b-name'] = 'Add your name so buyers know who they’re writing to.';
+      if (!/^\S+@\S+\.\S+$/.test(builder.email)) p['b-email'] = builder.email ? 'That email address doesn’t look complete.' : 'Add an email address for inquiries.';
+      if (!builder.landowner) p['b-owner'] = 'Add the landowner’s name.';
+      if (!builder.permission) p['b-permission'] = 'Confirm you have the landowner’s permission to list this design.';
+    }
+    return p;
+  }
+
+  function showProblems(p) {
+    for (const box of el.querySelectorAll('.qbox[data-field]')) {
+      const f = box.dataset.field;
+      const msg = p[f] && (tried || touched.has(f)) ? p[f] : '';
+      box.classList.toggle('has-error', !!msg);
+      const out = box.querySelector('.qerror');
+      if (out) out.innerHTML = msg ? `${icon('alert')}<span>${msg}</span>` : '';
+      box.querySelector('.qcontrol, input')?.setAttribute('aria-invalid', String(!!msg));
+    }
+    const n = Object.keys(p).length + (siteProblems.length ? 1 : 0);
+    summary.textContent = siteProblems.length ? siteProblems[0]
+      : tried && n ? `${n === 1 ? 'One box needs' : `${n} boxes need`} an answer before sending.`
+      : '';
+    summary.classList.toggle('is-error', !!(siteProblems.length || (tried && n)));
+    // Advanced boxes with a problem open the menu so the error is seen.
+    if (tried && ['unitMix', 'parkingSpaces'].some((k) => p[k])) el.querySelector('[data-advanced]').open = true;
+  }
+
+  function sync() {
+    read();
+    const type = form.housingType;
     builderBox.hidden = mode !== 'build';
     modeNote.textContent = mode === 'build'
       ? 'Listings appear in the catalog, and inquiries go to you.'
       : 'Only you see it. Share it with a link if you like; it is never listed.';
-    const problem = validate(v);
-    sendBtn.disabled = !!problem;
-    sendNote.textContent = problem;
-    onChange({ brief: v.brief, mode: v.mode, builder: v.builder });
-  };
+    const chosen = type ? advancedFields(type).length - aiDecides(type, form.advanced).length : 0;
+    el.querySelector('[data-adv-count]').textContent = chosen ? `${chosen} set` : '';
+    syncTypeArt();
+    el.querySelector('[data-type-said]').textContent = type ? HOUSING_TYPES.find((t) => t.id === type).blurb + '.' : '';
+    showProblems(problems());
+    onChange({ form: structuredClone(form), mode, builder: { ...builder } });
+  }
 
-  form.addEventListener('input', sync);
-  form.addEventListener('change', sync);
-  form.addEventListener('click', (e) => {
-    const step = e.target.closest('[data-step]');
-    if (!step) return;
-    const input = form.elements[step.dataset.name];
-    const v = Math.max(Number(input.min), Math.min(Number(input.max), Number(input.value) + Number(step.dataset.step)));
-    input.value = v;
-    form.querySelector(`[data-show="${step.dataset.name}"]`).textContent = v;
+  // ---- events ----------------------------------------------------------------------------------
+  formEl.addEventListener('change', (e) => {
+    if (e.target.name === 'housingType') {
+      read();
+      renderBasics();
+      renderAdvanced();
+      touched.delete('housingType');
+    }
+    if (e.target.name === 'noBudgetLimit') {
+      const input = formEl.elements.budgetUSD;
+      input.disabled = e.target.checked;
+      if (e.target.checked) input.value = '';
+      touched.add('budgetUSD');
+    }
     sync();
   });
-  form.elements.budget.addEventListener('blur', (e) => {
-    const n = Number(e.target.value.replace(/[^0-9]/g, ''));
-    e.target.value = n ? n.toLocaleString('en-US') : '';
+  formEl.addEventListener('input', sync);
+  formEl.addEventListener('focusout', (e) => {
+    const box = e.target.closest('.qbox[data-field]');
+    if (!box || box.contains(e.relatedTarget)) return;
+    // A box shows its problem once it has something in it, or after a send attempt.
+    if (String(e.target.value ?? '').trim() !== '') touched.add(box.dataset.field);
+    if (e.target.name === 'budgetUSD') {
+      const n = num(e.target.value);
+      e.target.value = n ? n.toLocaleString('en-US') : '';
+    }
+    showProblems(problems());
   });
-  form.addEventListener('submit', (e) => {
+  formEl.addEventListener('click', (e) => {
+    const step = e.target.closest('[data-step]');
+    if (!step) return;
+    const f = step.dataset.for;
+    const input = formEl.elements[f];
+    const isArea = f === 'areaM2';
+    const [lo, hi] = BRIEF_RULES[form.housingType][f];
+    const stepBy = isArea ? (fmt.unitArea() === 'm²' ? 5 : 50) : STEP[f];
+    const loD = isArea ? Math.ceil(fmt.toDisplayArea(lo) / stepBy) * stepBy : lo;
+    const hiD = isArea ? Math.floor(fmt.toDisplayArea(hi) / stepBy) * stepBy : hi;
+    const cur = num(input.value);
+    let next;
+    if (cur == null) next = Number(step.dataset.step) > 0 ? loD : hiD;
+    else next = Math.round((cur + stepBy * Number(step.dataset.step)) / stepBy) * stepBy;
+    input.value = Math.max(loD, Math.min(hiD, next));
+    touched.add(f);
+    sync();
+  });
+  formEl.addEventListener('submit', (e) => {
     e.preventDefault();
-    const v = read();
-    if (validate(v)) return;
-    onChange(v);
+    read();
+    tried = true;
+    const p = problems();
+    showProblems(p);
+    if (siteProblems.length) return;
+    const first = Object.keys(p)[0];
+    if (first) {
+      const box = el.querySelector(`.qbox[data-field="${first}"]`);
+      if (box?.closest('details')) box.closest('details').open = true;
+      box?.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+      (box?.querySelector('input:not([type=hidden]):not(:disabled), select, textarea'))?.focus({ preventScroll: true });
+      return;
+    }
+    onChange({ form: structuredClone(form), mode, builder: { ...builder } });
     onSend();
   });
   el.querySelector('[data-edit]').addEventListener('click', onEditOutline);
-  void toDisp;
+
+  renderBasics();
+  renderAdvanced();
   sync();
 }
 
-function stepper(name, label, value, min, max) {
-  return `<div class="field stepper">
-    <span class="label" id="${name}-l">${label}</span>
-    <div class="stepper-row" role="group" aria-labelledby="${name}-l">
-      <button type="button" class="btn btn-small btn-icon" data-step="-1" data-name="${name}" aria-label="Fewer ${label.toLowerCase()}">−</button>
-      <output class="num" data-show="${name}">${value}</output>
-      <button type="button" class="btn btn-small btn-icon" data-step="1" data-name="${name}" aria-label="More ${label.toLowerCase()}">+</button>
-      <input type="hidden" name="${name}" value="${value}" min="${min}" max="${max}">
-    </div>
+function textBox(id, label, value, { autocomplete, type = 'text', optional = false } = {}) {
+  return `<div class="qbox qbox-plain" data-field="${id}">
+    <label class="qlabel" for="${id}">${label}${optional ? ' <span class="optional">(optional)</span>' : ''}</label>
+    <input class="input qcontrol" id="${id}" name="${id}" type="${type}" ${autocomplete ? `autocomplete="${autocomplete}"` : ''} value="${esc(value)}" aria-describedby="err-${id}">
+    <p class="qerror" id="err-${id}" role="alert"></p>
   </div>`;
 }
 
-const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// Artboard names in types.riv.
+export function typeArtboard(id) {
+  return { house: 'House', 'tiny-home': 'Tiny', townhouse: 'Townhouse', duplex: 'Duplex', apartment: 'Apartment', condo: 'Condo', dorm: 'Dorm' }[id];
+}

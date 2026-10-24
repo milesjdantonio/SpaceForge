@@ -5,6 +5,7 @@ import { mountRive } from '../rive.js';
 import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
 import { config } from '../config.js';
+import { typeName } from '../lib/housing.js';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -13,7 +14,7 @@ export function renderSending(el, { request, run, onFailed, onRetry, onEdit, onP
     <header class="panel-head">
       <div>
         <h2 class="panel-title">Sending your land</h2>
-        <p class="panel-sub">${request.mode === 'build' ? 'As a listing' : 'Privately'} · ${request.brief.bedrooms} bed · ${request.brief.style}</p>
+        <p class="panel-sub">${request.mode === 'build' ? 'As a listing' : 'Privately'} · ${typeName(request.housingType)} · ${request.brief.floors} ${request.brief.floors === 1 ? 'floor' : 'floors'}</p>
       </div>
     </header>
     <div class="forge" data-rive-slot>
@@ -41,7 +42,7 @@ export function renderSending(el, { request, run, onFailed, onRetry, onEdit, onP
     const corners = request.site.geometry.coordinates[0].length - 1;
     line(`Packing the outline: ${corners} corners.`);
     await wait(700);
-    line('Adding the brief and your units.');
+    line(`Adding the brief: ${request.aiDecides.length ? `${request.aiDecides.length} choices left to the design system` : 'every choice made by you'}.`);
     await wait(650);
     line('Contacting the design service…');
     await wait(900);
@@ -60,7 +61,7 @@ export function renderSending(el, { request, run, onFailed, onRetry, onEdit, onP
         <div class="fail-card">
           <h3 class="fail-title">${notConnected ? 'Not sent: the design service isn’t connected yet' : 'Not sent'}</h3>
           <p>${notConnected
-            ? 'TerraSim’s design system (Gemma) will draw a house for this land once its API is connected. Your outline and brief are saved under My sites, ready to send.'
+            ? 'TerraSim’s design system (Gemma) will design a building for this land once its API is connected. Your outline and brief are saved under My sites, ready to send.'
             : 'Your outline and brief are saved under My sites. Try again in a moment.'}</p>
           <div class="fail-actions">
             ${config.showSample ? `<button type="button" class="btn btn-primary" data-a="preview">${icon('house')}<span>Preview with the sample house</span></button>` : ''}

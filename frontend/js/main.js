@@ -10,6 +10,7 @@ import { api } from './api/client.js';
 import { icon } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { renderBriefPanel } from './panels/brief.js';
+import { buildRequest } from './api/request.js';
 import { renderSending } from './panels/send.js';
 import { renderHousePanel } from './panels/house.js';
 import { renderCatalog, renderSites } from './panels/lists.js';
@@ -29,7 +30,7 @@ const app = {
   basemap: 'satellite',
   tilted: true,
   night: false,
-  site: null,      // { id, ring, brief, mode, builder, status }
+  site: null,      // { id, ring, form, mode, builder, status }
   you: null,       // visitor location [lng, lat]
 };
 
@@ -146,7 +147,7 @@ function decodeShare(str) {
 }
 function shareLink({ preview = false } = {}) {
   if (!app.site) return location.href.split('#')[0];
-  const data = { v: 1, r: app.site.ring.map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]), b: app.site.brief, p: preview ? 1 : 0 };
+  const data = { v: 2, r: app.site.ring.map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]), f: app.site.form ?? null, p: preview ? 1 : 0 };
   return `${location.href.split('#')[0]}#s=${encodeShare(data)}`;
 }
 async function openShared(hash) {
@@ -155,7 +156,7 @@ async function openShared(hash) {
   stopSpin();
   intro.hidden = true;
   setGlobe(map, false);
-  app.site = { id: `site-${Date.now().toString(36)}`, ring: data.r, brief: data.b ?? null, mode: 'dream', builder: null, status: 'shared', createdAt: new Date().toISOString() };
+  app.site = { id: `site-${Date.now().toString(36)}`, ring: data.r, form: data.v === 2 ? data.f ?? null : null, mode: 'dream', builder: null, status: 'shared', createdAt: new Date().toISOString() };
   const c = measure(data.r).centroid;
   map.jumpTo({ center: c, zoom: 18, pitch: 55, bearing: -20, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
   outliner.load(data.r);
@@ -251,7 +252,7 @@ function onOutlineDone(ring, edited) {
   app.site = {
     id: `site-${Date.now().toString(36)}`,
     ring,
-    brief: store.get('lastBrief', null),
+    form: store.get('lastForm', null),
     mode: 'dream',
     builder: store.get('builder', null),
     status: 'draft',
@@ -288,14 +289,15 @@ function openBrief() {
     site: app.site,
     measure: measure(app.site.ring),
     onEditOutline: () => { closePanel(); outliner.load(app.site.ring); toast('Drag the corners to adjust the outline.'); setMode('explore'); },
-    onChange: (patch) => { Object.assign(app.site, patch); if (patch.brief) store.set('lastBrief', patch.brief); if (patch.builder) store.set('builder', patch.builder); saveSite(); },
+    onChange: (patch) => { Object.assign(app.site, patch); if (patch.form) store.set('lastForm', patch.form); if (patch.builder) store.set('builder', patch.builder); saveSite(); },
     onSend: () => send(),
   }));
 }
 
 async function send() {
   setMode('sending');
-  const request = buildRequest();
+  const request = buildRequest(app.site);
+  app.site.lastRequestId = request.id;
   openPanel((el) => renderSending(el, {
     request,
     run: () => api.submitDesign(request),
@@ -309,23 +311,6 @@ async function send() {
     onEdit: () => openBrief(),
     onPreview: () => previewSample(),
   }));
-}
-
-function buildRequest() {
-  const m = measure(app.site.ring);
-  const ring = app.site.ring.map((p) => [+p[0].toFixed(7), +p[1].toFixed(7)]);
-  return {
-    schema: 'terrasim.design-request/1',
-    site: {
-      type: 'Feature',
-      geometry: { type: 'Polygon', coordinates: [[...ring, ring[0]]] },
-      properties: { areaM2: Math.round(m.areaM2), perimeterM: Math.round(m.perimeterM), centroid: m.centroid.map((v) => +v.toFixed(6)), setbackM: 3 },
-    },
-    brief: app.site.brief,
-    mode: app.site.mode,
-    builder: app.site.mode === 'build' ? app.site.builder : null,
-    client: { units: settings.units, createdAt: new Date().toISOString() },
-  };
 }
 
 async function previewSample() {
