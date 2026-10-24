@@ -96,6 +96,7 @@ export async function createMap(container) {
     if (l.type === 'symbol' && /poi|transit|airport|aeroway/.test(l.id)) map.setLayoutProperty(l.id, 'visibility', 'none');
   }
   setBasemap(map, 'satellite');
+  styleBoundariesAndLabels(map);
 
   // A slow spin while the globe waits for the visitor; any touch of the map stops it.
   let spinning = false;
@@ -104,7 +105,9 @@ export async function createMap(container) {
     const c = map.getCenter();
     map.easeTo({ center: [c.lng + 12, c.lat], duration: 4000, easing: (t) => t });
   };
-  map.on('moveend', () => { if (spinning) spin(); });
+  // The next turn starts on the following frame: starting an ease inside moveend lets MapLibre
+  // clear the new ease's state as it finishes the old one.
+  map.on('moveend', () => { if (spinning) requestAnimationFrame(spin); });
   const stopSpin = () => { if (spinning) { spinning = false; map.stop(); } };
   const startSpin = () => {
     if (spinning || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -157,25 +160,64 @@ export function setEvening(map, on) {
   if (bg) map.setPaintProperty(bg.id, 'background-color', on ? '#1c2330' : '#f8f4f0');
 }
 
-// The visitor's location as a pulsing marker.
-export function locationMarker(map, lngLat) {
-  const el = document.createElement('div');
+// The visitor's location: a pulsing marker that is also a button. Hovering it says what a click
+// does; clicking it flies there.
+export function locationMarker(map, lngLat, { onClick } = {}) {
+  const el = document.createElement('button');
+  el.type = 'button';
   el.className = 'you';
-  el.innerHTML = '<span class="you-pulse"></span><span class="you-dot"></span>';
-  el.setAttribute('aria-label', 'Your location');
-  return new maplibregl.Marker({ element: el }).setLngLat(lngLat).addTo(map);
+  el.innerHTML = '<span class="you-pulse"></span><span class="you-dot"></span><span class="you-label">Fly to your location</span>';
+  el.setAttribute('aria-label', 'Fly to your location');
+  el.addEventListener('click', (e) => { e.stopPropagation(); onClick?.(); });
+  return new maplibregl.Marker({ element: el, opacityWhenCovered: '0' }).setLngLat(lngLat).addTo(map);
 }
 
-// The globe is for the opening; at street level the map is flat mercator (they look the same
-// there), which is what the 3D house layer is placed in.
-export function setGlobe(map, on) {
-  map.setProjection({ type: on ? 'globe' : 'mercator' });
+// Country, state and province borders and place names that read over satellite imagery, from the
+// globe down to street level. Counties and districts appear once zoomed in.
+function styleBoundariesAndLabels(map) {
+  const layers = map.getStyle().layers;
+  const has = (id) => layers.some((l) => l.id === id);
+  if (has('boundary_2')) {
+    map.setPaintProperty('boundary_2', 'line-color', 'rgba(255, 255, 255, 0.78)');
+    map.setPaintProperty('boundary_2', 'line-width', ['interpolate', ['linear'], ['zoom'], 1, 0.7, 5, 1.4, 10, 2]);
+  }
+  const b3 = layers.find((l) => l.id === 'boundary_3');
+  if (b3) {
+    // Replaces the admin-level range in the style's filter: states and provinces are levels 3–4,
+    // counties and districts 5–6.
+    const withLevels = (lo, hi) => JSON.parse(JSON.stringify(b3.filter)
+      .replace('[">=",["get","admin_level"],3]', `[">=",["get","admin_level"],${lo}]`)
+      .replace('["<=",["get","admin_level"],6]', `["<=",["get","admin_level"],${hi}]`));
+    map.setFilter('boundary_3', withLevels(3, 4));
+    map.setLayerZoomRange('boundary_3', 2, 24);
+    map.setPaintProperty('boundary_3', 'line-color', 'rgba(255, 255, 255, 0.55)');
+    map.setPaintProperty('boundary_3', 'line-width', ['interpolate', ['linear'], ['zoom'], 2, 0.6, 6, 1.1, 12, 1.6]);
+    map.setPaintProperty('boundary_3', 'line-dasharray', [3, 2]);
+    map.addLayer({
+      id: 'boundary_local', type: 'line', source: b3.source, 'source-layer': b3['source-layer'], minzoom: 8,
+      filter: withLevels(5, 6), layout: b3.layout ?? {},
+      paint: { 'line-color': 'rgba(255, 255, 255, 0.32)', 'line-width': 0.8, 'line-dasharray': [2, 2] },
+    }, 'boundary_3');
+  }
+  // Place names: light text with a dark halo over imagery.
+  for (const l of layers) {
+    if (l.type !== 'symbol' || l['source-layer'] !== 'place') continue;
+    map.setPaintProperty(l.id, 'text-color', l.id === 'label_state' ? 'rgba(255, 255, 255, 0.82)' : '#f5f2ec');
+    map.setPaintProperty(l.id, 'text-halo-color', 'rgba(8, 12, 18, 0.85)');
+    map.setPaintProperty(l.id, 'text-halo-width', 1.4);
+  }
+  if (has('label_state')) {
+    map.setLayerZoomRange('label_state', 3, 9);
+    map.setLayoutProperty('label_state', 'text-transform', 'uppercase');
+    map.setLayoutProperty('label_state', 'text-letter-spacing', 0.14);
+    map.setLayoutProperty('label_state', 'text-size', ['interpolate', ['linear'], ['zoom'], 3, 9, 7, 13]);
+  }
 }
 
 export function flyToGround(map, lngLat, { zoom = 17.6, pitch = 58, bearing = -20, duration = 7000 } = {}) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   return new Promise((ok) => {
-    map.once('moveend', () => { setGlobe(map, false); ok(); });
+    map.once('moveend', () => ok());
     const padding = { top: 0, bottom: 0, left: 0, right: 0 };
     if (reduced) map.jumpTo({ center: lngLat, zoom, pitch, bearing, padding });
     else map.flyTo({ center: lngLat, zoom, pitch, bearing, duration, curve: 1.5, essential: true, padding });

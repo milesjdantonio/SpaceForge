@@ -1,7 +1,7 @@
 // TerraSim: the globe, the fly-down, outlining land, the brief, sending, and the house on its lot.
 
 import { settings, store } from './store.js';
-import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setGlobe, setEvening } from './map/map.js';
+import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setEvening } from './map/map.js';
 import { createOutliner } from './map/draw.js';
 import { createHouseLayer } from './map/house-layer.js';
 import { measure, problemsFor, placeOnLot, inFootprint } from './lib/place.js';
@@ -17,6 +17,7 @@ import { checkDesign } from './lib/design.js';
 import { renderCatalog, renderSites } from './panels/lists.js';
 import { mountRive } from './rive.js';
 import { createStarfield } from './map/stars.js';
+import { searchPlaces, placeName } from './map/places.js';
 
 const $ = (sel) => document.querySelector(sel);
 const body = document.body;
@@ -54,6 +55,23 @@ const house = createHouseLayer(map);
 map.addLayer(house.layer);
 window.__terrasim = { map, app, house, stopSpin };
 
+// The globe sits beside the intro: to its right on wide screens, above it on phones.
+const wide = () => innerWidth > 760;
+function globePadding() {
+  return wide()
+    ? { top: 0, bottom: 0, left: Math.min(560, Math.round(innerWidth * 0.4)), right: 0 }
+    : { top: 0, bottom: Math.round(innerHeight * 0.34), left: 0, right: 0 };
+}
+map.setPadding(globePadding());
+addEventListener('resize', () => { if (app.mode === 'globe') map.setPadding(globePadding()); });
+
+const verb = () => (matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click');
+function globeHint() {
+  introHint.textContent = app.you
+    ? `${verb()} your marker to fly home, or anywhere on the globe to go there.`
+    : `${verb()} anywhere on the globe to fly there, or search for a place.`;
+}
+
 const marker = { current: null };
 if (location.hash.startsWith('#s=')) await openShared(location.hash);
 else if (location.hash.startsWith('#l=')) {
@@ -61,24 +79,25 @@ else if (location.hash.startsWith('#l=')) {
 }
 getLocation().then((you) => {
   app.you = you;
-  if (you) {
-    marker.current = locationMarker(map, you);
-    introHint.textContent = `${matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click'} anywhere to fly to where you are.`;
-  } else {
-    introHint.textContent = 'Your location wasn’t shared. Spin the globe and click the place you want to see.';
-  }
+  if (you) marker.current = locationMarker(map, you, { onClick: () => goHome() });
+  globeHint();
+  if (!you) introHint.textContent = `Your location wasn’t shared. ${globeHintTail()}`;
 });
+const globeHintTail = () => `${verb()} anywhere on the globe to fly there, or search for a place.`;
+
+function goHome() {
+  if (!app.you) return;
+  if (app.mode === 'globe' || map.getZoom() < 10) arrive(app.you, { zoom: 17.6 });
+  else map.flyTo({ center: app.you, zoom: 17.5, pitch: app.tilted ? 58 : 0, duration: 2500 });
+}
 
 map.on('click', (e) => {
+  if (e.originalEvent?.target?.closest?.('.you')) return;
   if (app.mode === 'globe') {
-    // First visit: fly to the visitor. After they've zoomed back out: fly where they clicked,
-    // but only if the click landed on the globe rather than in space beside it.
-    const flyHome = !app.returned && app.you;
-    if (!flyHome) {
-      const back = map.project(e.lngLat);
-      if (Math.hypot(back.x - e.point.x, back.y - e.point.y) > 4) return;
-    }
-    arrive(flyHome ? app.you : [e.lngLat.lng, e.lngLat.lat], { zoom: flyHome ? 17.6 : 16.2 });
+    // Fly to where the click landed, as long as it landed on the globe and not in space beside it.
+    const back = map.project(e.lngLat);
+    if (Math.hypot(back.x - e.point.x, back.y - e.point.y) > 4) return;
+    arrive([e.lngLat.lng, e.lngLat.lat], { zoom: 16.2 });
     return;
   }
   if (app.mode === 'house' || app.mode === 'explore' || app.mode === 'failed') {
@@ -90,38 +109,46 @@ map.on('mousemove', (e) => {
   if (outliner.active) return;
   const p = house.placement;
   const over = p && map.getZoom() > 14 && inFootprint([e.lngLat.lng, e.lngLat.lat], p.footprint);
-  map.getCanvas().style.cursor = over ? 'pointer' : app.mode === 'globe' ? 'pointer' : '';
+  map.getCanvas().style.cursor = over ? 'pointer' : app.mode === 'globe' ? 'crosshair' : '';
 });
 
-// Zooming far out puts the visitor back in the world: the globe returns, ready for a new place.
-const WORLD_ZOOM = 4.2;
-function worldHint() {
-  introHint.textContent = `${matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click'} a place on the globe to fly there.`;
-}
-function backToWorld() {
+// Space shows behind the globe whenever the map is zoomed out far enough to see it.
+const syncSpace = () => {
+  body.classList.toggle('in-space', map.getZoom() < 5.5);
+  // Zoomed in on the globe, the intro steps back to just its hint so the map shows.
+  body.classList.toggle('globe-near', map.getZoom() > 2.7);
+};
+map.on('zoom', syncSpace);
+syncSpace();
+
+// Zooming far out by hand eases back into globe mode where the camera already is: nothing is
+// cleared and the camera isn't moved, so it never fights the scroll wheel.
+const WORLD_ZOOM = 3;
+function enterGlobeMode() {
   if (outliner.active) outliner.cancel();
-  closePanel();
+  if (!wide()) closePanel();
   hint.hidden = true;
-  app.returned = true;
-  setGlobe(map, true);
   setMode('globe');
   intro.hidden = false;
   intro.classList.remove('is-leaving');
-  worldHint();
-  map.easeTo({ zoom: 1.9, pitch: 0, bearing: 0, duration: 1600, padding: { top: 0, bottom: Math.round(innerHeight * 0.26), left: 0, right: 0 } });
-  map.once('moveend', () => { if (app.mode === 'globe') startSpin(); });
+  globeHint();
+  placeChip.hidden = true;
 }
 map.on('zoomend', () => {
   const z = map.getZoom();
-  if (z < WORLD_ZOOM && ['explore', 'house', 'failed', 'brief'].includes(app.mode)) backToWorld();
+  if (z < WORLD_ZOOM && ['explore', 'house', 'failed', 'brief'].includes(app.mode)) enterGlobeMode();
   // Zooming in on the globe by hand leaves the intro.
-  if (app.mode === 'globe' && z >= 9) {
-    stopSpin();
-    intro.hidden = true;
-    setGlobe(map, false);
-    setMode('explore');
-  }
+  if (app.mode === 'globe' && z >= 6) leaveGlobe();
 });
+
+// The Globe button: back out to the whole Earth, keeping the outline and any building.
+function toWorld() {
+  enterGlobeMode();
+  closePanel();
+  const c = map.getCenter();
+  map.easeTo({ center: [c.lng, Math.max(-50, Math.min(50, c.lat))], zoom: 1.9, pitch: 0, bearing: 0, duration: 2200, padding: globePadding() });
+  map.once('moveend', () => { if (app.mode === 'globe') startSpin(); });
+}
 
 async function arrive(lngLat, { zoom = 17.6 } = {}) {
   stopSpin();
@@ -133,6 +160,107 @@ async function arrive(lngLat, { zoom = 17.6 } = {}) {
   const atYou = app.you && Math.abs(lngLat[0] - app.you[0]) < 1e-6 && Math.abs(lngLat[1] - app.you[1]) < 1e-6;
   toast(atYou ? 'You’re here. Pan around, then outline the land you want to build on.' : 'Pan around, then outline the land you want to build on.');
 }
+
+// ---- finding your way: controls, place name, search -------------------------------------------
+const controls = $('#map-controls');
+controls.querySelector('[data-ctl="in"]').innerHTML = icon('plus');
+controls.querySelector('[data-ctl="out"]').innerHTML = icon('minus');
+controls.querySelector('[data-ctl="globe"]').innerHTML = icon('globe');
+const needle = controls.querySelector('.compass-needle');
+controls.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-ctl]')?.dataset.ctl;
+  if (c === 'in') map.zoomIn({ duration: 300 });
+  if (c === 'out') map.zoomOut({ duration: 300 });
+  if (c === 'north') map.easeTo({ bearing: 0, pitch: map.getBearing() === 0 ? 0 : map.getPitch(), duration: 700 });
+  if (c === 'globe') toWorld();
+});
+const syncCompass = () => {
+  needle.style.transform = `rotate(${-map.getBearing()}deg)`;
+  controls.querySelector('[data-ctl="north"]').classList.toggle('is-turned', Math.abs(map.getBearing()) > 0.5 || map.getPitch() > 1);
+};
+map.on('rotate', syncCompass);
+map.on('pitch', syncCompass);
+syncCompass();
+
+// "Near Asheville, North Carolina": where the map is looking, once it settles.
+const placeChip = $('#place-chip');
+let placeTimer = 0, placeAbort = null;
+map.on('movestart', () => { clearTimeout(placeTimer); placeAbort?.abort(); });
+map.on('moveend', () => {
+  clearTimeout(placeTimer);
+  if (app.mode === 'globe' || app.mode === 'flying' || map.getZoom() < 4) { placeChip.hidden = true; return; }
+  placeTimer = setTimeout(async () => {
+    placeAbort = new AbortController();
+    try {
+      const c = map.getCenter();
+      const name = await placeName([c.lng, c.lat], map.getZoom(), { signal: placeAbort.signal });
+      if (!name || app.mode === 'globe') return;
+      placeChip.innerHTML = `${icon('pin')}<span>${name.replace(/[<>&]/g, '')}</span>`;
+      placeChip.hidden = false;
+    } catch {}
+  }, 1200);
+});
+
+const search = $('#search');
+const searchInput = $('#search-q');
+const results = $('#search-results');
+let found = [];
+let searchAbort = null;
+search.querySelector('.search-icon').innerHTML = icon('search');
+const closeResults = () => { results.hidden = true; searchInput.setAttribute('aria-expanded', 'false'); };
+search.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = searchInput.value.trim();
+  if (q.length < 2) return;
+  searchAbort?.abort();
+  searchAbort = new AbortController();
+  results.hidden = false;
+  searchInput.setAttribute('aria-expanded', 'true');
+  results.innerHTML = '<li class="search-note">Searching…</li>';
+  try {
+    found = await searchPlaces(q, { signal: searchAbort.signal });
+    results.innerHTML = found.length
+      ? found.map((p, i) => `<li role="option" id="sr-${i}" tabindex="-1" data-i="${i}"><span class="sr-name">${esc(p.name)}</span><span class="sr-detail">${esc(p.detail)}</span></li>`).join('')
+      : '<li class="search-note">No places found. Try a town, address or landmark.</li>';
+    results.querySelector('[data-i]')?.focus();
+  } catch (err) {
+    if (err.name !== 'AbortError') results.innerHTML = '<li class="search-note">Search isn’t reachable right now.</li>';
+  }
+});
+function goToPlace(p) {
+  closeResults();
+  searchInput.value = p.name;
+  searchInput.blur();
+  stopSpin();
+  if (app.mode === 'globe') { intro.classList.add('is-leaving'); }
+  const done = () => { if (app.mode === 'globe' || app.mode === 'flying') { intro.hidden = true; setMode('explore'); } };
+  setMode('flying');
+  const padding = { top: 80, bottom: 90, left: 40, right: 40 };
+  if (p.bbox && (p.bbox[2] - p.bbox[0] > 0.003 || p.bbox[3] - p.bbox[1] > 0.003)) {
+    map.fitBounds([[p.bbox[0], p.bbox[1]], [p.bbox[2], p.bbox[3]]], { maxZoom: 17.5, pitch: app.tilted ? 50 : 0, duration: 4000, padding });
+  } else {
+    map.flyTo({ center: p.center, zoom: 17.5, pitch: app.tilted ? 58 : 0, duration: 4000, padding });
+  }
+  map.once('moveend', done);
+}
+results.addEventListener('click', (e) => {
+  const li = e.target.closest('[data-i]');
+  if (li) goToPlace(found[Number(li.dataset.i)]);
+});
+results.addEventListener('keydown', (e) => {
+  const li = e.target.closest('[data-i]');
+  if (!li) return;
+  if (e.key === 'Enter') { e.preventDefault(); goToPlace(found[Number(li.dataset.i)]); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); (li.nextElementSibling ?? li).focus(); }
+  if (e.key === 'ArrowUp') { e.preventDefault(); (li.previousElementSibling ?? searchInput).focus(); }
+  if (e.key === 'Escape') { closeResults(); searchInput.focus(); }
+});
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' && !results.hidden) { e.preventDefault(); results.querySelector('[data-i]')?.focus(); }
+  if (e.key === 'Escape') closeResults();
+});
+document.addEventListener('pointerdown', (e) => { if (!search.contains(e.target)) closeResults(); });
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---- share links ------------------------------------------------------------------------------
 // A shared link carries the outline and brief (never builder details) in the URL hash, so a dreamer's
@@ -157,7 +285,6 @@ async function openShared(hash) {
   if (!data?.r || data.r.length < 3) { toast('That link doesn’t contain a site.'); return false; }
   stopSpin();
   intro.hidden = true;
-  setGlobe(map, false);
   app.site = { id: `site-${Date.now().toString(36)}`, ring: data.r, form: data.v === 2 ? data.f ?? null : null, mode: 'dream', builder: null, status: 'shared', createdAt: new Date().toISOString() };
   const c = measure(data.r).centroid;
   map.jumpTo({ center: c, zoom: 18, pitch: 55, bearing: -20, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -338,8 +465,7 @@ function showDesign(design, estimate) {
   map.once('moveend', () => {
     stopSpin();
     intro.hidden = true;
-    setGlobe(map, false);
-    if (design.site?.outline) outliner.load(design.site.outline);
+      if (design.site?.outline) outliner.load(design.site.outline);
     house.show(design, placement);
     frameHouse(placement);
     setTimeout(openHouse, 2600);
@@ -416,6 +542,7 @@ function leaveGlobe() {
   stopSpin();
   intro.hidden = true;
   setMode('explore');
+  map.easeTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 600 });
 }
 
 document.querySelector('[data-open="catalog"]').addEventListener('click', async () => {
@@ -436,7 +563,7 @@ document.querySelector('[data-open="sites"]').addEventListener('click', () => {
       outliner.load(s.ring);
       const c = measure(s.ring).centroid;
       map.flyTo({ center: c, zoom: 18, pitch: 55, duration: 3500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
-      map.once('moveend', () => { setGlobe(map, false); openBrief(); });
+      map.once('moveend', () => openBrief());
     },
     onDelete: (s) => store.update('sites', [], (list) => list.filter((x) => x.id !== s.id)),
     onOpenFile: (file) => openDesignFile(file),
@@ -461,11 +588,10 @@ document.querySelector('.brand').addEventListener('click', (e) => {
   house.hide();
   intro.hidden = false;
   intro.classList.remove('is-leaving');
-  app.returned = true;
   setMode('globe');
-  setGlobe(map, true);
-  worldHint();
-  map.flyTo({ center: [map.getCenter().lng, 20], zoom: 1.9, pitch: 0, bearing: 0, duration: 4000, padding: { top: 0, bottom: Math.round(innerHeight * 0.26), left: 0, right: 0 } });
+  globeHint();
+  placeChip.hidden = true;
+  map.flyTo({ center: [map.getCenter().lng, 20], zoom: 1.9, pitch: 0, bearing: 0, duration: 4000, padding: globePadding() });
   map.once('moveend', () => { if (app.mode === 'globe') startSpin(); });
 });
 

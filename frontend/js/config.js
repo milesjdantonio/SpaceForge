@@ -9,6 +9,10 @@ export const config = {
   // drawn lot as a labelled preview. Turn off once real designs exist.
   showSample: true,
 
+  // Place search and place names: OpenStreetMap Nominatim (free for light use, no key). See
+  // js/map/places.js. Replace with a hosted geocoder before real traffic.
+  geocoder: 'https://nominatim.openstreetmap.org',
+
   map: {
     // OpenStreetMap vector style with 3D buildings, from OpenFreeMap (free, no key).
     style: 'https://tiles.openfreemap.org/styles/liberty',

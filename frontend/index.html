@@ -32,6 +32,12 @@
       <span class="brand-mark" data-rive="mark" aria-hidden="true"></span>
       <span class="brand-name">TerraSim</span>
     </a>
+    <form class="search" role="search" id="search" autocomplete="off">
+      <label class="sr-only" for="search-q">Search for a place or address</label>
+      <span class="search-icon" aria-hidden="true"></span>
+      <input id="search-q" name="q" type="search" placeholder="Search a place or address" enterkeyhint="search" aria-controls="search-results" aria-expanded="false">
+      <ul class="search-results" id="search-results" role="listbox" hidden></ul>
+    </form>
     <nav class="bar-nav" aria-label="Main">
       <button type="button" class="bar-link" data-open="sites">My sites</button>
       <button type="button" class="bar-link" data-open="catalog">Catalog</button>
@@ -45,9 +51,22 @@
   <main id="main">
     <section class="intro" id="intro" aria-labelledby="intro-title">
       <h1 class="intro-title" id="intro-title">TerraSim</h1>
-      <p class="intro-sentence">Find your land, outline it, and see the house that belongs there, standing among everything around it.</p>
+      <p class="intro-sentence">Find your land, outline it, and see the building that belongs there, standing among everything around it.</p>
+      <ol class="intro-steps">
+        <li><span class="num">1</span>Find your land on the globe</li>
+        <li><span class="num">2</span>Outline it and say what to build</li>
+        <li><span class="num">3</span>See the design standing on it</li>
+      </ol>
       <p class="intro-hint" id="intro-hint" aria-live="polite">Finding your location…</p>
     </section>
+
+    <p class="place-chip" id="place-chip" aria-live="polite" hidden></p>
+    <div class="map-controls" id="map-controls" role="group" aria-label="Map view">
+      <button type="button" class="ctl" data-ctl="in" aria-label="Zoom in" title="Zoom in"></button>
+      <button type="button" class="ctl" data-ctl="out" aria-label="Zoom out" title="Zoom out"></button>
+      <button type="button" class="ctl ctl-compass" data-ctl="north" aria-label="Face north" title="Face north, look straight down"><span class="compass-needle" aria-hidden="true"></span></button>
+      <button type="button" class="ctl" data-ctl="globe" aria-label="Back to the globe" title="Back to the globe"></button>
+    </div>
 
     <div class="toolbar" id="toolbar" hidden></div>
     <div class="draw-hint" id="draw-hint" hidden aria-live="polite"></div>
