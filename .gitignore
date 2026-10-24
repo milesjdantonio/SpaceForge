@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+backend/bin/
+coverage.out
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+*-debug.log
+.firebase/
+node_modules/
+credentials*.json
+service-account*.json

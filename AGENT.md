@@ -1,53 +1,18 @@
-# AGENT.md
+# Backend guidance
 
-Guidance for an AI agent (or human) working on SpaceForge. This file tracks decisions that are made, decisions that are still open, and the shape of the system so work stays consistent as the project grows.
+Scope: Firebase authentication and private JSON building storage in one Go API.
+See [BACKEND.md](BACKEND.md) for setup and [docs/api.md](docs/api.md) for routes.
 
-## What the app does
-
-A user highlights an area on a map (an empty lot, a hillside, any plot of land) and provides design inputs (style, size, rooms, budget, materials, etc.). That input is sent to Gemma, via Google's hosted AI API, to generate a house design suited to that specific site. The system then stores, alongside the design:
-
-- Predicted build cost
-- Predicted materials list
-- Predicted cost over time (maintenance/appreciation/depreciation projections)
-
-Other users can then browse these generated designs/listings and contact the developer directly (not the original requester) if they want to pursue that design — SpaceForge is the catalog/lead-gen layer, not a marketplace with transactions built in (at least not yet).
-
-## Decisions made so far
-
-This project is **polyglot by design** — each service uses the language suited to its job, not one shared stack:
-
-- **Accounts service:** Go. Handles user accounts/auth as its own service, separate from the main API.
-- **API:** Python. The main application API — map/design requests, predictions, inquiries. Framework not yet chosen (FastAPI is the likely pick given async needs for calling the Gemma API, but unconfirmed).
-- **Data/analytics:** Python and R. Data processing pipelines and the prediction models (cost, materials, cost-over-time). R is likely for statistical modeling, Python for data wrangling/ML glue — exact split is implementation detail, not fixed yet.
-- **Frontend:** HTML/CSS/JavaScript, with **Rive** for interactive/animated UI (e.g. animating the generated house design, map interactions). No JS framework (React/Vue/etc.) has been chosen or implied — don't introduce one without confirming.
-- **AI model:** Gemma, accessed through Google's **hosted AI API** (Gemini API / Vertex AI) — not self-hosted. Do not add local model-serving code (e.g. Ollama) unless the user asks.
-
-Because accounts (Go), API (Python), and data/analytics (Python/R) are separate services, expect inter-service communication (REST/gRPC/etc.) rather than in-process calls — don't assume they share a runtime, a process, or a single codebase layout.
-
-## Open decisions (do not assume — ask or flag before building around these)
-
-- **Service boundaries & communication:** How the Go accounts service, Python API, and Python/R data layer talk to each other (REST, gRPC, shared DB, message queue) is not decided.
-- **API framework:** Python framework for the API not yet chosen (FastAPI likely, unconfirmed).
-- **Map provider:** Not chosen. Candidates discussed:
-  - *Mapbox GL JS* (+ Mapbox GL Draw) — best drawing/highlighting UX, good imagery, generous free tier.
-  - *Google Maps Platform* — familiar, strong geocoding/street view, drawing tools more DIY.
-  - *Leaflet + OpenStreetMap* — free, no API key, good MVP option but less polished imagery.
-  - Whichever is picked needs to support: letting a user draw/select an arbitrary polygon or area on the map, and reading back the resulting coordinates/geometry to send to the backend.
-- **Data store:** Not chosen (Postgres is a reasonable default given relational data: users, designs, predictions, messages). Needs to support storing structured prediction data (cost, materials list, cost-over-time series) tied to a generated design and its map geometry.
-- **Gemma model details:** Exact model variant/endpoint and whether it needs to be multimodal (to reason about terrain/imagery from the map selection, not just text inputs) is unconfirmed. Check actual Google AI API model availability before wiring up calls — don't assume a specific model name is correct without verifying against current API docs.
-- **Contact/messaging flow:** Not designed yet. At minimum: an interested browsing user needs a way to send a message/inquiry that reaches the developer (the user, milesjdantonio@gmail.com, or a future admin) referencing a specific design. Could be as simple as a stored "inquiry" record + email notification, or a full in-app messaging system — scope this with the user before building either.
-- **Auth:** Not decided — needed at minimum to distinguish "the developer" from browsing users once messaging exists.
-
-## Data model sketch (not final — adjust as decisions above are made)
-
-- **Site** — map geometry (polygon/bounds), location metadata.
-- **DesignRequest** — a Site + user-provided inputs (style, size, budget, materials, etc.) that was sent to Gemma.
-- **Design** — the generated output for a DesignRequest (description, imagery/renderings if any, layout details).
-- **Prediction** — cost estimate, materials list, cost-over-time projection, linked to a Design.
-- **Inquiry** — a message from a browsing user about a specific Design, directed to the developer.
-
-## Working conventions
-
-- This project has no scaffolding yet. When adding the first backend/frontend code, update the README's "Getting started" section with real run instructions in the same change.
-- Keep this file in sync with real decisions as they're made — move items from "Open decisions" to "Decisions made so far" rather than letting both sections drift out of date.
-- Don't invent API keys, model names, or provider-specific config — leave clearly marked placeholders and flag what needs to be filled in by the user.
+- Leave README.md unchanged unless explicitly requested.
+- Store renderer documents as flexible JSONB; keep the marked frontend/module TODOs
+  until their interfaces are known. Do not invent a scene schema or add services.
+- Derive ownership from the authenticated user and scope every building query to it.
+  Client identity/role fields must never grant access.
+- Keep applied migrations immutable and preserve existing data. Legacy tables,
+  including the unused role column, stay for compatibility with existing databases.
+- Emulator mode is local development/test only, with a demo- project and loopback
+  addresses. Production must reject it. Never add authentication bypasses.
+- Keep credentials, ID tokens, and building documents out of logs/version control.
+- Run go vet and go test -race from backend/. Set TEST_DATABASE_URL to a dedicated
+  PostgreSQL/PostGIS database to include SQL persistence and ownership tests.
+- Keep backend docs aligned with actual routes and report which checks ran.
