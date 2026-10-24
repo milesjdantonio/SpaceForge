@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Local Claude Code settings (Impeccable's hooks live here; rerun its installer to get them)
+.claude/settings.local.json
+
+# Impeccable's engine binary downloads on first run
+.claude/skills/impeccable/scripts/bin/
+
+# Design-tool working files (screenshots, captures, local state)
+.taste-skill/inspect/
+.taste-skill/before/
+.taste-skill/after/
+.impeccable/review/
+.impeccable/build/
+.impeccable/mocks/
+.impeccable/live/
+.impeccable/config.local.json
+
+# Python caches from skill scripts
+__pycache__/
+*.pyc
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+
+# Secrets: never commit keys
+.env
+.env.*
+*.key
