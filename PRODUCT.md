@@ -8,10 +8,10 @@ web
 
 ## Stack
 
-Plain HTML, CSS and JavaScript (no framework), with Rive for animation, Leaflet + OpenStreetMap for the
-map and Motion (vanilla build) for interface motion. Chosen by the user; see AGENT.md. The backend
-(Go accounts service, Python API, Python/R prediction models, Gemma via Google's hosted AI API) does not
-exist yet: the frontend runs on a mock layer with the same request and response shapes.
+Plain HTML, CSS and JavaScript (no framework), with MapLibre GL JS (3D map), three.js (the house on the
+map and the walkthrough) and Rive (animation). Chosen by the user; see AGENT.md. The backend (Go
+accounts service, Python API, the Gemma design system) is not connected yet: the interface sends
+requests in the shape GEMMA.md defines and says plainly when the service isn't there.
 
 ## Users
 
@@ -62,16 +62,17 @@ the design rather than as an afterthought.
 ## Brand Commitments
 
 - Name: **TerraSim** (renamed from SpaceForge on 2026-10-24; the GitHub repo is milesjdantonio/TerraSim).
-- The user chose a "Blueprint + Forge" direction for the web frontend; recorded here as a binding
-  constraint, detailed in DESIGN.md.
+- The interface is map-first (the user's direction, 2026-10-24): the whole background is the map, the
+  home screen is the globe, and the house is shown as an actual building on the land, not a
+  blueprint. Panels float over the map. The earlier "Blueprint + Forge" look was dropped.
 
 ## Evidence on Hand
 
 - No real users, listings, testimonials, press, partner builders or business numbers exist. Sample
   listings in the frontend are clearly sample data and must not be presented as real customers or
   real sales.
-- Cost, materials and cost-over-time figures shown before the prediction models exist come from a
-  transparent placeholder estimator in the frontend, labelled as an estimate.
+- Exactly one sample house (`frontend/fixtures/mock-house/`) exists for testing. It is labelled as a
+  sample wherever it appears and is never presented as a design generated for the user's land.
 
 ## Product Principles
 
