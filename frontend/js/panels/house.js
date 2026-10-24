@@ -5,20 +5,36 @@ import { renderPlan } from '../render/plan.js';
 import { renderOverTime } from '../render/chart.js';
 import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
+import { typeName } from '../lib/housing.js';
+
+// One line saying what the building holds.
+export function holdsLine(design) {
+  const t = design.totals || {};
+  if (design.housingType === 'dorm') return `${t.residents} beds · ${t.floors} floors`;
+  if ((t.unitCount ?? 1) > 1) return `${t.unitCount} homes · ${t.floors} floors`;
+  return `${t.bedrooms} bed · ${t.bathrooms} bath`;
+}
+
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['materials', 'Materials'], ['time', 'Over time']];
 
 export function renderHousePanel(el, { design, estimate, preview, onWalk, shareUrl }) {
   let tab = 'overview';
   let level = 0;
-  const cost = estimate.buildCost;
+  // The panel element is shared; drop the listeners an earlier house left on it.
+  el.__houseListeners?.abort();
+  const listeners = new AbortController();
+  el.__houseListeners = listeners;
+  const signal = listeners.signal;
+  const cost = estimate?.buildCost ?? null;
   const faces = fmt.bearing((design.placement.xAxisBearingDeg + 90) % 360);
 
   el.innerHTML = `
     <header class="panel-head">
       <div>
-        <h2 class="panel-title">${design.title}</h2>
-        <p class="panel-sub">${design.sample ? (preview ? 'Sample house placed on your land' : 'Sample listing') : 'Designed for this land'}</p>
+        <h2 class="panel-title">${esc(design.overview.title)}</h2>
+        <p class="panel-sub">${design.sample ? (preview ? 'Sample house placed on your land' : 'Sample listing') : `${typeName(design.housingType)} designed for this land`}</p>
       </div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
@@ -26,9 +42,9 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
       ? 'This is TerraSim’s one sample house, placed and turned to fit your outline. A real design will be drawn for your land once the design service is connected.'
       : 'Sample data: this house shows what the design service returns.'}</p>` : ''}
     <dl class="facts num">
-      <div><dt>Build estimate</dt><dd>${fmt.money(cost.low, { short: true })}–${fmt.money(cost.high, { short: true })}</dd></div>
-      <div><dt>Living space</dt><dd>${fmt.area(design.finishedAreaM2)}</dd></div>
-      <div><dt>Rooms</dt><dd>${design.bedrooms} bed · ${design.bathrooms} bath</dd></div>
+      <div><dt>Build estimate</dt><dd>${cost ? `${fmt.money(cost.low, { short: true })}–${fmt.money(cost.high, { short: true })}` : 'Not included'}</dd></div>
+      <div><dt>Finished space</dt><dd>${fmt.area(design.totals.finishedAreaM2)}</dd></div>
+      <div><dt>Holds</dt><dd>${holdsLine(design)}</dd></div>
       <div><dt>Front faces</dt><dd>${faces}</dd></div>
     </dl>
     <div class="panel-actions">
@@ -48,14 +64,15 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
     body.setAttribute('aria-labelledby', `tab-${tab}`);
     if (tab === 'overview') {
       body.innerHTML = `
-        <p class="lead-text">${design.summary}</p>
-        ${design.description.map((p) => `<p>${p}</p>`).join('')}
+        <p class="lead-text">${esc(design.overview.summary)}</p>
+        ${design.overview.description.map((p) => `<p>${esc(p)}</p>`).join('')}
+        ${design.overview.features?.length ? `<h3 class="group-title">Features</h3><ul class="ticks">${design.overview.features.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
         <h3 class="group-title">How it answers the land</h3>
-        <ul class="ticks">${design.siteResponse.map((s) => `<li>${s}</li>`).join('')}</ul>
+        <ul class="ticks">${design.overview.siteResponse.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
         <h3 class="group-title">Materials</h3>
-        <ul class="swatches">${design.materials.palette.map((p) => `<li><span class="swatch" style="background:${p.hex}"></span><span>${p.name}</span><span class="swatch-use">${p.use}</span></li>`).join('')}</ul>
+        <ul class="swatches">${design.exterior.materials.palette.map((p) => `<li><span class="swatch" style="background:${esc(p.hex)}"></span><span>${esc(p.name)}</span><span class="swatch-use">${esc(p.use)}</span></li>`).join('')}</ul>
         <h3 class="group-title">Check before building</h3>
-        <ul class="ticks ticks-warn">${design.cautions.map((s) => `<li>${s}</li>`).join('')}</ul>`;
+        <ul class="ticks ticks-warn">${design.overview.cautions.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>`;
     }
     if (tab === 'plans') {
       body.innerHTML = `
@@ -63,15 +80,12 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
           ${design.levels.map((l, i) => `<button type="button" data-level="${i}" aria-pressed="${i === level}">${l.name}</button>`).join('')}
         </div>
         <div class="plan-box"></div>
-        <table class="rooms num">
-          <thead><tr><th>Room</th><th class="r">Size</th><th class="r">Area</th></tr></thead>
-          <tbody>${design.levels[level].rooms.map((r) => {
-            const xs = r.polygon.map((p) => p[0]), ys = r.polygon.map((p) => p[1]);
-            const w = Math.max(...xs) - Math.min(...xs), d = Math.max(...ys) - Math.min(...ys);
-            return `<tr><td>${r.name}</td><td class="r">${fmt.len(w, { precise: true })} × ${fmt.len(d, { precise: true })}</td><td class="r">${fmt.area(r.areaM2)}</td></tr>`;
-          }).join('')}</tbody>
-        </table>`;
+        ${homesOn(design, level) ?? roomsTable(design.levels[level])}`;
       body.querySelector('.plan-box').append(renderPlan(design, { level, className: 'plan plan-panel' }));
+    }
+    if (!estimate && ['cost', 'materials', 'time'].includes(tab)) {
+      body.innerHTML = '<p class="empty">No estimate came with this design. The design service sends it as a separate file (terrasim.estimate/1).</p>';
+      return;
     }
     if (tab === 'cost') {
       const max = Math.max(...cost.lines.map((l) => l.amount));
@@ -79,7 +93,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
         <div class="range">
           <div class="range-figures num"><span>${fmt.money(cost.low)}</span><strong>${fmt.money(cost.expected)}</strong><span>${fmt.money(cost.high)}</span></div>
           <div class="range-bar" aria-hidden="true"><span style="left:${((cost.expected - cost.low) / (cost.high - cost.low) * 100).toFixed(1)}%"></span></div>
-          <p class="note">Low, expected and high. ${fmt.perArea(cost.expected / design.finishedAreaM2)} · ${cost.confidence} confidence.</p>
+          <p class="note">Low, expected and high. ${fmt.perArea(cost.expected / design.totals.finishedAreaM2)} · ${cost.confidence} confidence.</p>
         </div>
         <table class="lines num">
           <tbody>${cost.lines.map((l) => `<tr><td>${l.name}</td><td class="r">${fmt.money(l.amount)}</td><td class="bar-cell"><span style="width:${(l.amount / max * 100).toFixed(1)}%"></span></td></tr>`).join('')}</tbody>
@@ -127,13 +141,59 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
       catch { prompt('Copy this link:', url); }
     }
     if (e.target.closest('[data-contact]')) toast('Messages to builders arrive once the TerraSim API is connected.');
-  });
+  }, { signal });
   el.addEventListener('keydown', (e) => {
     if (!e.target.matches('[role="tab"]') || !['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
     const ids = TABS.map((x) => x[0]);
     tab = ids[(ids.indexOf(tab) + (e.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length];
     draw();
     el.querySelector(`[data-tab="${tab}"]`).focus();
-  });
+  }, { signal });
   draw();
+}
+
+function roomsTable(level) {
+  return `<table class="rooms num">
+    <thead><tr><th>Room</th><th class="r">Size</th><th class="r">Area</th></tr></thead>
+    <tbody>${level.rooms.filter((r) => !['hall', 'stair', 'elevator', 'corridor'].includes(r.type)).map((r) => {
+      const xs = r.polygon.map((p) => p[0]), ys = r.polygon.map((p) => p[1]);
+      const w = Math.max(...xs) - Math.min(...xs), d = Math.max(...ys) - Math.min(...ys);
+      return `<tr><td>${esc(r.name)}</td><td class="r">${fmt.len(w, { precise: true })} × ${fmt.len(d, { precise: true })}</td><td class="r">${fmt.area(r.areaM2)}</td></tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// For buildings with several homes: the homes on a floor, then its shared rooms.
+function homesOn(design, li) {
+  if ((design.units || []).length < 2 && design.housingType !== 'dorm') return null;
+  const level = design.levels[li];
+  const homes = design.units.filter((u) => level.rooms.some((r) => r.unitId === u.id));
+  const shared = level.rooms.filter((r) => r.unitId == null && !['stair', 'elevator', 'corridor', 'hall'].includes(r.type));
+  const KIND = { studio: 'Studio', '1-bed': '1 bed', '2-bed': '2 bed', '3-bed': '3 bed', '4-bed': '4 bed', townhome: 'Townhome', house: 'House' };
+  return `
+    ${homes.length ? `<table class="rooms num">
+      <thead><tr><th>Home</th><th>Kind</th><th class="r">Baths</th><th class="r">Area</th></tr></thead>
+      <tbody>${homes.map((u) => `<tr><td>${esc(u.name)}</td><td>${KIND[u.kind] ?? esc(u.kind)}</td><td class="r">${u.bathrooms}</td><td class="r">${fmt.area(u.areaM2)}</td></tr>`).join('')}</tbody>
+    </table>` : ''}
+    ${shared.length ? `<table class="rooms num">
+      <thead><tr><th>Shared</th><th class="r">Area</th></tr></thead>
+      <tbody>${shared.map((r) => `<tr><td>${esc(r.name)}</td><td class="r">${fmt.area(r.areaM2)}</td></tr>`).join('')}</tbody>
+    </table>` : ''}`;
+}
+
+// When a design file breaks the contract: what's wrong, so it can be fixed at the source.
+export function renderDesignProblems(el, { design, result, onClose }) {
+  el.innerHTML = `
+    <header class="panel-head">
+      <div>
+        <h2 class="panel-title">This design can’t be drawn</h2>
+        <p class="panel-sub">${esc(design?.overview?.title ?? design?.id ?? 'Design file')}</p>
+      </div>
+      <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
+    </header>
+    <p>The design file breaks ${result.errors.length === 1 ? 'a rule' : `${result.errors.length} rules`} the website relies on (contracts/FIELDS.md, “Rules the renderer checks”). Nothing is drawn rather than drawing it wrong.</p>
+    <ul class="ticks ticks-warn">${result.errors.slice(0, 12).map((e) => `<li>${esc(e.message)}</li>`).join('')}</ul>
+    ${result.errors.length > 12 ? `<p class="note">And ${result.errors.length - 12} more.</p>` : ''}
+    ${result.warnings.length ? `<details class="request"><summary>${result.warnings.length} smaller ${result.warnings.length === 1 ? 'issue' : 'issues'}</summary><ul class="ticks">${result.warnings.map((w) => `<li>${esc(w.message)}</li>`).join('')}</ul></details>` : ''}`;
+  el.querySelector('[data-close]').addEventListener('click', () => onClose?.());
 }

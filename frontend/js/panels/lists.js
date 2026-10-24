@@ -5,6 +5,7 @@ import { measure } from '../lib/place.js';
 import { icon } from '../ui/icons.js';
 import { renderPlan } from '../render/plan.js';
 import { typeName } from '../lib/housing.js';
+import { holdsLine } from './house.js';
 
 export function renderCatalog(el, { listings, onOpen }) {
   el.innerHTML = `
@@ -21,8 +22,8 @@ export function renderCatalog(el, { listings, onOpen }) {
     li.innerHTML = `<button type="button" class="card">
       <span class="card-plan"></span>
       <span class="card-body">
-        <span class="card-title">${l.design.title}</span>
-        <span class="card-meta num">${l.design.bedrooms} bed · ${l.design.bathrooms} bath · ${fmt.area(l.design.finishedAreaM2)}</span>
+        <span class="card-title">${l.design.overview.title}</span>
+        <span class="card-meta num">${typeName(l.design.housingType)} · ${holdsLine(l.design)} · ${fmt.area(l.design.totals.finishedAreaM2)}</span>
         <span class="card-price num">${fmt.money(l.estimate.buildCost.low, { short: true })}–${fmt.money(l.estimate.buildCost.high, { short: true })} to build</span>
         <span class="card-by">${l.builder.company}</span>
       </span></button>`;
@@ -32,14 +33,19 @@ export function renderCatalog(el, { listings, onOpen }) {
   }
 }
 
-export function renderSites(el, { sites, onOpen, onDelete }) {
+export function renderSites(el, { sites, onOpen, onDelete, onOpenFile }) {
   const statusText = { draft: 'Draft', 'not-sent': 'Not sent yet', sent: 'Sent' };
   el.innerHTML = `
     <header class="panel-head">
       <div><h2 class="panel-title">My sites</h2><p class="panel-sub">Saved in this browser</p></div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
-    ${sites.length ? '<ul class="sites"></ul>' : '<p class="empty">No sites yet. Outline some land on the map and it will be saved here.</p>'}`;
+    ${sites.length ? '<ul class="sites"></ul>' : '<p class="empty">No sites yet. Outline some land on the map and it will be saved here.</p>'}
+    <div class="file-open">
+      <label class="btn btn-small">${icon('house')}<span>Open a design file</span><input type="file" accept="application/json,.json" class="sr-only" data-file></label>
+      <p class="note">For checking Gemma’s output: a terrasim.design/2 JSON file, or a reply with design and estimate. It’s checked against the contract, then drawn where it stands.</p>
+    </div>`;
+  el.querySelector('[data-file]').addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) onOpenFile?.(f); });
   const ul = el.querySelector('.sites');
   for (const s of sites) {
     const m = measure(s.ring);

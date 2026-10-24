@@ -12,7 +12,8 @@ import { toast } from './ui/toast.js';
 import { renderBriefPanel } from './panels/brief.js';
 import { buildRequest } from './api/request.js';
 import { renderSending } from './panels/send.js';
-import { renderHousePanel } from './panels/house.js';
+import { renderHousePanel, renderDesignProblems } from './panels/house.js';
+import { checkDesign } from './lib/design.js';
 import { renderCatalog, renderSites } from './panels/lists.js';
 import { mountRive } from './rive.js';
 import { createStarfield } from './map/stars.js';
@@ -32,6 +33,7 @@ const app = {
   night: false,
   site: null,      // { id, ring, form, mode, builder, status }
   you: null,       // visitor location [lng, lat]
+  estimates: new Map(), // design id -> estimate that came with it
 };
 
 function setMode(mode) {
@@ -313,8 +315,51 @@ async function send() {
   }));
 }
 
+// Checks a design against the contract before anything is drawn; a broken file opens a panel that
+// says what's wrong instead.
+function drawable(design) {
+  const result = checkDesign(design);
+  for (const w of result.warnings) console.warn(`[design ${design?.id}] ${w.message}`);
+  if (result.ok) return true;
+  setMode(house.design ? 'house' : 'explore');
+  openPanel((el) => renderDesignProblems(el, { design, result, onClose: closePanel }));
+  return false;
+}
+
+// Shows a stored design where it stands: flies there, draws the lot and the building, opens it.
+function showDesign(design, estimate) {
+  if (!drawable(design)) return;
+  if (estimate) app.estimates.set(design.id, estimate);
+  closePanel();
+  setMode('house');
+  const placement = design.placement;
+  const c = placement.footprint[0];
+  map.flyTo({ center: c, zoom: 18.3, pitch: 60, bearing: -30, duration: 4500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+  map.once('moveend', () => {
+    stopSpin();
+    intro.hidden = true;
+    setGlobe(map, false);
+    if (design.site?.outline) outliner.load(design.site.outline);
+    house.show(design, placement);
+    frameHouse(placement);
+    setTimeout(openHouse, 2600);
+  });
+}
+
+// Opens a design file from disk: a Gemma reply ({ design, estimate }) or a bare design.
+async function openDesignFile(file) {
+  let data;
+  try { data = JSON.parse(await file.text()); }
+  catch { toast('That file isn’t JSON.'); return; }
+  const design = data?.design ?? data;
+  const estimate = data?.estimate ?? null;
+  if (design?.schema !== 'terrasim.design/2') { toast('That file isn’t a terrasim.design/2 design.'); return; }
+  showDesign(design, estimate);
+}
+
 async function previewSample() {
   const design = await api.design('sample-0001');
+  if (!drawable(design)) return;
   const placement = placeOnLot(design, app.site.ring);
   house.show({ ...design, previewOn: app.site.id }, placement);
   app.site.preview = true;
@@ -345,7 +390,10 @@ function frameHouse(placement, { duration = 1800 } = {}) {
 async function openHouse() {
   const design = house.design;
   if (!design) return;
-  const estimate = await api.estimate('sample-0001');
+  let estimate = app.estimates.get(design.id) ?? null;
+  if (!estimate) {
+    try { estimate = await api.estimate(design.id); } catch { estimate = null; }
+  }
   setMode('house');
   openPanel((el) => renderHousePanel(el, {
     design,
@@ -375,20 +423,7 @@ document.querySelector('[data-open="catalog"]').addEventListener('click', async 
   leaveGlobe();
   openPanel((el) => renderCatalog(el, {
     listings,
-    onOpen: (l) => {
-      closePanel();
-      const placement = l.design.placement;
-      setMode('house');
-      const c = l.design.placement.footprint[0];
-      map.flyTo({ center: c, zoom: 18.3, pitch: 60, bearing: -30, duration: 4500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
-      map.once('moveend', () => {
-        setGlobe(map, false);
-        if (l.design.site?.outline) outliner.load(l.design.site.outline);
-        house.show(l.design, placement);
-        frameHouse(placement);
-        setTimeout(openHouse, 2600);
-      });
-    },
+    onOpen: (l) => showDesign(l.design, l.estimate),
   }));
 });
 document.querySelector('[data-open="sites"]').addEventListener('click', () => {
@@ -404,6 +439,7 @@ document.querySelector('[data-open="sites"]').addEventListener('click', () => {
       map.once('moveend', () => { setGlobe(map, false); openBrief(); });
     },
     onDelete: (s) => store.update('sites', [], (list) => list.filter((x) => x.id !== s.id)),
+    onOpenFile: (file) => openDesignFile(file),
   }));
 });
 

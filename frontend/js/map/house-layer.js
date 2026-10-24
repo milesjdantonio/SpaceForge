@@ -1,144 +1,206 @@
-// The house on the map: a three.js model built from a terrasim.design/1 record and placed at its
+// The building on the map: a three.js model built from a terrasim.design/2 record and placed at its
 // real position and bearing. It rises out of a grid of tiles when it appears.
 
 import * as THREE from 'three';
 import { maplibregl } from './map.js';
+import { openingSegment, pointInPolygon, bounds } from '../lib/design.js';
 
-const DEFAULTS = { walls: '#e9e4da', roof: '#4a4f55', trim: '#2b2f33', glass: '#5d7c99' };
+const DEFAULTS = { walls: '#e9e4da', roof: '#4a4f55', trim: '#2b2f33', glass: '#5d7c99', accent: '#8a6a4a' };
 
 function paletteColors(design) {
   const out = { ...DEFAULTS };
-  for (const p of design.materials?.palette ?? []) {
+  for (const p of design.exterior?.materials?.palette ?? []) {
     const use = (p.use || '').toLowerCase();
+    if (use.includes('interior')) continue;
     if (use.includes('wall')) out.walls = p.hex;
     else if (use.includes('roof')) out.roof = p.hex;
     else if (use.includes('window') || use.includes('trim')) out.trim = p.hex;
+    else if (use.includes('accent') || use.includes('door')) out.accent = p.hex;
   }
   return out;
 }
 
-// Builds the model in house metres: x along the width, y along the depth (0 = front), z up.
+// The outside of the building, in building metres: x along the width, y along the depth (0 = front),
+// z up. Each level is its outline raised to its height; windows and doors come from the exterior
+// walls' openings; balconies, garage, porch, parking and roof from the file.
 export function buildHouseModel(design) {
   const group = new THREE.Group();
   const colors = paletteColors(design);
-  const W = design.size.widthM, D = design.size.depthM;
   const levels = design.levels;
-  const wallTop = levels.reduce((m, l) => Math.max(m, l.elevationM + l.heightM), 0);
+  const PLINTH = 0.3;
   const mat = (hex, extra = {}) => new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.85, metalness: 0.02, side: THREE.DoubleSide, ...extra });
   const wallMat = mat(colors.walls);
   const roofMat = mat(colors.roof, { roughness: 0.7 });
   const trimMat = mat(colors.trim);
+  const accentMat = mat(colors.accent);
   const glassMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(colors.glass), roughness: 0.15, metalness: 0.4, emissive: new THREE.Color('#ffb15c'), emissiveIntensity: 0 });
+  const railGlass = new THREE.MeshStandardMaterial({ color: new THREE.Color('#bcd3e6'), roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
   const slabMat = mat('#bfb8ab');
+  const asphaltMat = mat('#4a4d52', { roughness: 1 });
 
   const box = (w, d, h, x, y, z, m) => {
-    const g = new THREE.BoxGeometry(w, d, h);
-    const mesh = new THREE.Mesh(g, m);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), m);
     mesh.position.set(x + w / 2, y + d / 2, z + h / 2);
     group.add(mesh);
     return mesh;
   };
-
-  // Plinth and walls.
-  box(W + 0.3, D + 0.3, 0.35, -0.15, -0.15, -0.05, slabMat);
-  box(W, D, wallTop, 0, 0, 0.3, wallMat);
-  // Floor bands between storeys.
-  for (const l of levels.slice(1)) box(W + 0.06, D + 0.06, 0.16, -0.03, -0.03, l.elevationM + 0.22, trimMat);
-
-  // Windows and doors on the outside walls.
-  const onEdge = (o) => {
-    const eps = 0.05;
-    if (Math.abs(o.y1) < eps && Math.abs(o.y2) < eps) return 'front';
-    if (Math.abs(o.y1 - D) < eps && Math.abs(o.y2 - D) < eps) return 'back';
-    if (Math.abs(o.x1) < eps && Math.abs(o.x2) < eps) return 'left';
-    if (Math.abs(o.x1 - W) < eps && Math.abs(o.x2 - W) < eps) return 'right';
-    return null;
+  // A polygon raised from z0 to z1.
+  const prism = (poly, z0, z1, m) => {
+    const shape = new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y)));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: z1 - z0, bevelEnabled: false });
+    const mesh = new THREE.Mesh(geo, m);
+    mesh.position.z = z0;
+    group.add(mesh);
+    return mesh;
   };
+  // A thin box lying along a segment, pushed `out` metres along its outward normal.
+  const along = (a, b, z0, z1, depth, out, m) => {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len < 0.02 || z1 - z0 < 0.01) return null;
+    const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, depth, z1 - z0), m);
+    mesh.position.set((a[0] + b[0]) / 2 + uy * out, (a[1] + b[1]) / 2 - ux * out, (z0 + z1) / 2);
+    mesh.rotation.z = Math.atan2(uy, ux);
+    group.add(mesh);
+    return mesh;
+  };
+  // Signed distance direction: +1 when the right-hand normal of a→b points out of the outline.
+  const outward = (a, b, outline) => {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+    const nx = (b[1] - a[1]) / len, ny = -(b[0] - a[0]) / len;
+    return pointInPolygon(mx + nx * 0.25, my + ny * 0.25, outline) ? -1 : 1;
+  };
+
   const glassPanes = [];
-  for (const l of levels) {
-    for (const o of l.openings || []) {
-      const side = onEdge(o);
-      if (!side) continue;
-      const isWindow = o.kind === 'window';
-      const z0 = l.elevationM + 0.3 + (isWindow ? (o.sillM ?? 0.8) : 0.02);
-      const z1 = l.elevationM + 0.3 + (isWindow ? (o.headM ?? 2.2) : 2.15);
-      const len = Math.hypot(o.x2 - o.x1, o.y2 - o.y1);
-      const depth = 0.08;
-      const m = isWindow || o.kind === 'patio' ? glassMat : trimMat;
-      let pane;
-      if (side === 'front') pane = box(len, depth, z1 - z0, Math.min(o.x1, o.x2), -depth / 2 - 0.02, z0, m);
-      if (side === 'back') pane = box(len, depth, z1 - z0, Math.min(o.x1, o.x2), D - depth / 2 + 0.02, z0, m);
-      if (side === 'left') pane = box(depth, len, z1 - z0, -depth / 2 - 0.02, Math.min(o.y1, o.y2), z0, m);
-      if (side === 'right') pane = box(depth, len, z1 - z0, W - depth / 2 + 0.02, Math.min(o.y1, o.y2), z0, m);
-      if (pane && m === glassMat) glassPanes.push(pane);
-      // A frame around each window.
-      if (pane && isWindow) {
-        const f = 0.07;
-        const horizontal = side === 'front' || side === 'back';
-        const yFace = side === 'front' ? -0.07 : side === 'back' ? D - 0.01 : null;
-        const xFace = side === 'left' ? -0.07 : side === 'right' ? W - 0.01 : null;
-        if (horizontal) {
-          box(len + 2 * f, 0.08, f, Math.min(o.x1, o.x2) - f, yFace, z0 - f, trimMat);
-          box(len + 2 * f, 0.08, f, Math.min(o.x1, o.x2) - f, yFace, z1, trimMat);
-        } else {
-          box(0.08, len + 2 * f, f, xFace, Math.min(o.y1, o.y2) - f, z0 - f, trimMat);
-          box(0.08, len + 2 * f, f, xFace, Math.min(o.y1, o.y2) - f, z1, trimMat);
-        }
+  let wallTop = 0;
+  levels.forEach((l, li) => {
+    const isTop = li === levels.length - 1;
+    const z0 = l.elevationM + PLINTH;
+    const z1 = isTop ? l.elevationM + (l.ceilingHeightM ?? l.heightM - 0.3) + PLINTH + 0.35 : l.elevationM + l.heightM + PLINTH;
+    wallTop = Math.max(wallTop, z1);
+    if (li === 0 || l.elevationM < 0) prism(l.outline, l.elevationM < 0 ? -0.05 : -0.05, z0, slabMat);
+    prism(l.outline, z0, z1, wallMat);
+    // A band at each floor line.
+    if (li > 0) {
+      for (let i = 0; i < l.outline.length; i++) {
+        const a = l.outline[i], b = l.outline[(i + 1) % l.outline.length];
+        along(a, b, z0 - 0.1, z0 + 0.08, 0.08, 0.03 * outward(a, b, l.outline), trimMat);
       }
     }
-  }
+    // Windows and doors on the outside walls.
+    const walls = new Map((l.walls || []).map((w) => [w.id, w]));
+    for (const o of l.openings || []) {
+      const w = walls.get(o.wallId);
+      if (!w || w.kind !== 'exterior') continue;
+      const seg = openingSegment(w, o);
+      const a = [seg.x1, seg.y1], b = [seg.x2, seg.y2];
+      const dir = outward(a, b, l.outline);
+      const isWindow = o.kind === 'window';
+      const glassy = isWindow || o.kind === 'patio';
+      const oz0 = z0 + (isWindow ? (o.sillM ?? 0.8) : 0.02);
+      const oz1 = z0 + (o.headM ?? (isWindow ? 2.2 : 2.1));
+      if (o.kind === 'passage' || o.kind === 'cased') {
+        along(a, b, z0 + 0.02, oz1, 0.08, 0.02 * dir, mat('#1b1f24'));
+        continue;
+      }
+      const pane = along(a, b, oz0, oz1, 0.08, 0.02 * dir, glassy ? glassMat : o.kind === 'garage' ? wallMat : accentMat);
+      if (pane && glassy) glassPanes.push(pane);
+      // A frame round windows and glass doors.
+      const f = 0.07;
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len;
+      const a2 = [a[0] - ux * f, a[1] - uy * f], b2 = [b[0] + ux * f, b[1] + uy * f];
+      if (isWindow) along(a2, b2, oz0 - f, oz0, 0.1, 0.05 * dir, trimMat);
+      along(a2, b2, oz1, oz1 + f, 0.1, 0.05 * dir, trimMat);
+      along(a2, a, oz0, oz1, 0.1, 0.05 * dir, trimMat);
+      along(b, b2, oz0, oz1, 0.1, 0.05 * dir, trimMat);
+    }
+    // Balconies: a slab and a railing on the edges away from the building.
+    for (const bal of l.balconies || []) {
+      prism(bal.polygon, z0 - 0.15, z0 + 0.02, slabMat);
+      const rail = bal.railing === 'glass' ? railGlass : bal.railing === 'solid' ? wallMat : trimMat;
+      for (let i = 0; i < bal.polygon.length; i++) {
+        const a = bal.polygon[i], b = bal.polygon[(i + 1) % bal.polygon.length];
+        const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        const nx = (b[1] - a[1]) / len * 0.25, ny = -(b[0] - a[0]) / len * 0.25;
+        if (pointInPolygon(mx + nx, my + ny, l.outline) || pointInPolygon(mx - nx, my - ny, l.outline)) continue;
+        along(a, b, z0 + 0.02, z0 + 1.05, 0.04, 0, rail);
+        along(a, b, z0 + 1.05, z0 + 1.1, 0.06, 0, trimMat);
+      }
+    }
+  });
 
-  // Roof.
-  const roof = design.roof ?? { type: 'gable', pitch: 0.6, eaveM: 0.5 };
-  const eave = roof.eaveM ?? 0.5;
-  const top = wallTop + 0.3;
-  if (roof.type === 'flat') {
-    box(W + 0.2, D + 0.2, 0.5, -0.1, -0.1, top, roofMat);
+  // Roof over the top level.
+  const topLevel = levels[levels.length - 1];
+  const roof = design.exterior?.roof ?? { type: 'flat' };
+  const eave = roof.eaveM ?? 0.4;
+  const tb = bounds(topLevel.outline);
+  if (roof.type === 'flat' || !roof.type) {
+    prism(topLevel.outline, wallTop, wallTop + 0.25, roofMat);
+    // A parapet round the edge.
+    for (let i = 0; i < topLevel.outline.length; i++) {
+      const a = topLevel.outline[i], b = topLevel.outline[(i + 1) % topLevel.outline.length];
+      along(a, b, wallTop, wallTop + 0.6, 0.2, -0.1 * outward(a, b, topLevel.outline), wallMat);
+    }
   } else {
-    const rise = Math.max(0.6, (roof.pitch ?? 0.6) * (D / 2 + eave));
-    const x0 = -eave, x1 = W + eave, y0 = -eave, y1 = D + eave, ym = D / 2;
-    const zE = top - eave * (roof.pitch ?? 0.6), zR = top + rise - eave * (roof.pitch ?? 0.6);
-    const g = new THREE.BufferGeometry();
+    // Gable or hip over the top level's rectangle, ridge along x or y.
+    const alongY = roof.ridgeAxis === 'y';
+    const L = alongY ? tb.y1 - tb.y0 : tb.x1 - tb.x0;   // length along the ridge
+    const S = alongY ? tb.x1 - tb.x0 : tb.y1 - tb.y0;   // span across it
+    const pitch = roof.pitch ?? 0.6;
+    const rise = Math.max(0.6, pitch * (S / 2 + eave));
+    const zE = wallTop - eave * pitch, zR = wallTop + rise - eave * pitch;
+    // Built with the ridge along local u, then mapped to x/y.
+    const P = (u, v, z) => (alongY ? [tb.x0 + v, tb.y0 + u, z] : [tb.x0 + u, tb.y0 + v, z]);
+    const u0 = -eave, u1 = L + eave, v0 = -eave, v1 = S + eave, vm = S / 2;
     let verts;
     if (roof.type === 'hip') {
-      const inset = Math.min((x1 - x0) / 2 - 0.1, (y1 - y0) / 2);
-      const r0 = [x0 + inset, ym, zR], r1 = [x1 - inset, ym, zR];
-      const a = [x0, y0, zE], b = [x1, y0, zE], c = [x1, y1, zE], d = [x0, y1, zE];
+      const inset = Math.min((u1 - u0) / 2 - 0.1, (v1 - v0) / 2);
+      const r0 = P(u0 + inset, vm, zR), r1 = P(u1 - inset, vm, zR);
+      const a = P(u0, v0, zE), b = P(u1, v0, zE), c = P(u1, v1, zE), d = P(u0, v1, zE);
       verts = [...a, ...b, ...r1, ...a, ...r1, ...r0, ...c, ...d, ...r0, ...c, ...r0, ...r1, ...b, ...c, ...r1, ...d, ...a, ...r0];
     } else {
-      const a = [x0, y0, zE], b = [x1, y0, zE], c = [x1, y1, zE], d = [x0, y1, zE];
-      const r0 = [x0, ym, zR], r1 = [x1, ym, zR];
+      const a = P(u0, v0, zE), b = P(u1, v0, zE), c = P(u1, v1, zE), d = P(u0, v1, zE);
+      const r0 = P(u0, vm, zR), r1 = P(u1, vm, zR);
       verts = [...a, ...b, ...r1, ...a, ...r1, ...r0, ...c, ...d, ...r0, ...c, ...r0, ...r1];
-      // Gable ends (walls up to the ridge).
       const ge = new THREE.BufferGeometry();
-      ge.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, top, 0, D, top, 0, ym, zR - 0.15, W, 0, top, W, D, top, W, ym, zR - 0.15], 3));
+      ge.setAttribute('position', new THREE.Float32BufferAttribute([...P(0, 0, wallTop), ...P(0, S, wallTop), ...P(0, vm, zR - 0.15), ...P(L, 0, wallTop), ...P(L, S, wallTop), ...P(L, vm, zR - 0.15)], 3));
       ge.computeVertexNormals();
       group.add(new THREE.Mesh(ge, wallMat));
     }
+    const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
     g.computeVertexNormals();
     group.add(new THREE.Mesh(g, roofMat));
   }
 
-  // Garage and porch.
-  if (design.garage) {
-    const gp = design.garage.polygon;
-    const gx = Math.min(...gp.map((p) => p[0])), gy = Math.min(...gp.map((p) => p[1]));
-    const gw = Math.max(...gp.map((p) => p[0])) - gx, gd = Math.max(...gp.map((p) => p[1])) - gy;
-    box(gw, gd, 3.0, gx, gy, 0, wallMat);
-    box(gw + 0.4, gd + 0.4, 0.35, gx - 0.2, gy - 0.2, 3.0, roofMat);
-    box(gw * 0.8, 0.06, 2.3, gx + gw * 0.1, gy - 0.04, 0.05, trimMat);
+  // Garage, porch and parking.
+  const ext = design.exterior || {};
+  if (ext.garage?.polygon) {
+    const gb = bounds(ext.garage.polygon);
+    const gh = ext.garage.heightM ?? 3;
+    prism(ext.garage.polygon, 0, gh, wallMat);
+    box(gb.x1 - gb.x0 + 0.4, gb.y1 - gb.y0 + 0.4, 0.35, gb.x0 - 0.2, gb.y0 - 0.2, gh, roofMat);
+    box((gb.x1 - gb.x0) * 0.8, 0.06, 2.3, gb.x0 + (gb.x1 - gb.x0) * 0.1, gb.y0 - 0.04, 0.05, trimMat);
   }
-  if (design.porch) {
-    const pp = design.porch.polygon;
-    const px = Math.min(...pp.map((p) => p[0])), py = Math.min(...pp.map((p) => p[1]));
-    const pw = Math.max(...pp.map((p) => p[0])) - px, pd = Math.max(...pp.map((p) => p[1])) - py;
-    box(pw, pd, 0.25, px, py, 0, slabMat);
-    box(pw, pd, 0.2, px, py, 2.7, roofMat);
-    for (const t of [0, 1]) box(0.18, 0.18, 2.5, px + t * (pw - 0.18), py + pd - 0.18, 0.2, trimMat);
+  if (ext.porch?.polygon) {
+    const pb = bounds(ext.porch.polygon);
+    const pw = pb.x1 - pb.x0, pd = pb.y1 - pb.y0;
+    prism(ext.porch.polygon, 0, 0.25, slabMat);
+    box(pw, pd, 0.2, pb.x0, pb.y0, 2.7, roofMat);
+    for (const t of [0, 1]) box(0.18, 0.18, 2.5, pb.x0 + t * (pw - 0.18), pb.y0, 0.2, accentMat);
+  }
+  for (const p of ext.parking || []) {
+    prism(p.polygon, 0, 0.04, asphaltMat);
+    if (p.covered) {
+      const pb = bounds(p.polygon);
+      box(pb.x1 - pb.x0, pb.y1 - pb.y0, 0.2, pb.x0, pb.y0, 2.6, roofMat);
+    }
   }
 
-  group.userData = { glassMat, glassPanes, W, D, height: zTop(group) };
+  group.userData = { glassMat, glassPanes, W: design.size.widthM, D: design.size.depthM, height: zTop(group) };
   return group;
 }
 

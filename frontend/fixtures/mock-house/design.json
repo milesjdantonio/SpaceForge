@@ -1,26 +1,48 @@
 {
- "schema": "terrasim.design/1",
+ "schema": "terrasim.design/2",
  "id": "sample-0001",
  "sample": true,
+ "requestId": null,
  "createdAt": "2026-10-24T15:00:00.000Z",
- "title": "The Bank Gable House",
- "summary": "A farmhouse house turned to the south, with 4 bedrooms on a 23,814 sq ft lot.",
- "description": [
-  "The Bank Gable House is a 2-storey farmhouse home of about 2,207 sq ft, with 4 bedrooms and 3 bathrooms, drawn for this 23,814 sq ft site. Steep gables, board-and-batten, a deep porch.",
-  "The plan turns its long side to the south, so the rooms people use most get the best light, while the entry, stair and wet rooms form a quiet back zone. Board-and-batten siding and standing-seam metal were chosen for a hot-humid climate."
- ],
- "siteResponse": [
-  "Living, dining and the primary bedroom face south for low winter sun; the hall and service rooms take the north side.",
-  "The house sits at the back of a 147 ft by 121 ft buildable area, leaving the garden on the sunny side of a 23,814 sq ft lot.",
-  "The ground falls 11% toward the southwest; the foundation steps with it instead of flattening the site.",
-  "Heat and humidity: shaded porches, raised floors, moisture-tolerant materials.",
-  "The 2-car garage closes the west end and shelters the entry."
- ],
- "style": "farmhouse",
- "floors": 2,
- "bedrooms": 4,
- "bathrooms": 3,
- "finishedAreaM2": 205,
+ "housingType": "house",
+ "overview": {
+  "title": "The Bank Gable House",
+  "summary": "A farmhouse house turned to the south, with 4 bedrooms on a 23,814 sq ft lot.",
+  "description": [
+   "The Bank Gable House is a 2-storey farmhouse home of about 2,207 sq ft, with 4 bedrooms and 3 bathrooms, drawn for this 23,814 sq ft site. Steep gables, board-and-batten, a deep porch.",
+   "The plan turns its long side to the south, so the rooms people use most get the best light, while the entry, stair and wet rooms form a quiet back zone. Board-and-batten siding and standing-seam metal were chosen for a hot-humid climate."
+  ],
+  "siteResponse": [
+   "Living, dining and the primary bedroom face south for low winter sun; the hall and service rooms take the north side.",
+   "The house sits at the back of a 147 ft by 121 ft buildable area, leaving the garden on the sunny side of a 23,814 sq ft lot.",
+   "The ground falls 11% toward the southwest; the foundation steps with it instead of flattening the site.",
+   "Heat and humidity: shaded porches, raised floors, moisture-tolerant materials.",
+   "The 2-car garage closes the west end and shelters the entry."
+  ],
+  "features": [
+   "Covered porch at the entry",
+   "Heat-pump heating and cooling, triple glazing, solar-ready roof",
+   "A study by the entry for working from home",
+   "Stacked stair with a window on the landing",
+   "Gable roof with trim eaves"
+  ],
+  "cautions": [
+   "Slope and soil are simulated until a survey and real terrain data are attached.",
+   "Check local zoning for setbacks, height limits and lot coverage before publishing."
+  ],
+  "style": "farmhouse"
+ },
+ "totals": {
+  "floors": 2,
+  "levelsBelowGround": 0,
+  "unitCount": 1,
+  "bedrooms": 4,
+  "bathrooms": 3.5,
+  "residents": null,
+  "finishedAreaM2": 205,
+  "grossAreaM2": 204.96,
+  "parkingSpaces": 2
+ },
  "site": {
   "outline": [
    [
@@ -72,17 +94,53 @@
   "depthM": 8.4,
   "heightM": 9.5
  },
+ "units": [
+  {
+   "id": "U-1",
+   "name": "The house",
+   "kind": "house",
+   "levels": [
+    0,
+    1
+   ],
+   "entryOpeningId": "L0-O5",
+   "bedrooms": 4,
+   "bathrooms": 3.5,
+   "residents": null,
+   "areaM2": 205
+  }
+ ],
  "levels": [
   {
    "index": 0,
    "name": "Ground floor",
    "elevationM": 0,
    "heightM": 3,
+   "ceilingHeightM": 2.7,
+   "outline": [
+    [
+     0,
+     0
+    ],
+    [
+     12.2,
+     0
+    ],
+    [
+     12.2,
+     8.4
+    ],
+    [
+     0,
+     8.4
+    ]
+   ],
    "rooms": [
     {
-     "id": "L0R0",
+     "id": "L0-R0",
      "name": "Kitchen",
      "type": "kitchen",
+     "unitId": "U-1",
      "polygon": [
       [
        0,
@@ -101,12 +159,14 @@
        4.03
       ]
      ],
-     "areaM2": 15.72
+     "areaM2": 15.72,
+     "floorFinish": "wood"
     },
     {
-     "id": "L0R1",
+     "id": "L0-R1",
      "name": "Dining",
      "type": "dining",
+     "unitId": "U-1",
      "polygon": [
       [
        3.9,
@@ -125,12 +185,14 @@
        4.03
       ]
      ],
-     "areaM2": 11.62
+     "areaM2": 11.62,
+     "floorFinish": "wood"
     },
     {
-     "id": "L0R2",
+     "id": "L0-R2",
      "name": "Living room",
      "type": "living",
+     "unitId": "U-1",
      "polygon": [
       [
        6.78,
@@ -149,12 +211,14 @@
        4.03
       ]
      ],
-     "areaM2": 21.87
+     "areaM2": 21.87,
+     "floorFinish": "wood"
     },
     {
-     "id": "L0R3",
+     "id": "L0-R3",
      "name": "Mudroom",
      "type": "mudroom",
+     "unitId": "U-1",
      "polygon": [
       [
        0,
@@ -173,12 +237,14 @@
        8.4
       ]
      ],
-     "areaM2": 4.35
+     "areaM2": 4.35,
+     "floorFinish": "tile"
     },
     {
-     "id": "L0R4",
+     "id": "L0-R4",
      "name": "Powder room",
      "type": "powder",
+     "unitId": "U-1",
      "polygon": [
       [
        1.37,
@@ -197,12 +263,14 @@
        8.4
       ]
      ],
-     "areaM2": 3.8
+     "areaM2": 3.8,
+     "floorFinish": "tile"
     },
     {
-     "id": "L0R5",
+     "id": "L0-R5",
      "name": "Study",
      "type": "office",
+     "unitId": "U-1",
      "polygon": [
       [
        2.57,
@@ -221,12 +289,14 @@
        8.4
       ]
      ],
-     "areaM2": 7.06
+     "areaM2": 7.06,
+     "floorFinish": "wood"
     },
     {
-     "id": "L0R6",
+     "id": "L0-R6",
      "name": "Entry",
      "type": "entry",
+     "unitId": "U-1",
      "polygon": [
       [
        7.4,
@@ -245,12 +315,14 @@
        8.4
       ]
      ],
-     "areaM2": 8.81
+     "areaM2": 8.81,
+     "floorFinish": "stone"
     },
     {
-     "id": "L0R7",
+     "id": "L0-R7",
      "name": "Laundry",
      "type": "laundry",
+     "unitId": "U-1",
      "polygon": [
       [
        10.18,
@@ -269,124 +341,1129 @@
        8.4
       ]
      ],
-     "areaM2": 6.4
+     "areaM2": 6.4,
+     "floorFinish": "tile"
+    },
+    {
+     "id": "L0-ST",
+     "name": "Stair",
+     "type": "stair",
+     "unitId": "U-1",
+     "polygon": [
+      [
+       4.8,
+       5.23
+      ],
+      [
+       7.4,
+       5.23
+      ],
+      [
+       7.4,
+       8.4
+      ],
+      [
+       4.8,
+       8.4
+      ]
+     ],
+     "areaM2": 8.24,
+     "floorFinish": "wood"
+    },
+    {
+     "id": "L0-H0",
+     "name": "Hall",
+     "type": "hall",
+     "unitId": "U-1",
+     "polygon": [
+      [
+       0,
+       4.03
+      ],
+      [
+       12.2,
+       4.03
+      ],
+      [
+       12.2,
+       5.23
+      ],
+      [
+       0,
+       5.23
+      ]
+     ],
+     "areaM2": 14.64,
+     "floorFinish": "wood"
+    }
+   ],
+   "walls": [
+    {
+     "id": "L0-W0",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 0,
+     "x2": 3.9,
+     "y2": 0,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W1",
+     "kind": "interior",
+     "x1": 0,
+     "y1": 4.03,
+     "x2": 3.9,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W2",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 0,
+     "x2": 0,
+     "y2": 4.03,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W3",
+     "kind": "exterior",
+     "x1": 3.9,
+     "y1": 0,
+     "x2": 6.78,
+     "y2": 0,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W4",
+     "kind": "interior",
+     "x1": 3.9,
+     "y1": 4.03,
+     "x2": 6.78,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W5",
+     "kind": "exterior",
+     "x1": 6.78,
+     "y1": 0,
+     "x2": 12.2,
+     "y2": 0,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W6",
+     "kind": "exterior",
+     "x1": 12.2,
+     "y1": 0,
+     "x2": 12.2,
+     "y2": 4.03,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W7",
+     "kind": "interior",
+     "x1": 6.78,
+     "y1": 4.03,
+     "x2": 12.2,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W8",
+     "kind": "interior",
+     "x1": 0,
+     "y1": 5.23,
+     "x2": 1.37,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W9",
+     "kind": "interior",
+     "x1": 1.37,
+     "y1": 5.23,
+     "x2": 1.37,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W10",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 8.4,
+     "x2": 1.37,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W11",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 5.23,
+     "x2": 0,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W12",
+     "kind": "interior",
+     "x1": 1.37,
+     "y1": 5.23,
+     "x2": 2.57,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W13",
+     "kind": "interior",
+     "x1": 2.57,
+     "y1": 5.23,
+     "x2": 2.57,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W14",
+     "kind": "exterior",
+     "x1": 1.37,
+     "y1": 8.4,
+     "x2": 2.57,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W15",
+     "kind": "interior",
+     "x1": 2.57,
+     "y1": 5.23,
+     "x2": 4.8,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W16",
+     "kind": "interior",
+     "x1": 4.8,
+     "y1": 5.23,
+     "x2": 4.8,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W17",
+     "kind": "exterior",
+     "x1": 2.57,
+     "y1": 8.4,
+     "x2": 4.8,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W18",
+     "kind": "interior",
+     "x1": 7.4,
+     "y1": 5.23,
+     "x2": 10.18,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W19",
+     "kind": "interior",
+     "x1": 10.18,
+     "y1": 5.23,
+     "x2": 10.18,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W20",
+     "kind": "exterior",
+     "x1": 7.4,
+     "y1": 8.4,
+     "x2": 10.18,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W21",
+     "kind": "interior",
+     "x1": 7.4,
+     "y1": 5.23,
+     "x2": 7.4,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W22",
+     "kind": "interior",
+     "x1": 10.18,
+     "y1": 5.23,
+     "x2": 12.2,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L0-W23",
+     "kind": "exterior",
+     "x1": 12.2,
+     "y1": 5.23,
+     "x2": 12.2,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W24",
+     "kind": "exterior",
+     "x1": 10.18,
+     "y1": 8.4,
+     "x2": 12.2,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W25",
+     "kind": "exterior",
+     "x1": 4.8,
+     "y1": 8.4,
+     "x2": 7.4,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W26",
+     "kind": "exterior",
+     "x1": 12.2,
+     "y1": 4.03,
+     "x2": 12.2,
+     "y2": 5.23,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L0-W27",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 4.03,
+     "x2": 0,
+     "y2": 5.23,
+     "thicknessM": 0.3
     }
    ],
    "openings": [
     {
-     "kind": "interior",
-     "x1": 0.3,
-     "y1": 5.23,
-     "x2": 1.12,
-     "y2": 5.23
+     "id": "L0-O0",
+     "kind": "door",
+     "wallId": "L0-W8",
+     "offsetM": 0.3,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L0-R3",
+      "L0-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 1.52,
-     "y1": 5.23,
-     "x2": 2.34,
-     "y2": 5.23
+     "id": "L0-O1",
+     "kind": "door",
+     "wallId": "L0-W12",
+     "offsetM": 0.15,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L0-R4",
+      "L0-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 3.73,
-     "y1": 5.23,
-     "x2": 4.55,
-     "y2": 5.23
+     "id": "L0-O2",
+     "kind": "door",
+     "wallId": "L0-W15",
+     "offsetM": 1.16,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L0-R5",
+      "L0-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 7.65,
-     "y1": 5.23,
-     "x2": 8.47,
-     "y2": 5.23
+     "id": "L0-O3",
+     "kind": "door",
+     "wallId": "L0-W18",
+     "offsetM": 0.25,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L0-R6",
+      "L0-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 10.43,
-     "y1": 5.23,
-     "x2": 11.25,
-     "y2": 5.23
+     "id": "L0-O4",
+     "kind": "door",
+     "wallId": "L0-W22",
+     "offsetM": 0.25,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L0-R7",
+      "L0-H0"
+     ]
     },
     {
+     "id": "L0-O5",
      "kind": "entry",
-     "x1": 8.29,
-     "y1": 8.4,
-     "x2": 9.29,
-     "y2": 8.4
+     "wallId": "L0-W20",
+     "offsetM": 0.89,
+     "widthM": 1,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L0-R6",
+      "outside"
+     ]
     },
     {
+     "id": "L0-O6",
      "kind": "patio",
-     "x1": 8.13,
-     "y1": 0,
-     "x2": 10.85,
-     "y2": 0
+     "wallId": "L0-W5",
+     "offsetM": 1.35,
+     "widthM": 2.72,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L0-R2",
+      "outside"
+     ]
     },
     {
+     "id": "L0-O7",
      "kind": "garage",
-     "x1": 0,
-     "y1": 5.53,
-     "x2": 0,
-     "y2": 6.35
+     "wallId": "L0-W11",
+     "offsetM": 0.3,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.4,
+     "connects": [
+      "L0-R3",
+      "outside"
+     ]
     },
     {
+     "id": "L0-O8",
      "kind": "window",
-     "x1": 1.04,
-     "y1": 0,
-     "x2": 2.86,
-     "y2": 0,
+     "wallId": "L0-W0",
+     "offsetM": 1.04,
+     "widthM": 1.82,
      "sillM": 0.75,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L0-R0",
+      "outside"
+     ]
     },
     {
+     "id": "L0-O9",
      "kind": "window",
-     "x1": 4.72,
-     "y1": 0,
-     "x2": 5.95,
-     "y2": 0,
+     "wallId": "L0-W3",
+     "offsetM": 0.82,
+     "widthM": 1.23,
      "sillM": 0.75,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L0-R1",
+      "outside"
+     ]
     },
     {
+     "id": "L0-O10",
      "kind": "window",
-     "x1": 8.78,
-     "y1": 0,
-     "x2": 10.2,
-     "y2": 0,
+     "wallId": "L0-W5",
+     "offsetM": 2,
+     "widthM": 1.42,
      "sillM": 0.75,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L0-R2",
+      "outside"
+     ]
     },
     {
+     "id": "L0-O11",
      "kind": "window",
-     "x1": 5.5,
-     "y1": 8.4,
-     "x2": 6.7,
-     "y2": 8.4,
+     "wallId": "L0-W25",
+     "offsetM": 0.7,
+     "widthM": 1.2,
      "sillM": 1.1,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L0-ST",
+      "outside"
+     ]
+    },
+    {
+     "id": "L0-O12c",
+     "kind": "cased",
+     "wallId": "L0-W1",
+     "offsetM": 0.78,
+     "widthM": 2.34,
+     "sillM": null,
+     "headM": 2.3,
+     "connects": [
+      "L0-R0",
+      "L0-H0"
+     ]
+    },
+    {
+     "id": "L0-O13c",
+     "kind": "cased",
+     "wallId": "L0-W4",
+     "offsetM": 0.58,
+     "widthM": 1.73,
+     "sillM": null,
+     "headM": 2.3,
+     "connects": [
+      "L0-R1",
+      "L0-H0"
+     ]
+    },
+    {
+     "id": "L0-O14c",
+     "kind": "cased",
+     "wallId": "L0-W7",
+     "offsetM": 1.08,
+     "widthM": 3.25,
+     "sillM": null,
+     "headM": 2.3,
+     "connects": [
+      "L0-R2",
+      "L0-H0"
+     ]
     }
    ],
-   "stairs": [
+   "balconies": [],
+   "furnishings": [
     {
-     "polygon": [
-      [
-       4.8,
-       5.23
-      ],
-      [
-       7.4,
-       5.23
-      ],
-      [
-       7.4,
-       8.4
-      ],
-      [
-       4.8,
-       8.4
-      ]
-     ],
-     "direction": "up"
+     "type": "counter",
+     "roomId": "L0-R0",
+     "x": 0.32,
+     "y": 2.15,
+     "w": 3,
+     "d": 0.64,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": true,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "counter",
+     "roomId": "L0-R0",
+     "x": 2.1,
+     "y": 0.32,
+     "w": 2.2,
+     "d": 0.64,
+     "h": null,
+     "rotationDeg": 180,
+     "size": null,
+     "sink": true,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "upper-cabinets",
+     "roomId": "L0-R0",
+     "x": 0.18,
+     "y": 2.15,
+     "w": 2.4,
+     "d": 0.35,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "fridge",
+     "roomId": "L0-R0",
+     "x": 0.4,
+     "y": 3.6,
+     "w": 0.9,
+     "d": 0.75,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "island",
+     "roomId": "L0-R0",
+     "x": 2.3,
+     "y": 2.25,
+     "w": 1.9,
+     "d": 0.95,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "stool",
+     "roomId": "L0-R0",
+     "x": 1.75,
+     "y": 2.98,
+     "w": 0.42,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "stool",
+     "roomId": "L0-R0",
+     "x": 2.3,
+     "y": 2.98,
+     "w": 0.42,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "stool",
+     "roomId": "L0-R0",
+     "x": 2.85,
+     "y": 2.98,
+     "w": 0.42,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "pendant",
+     "roomId": "L0-R0",
+     "x": 1.95,
+     "y": 2.25,
+     "w": 0.35,
+     "d": 0.35,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "pendant",
+     "roomId": "L0-R0",
+     "x": 2.65,
+     "y": 2.25,
+     "w": 0.35,
+     "d": 0.35,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "dining-table",
+     "roomId": "L0-R1",
+     "x": 5.34,
+     "y": 2,
+     "w": 1.9,
+     "d": 0.95,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L0-R1",
+     "x": 4.85,
+     "y": 1.25,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 180,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L0-R1",
+     "x": 5.83,
+     "y": 1.25,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 180,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L0-R1",
+     "x": 4.85,
+     "y": 2.75,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L0-R1",
+     "x": 5.83,
+     "y": 2.75,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L0-R1",
+     "x": 4.1,
+     "y": 2,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L0-R1",
+     "x": 6.58,
+     "y": 2,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "pendant",
+     "roomId": "L0-R1",
+     "x": 5.34,
+     "y": 2,
+     "w": 0.6,
+     "d": 0.6,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": true
+    },
+    {
+     "type": "plant",
+     "roomId": "L0-R1",
+     "x": 6.45,
+     "y": 0.4,
+     "w": 0.5,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "rug",
+     "roomId": "L0-R2",
+     "x": 9.7,
+     "y": 2.1,
+     "w": 3,
+     "d": 2.3,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "sofa",
+     "roomId": "L0-R2",
+     "x": 8.35,
+     "y": 2.1,
+     "w": 2.4,
+     "d": 0.95,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "coffee-table",
+     "roomId": "L0-R2",
+     "x": 9.65,
+     "y": 2.1,
+     "w": 1.1,
+     "d": 0.6,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "media-unit",
+     "roomId": "L0-R2",
+     "x": 11.97,
+     "y": 2.1,
+     "w": 1.9,
+     "d": 0.45,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "armchair",
+     "roomId": "L0-R2",
+     "x": 10.75,
+     "y": 3.35,
+     "w": 0.85,
+     "d": 0.85,
+     "h": null,
+     "rotationDeg": 200,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "floor-lamp",
+     "roomId": "L0-R2",
+     "x": 7.15,
+     "y": 3.65,
+     "w": 0.4,
+     "d": 0.4,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "plant",
+     "roomId": "L0-R2",
+     "x": 11.85,
+     "y": 0.4,
+     "w": 0.55,
+     "d": 0.55,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "side-table",
+     "roomId": "L0-R2",
+     "x": 8.35,
+     "y": 3.55,
+     "w": 0.45,
+     "d": 0.45,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bench",
+     "roomId": "L0-R3",
+     "x": 0.24,
+     "y": 7.2,
+     "w": 1.3,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "cabinet",
+     "roomId": "L0-R3",
+     "x": 0.68,
+     "y": 8.18,
+     "w": 1.1,
+     "d": 0.4,
+     "h": 1.9,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "toilet",
+     "roomId": "L0-R4",
+     "x": 1.97,
+     "y": 8.05,
+     "w": 0.4,
+     "d": 0.68,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "vanity",
+     "roomId": "L0-R4",
+     "x": 2.33,
+     "y": 6.4,
+     "w": 0.6,
+     "d": 0.45,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "desk",
+     "roomId": "L0-R5",
+     "x": 3.68,
+     "y": 8.03,
+     "w": 1.5,
+     "d": 0.7,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "office-chair",
+     "roomId": "L0-R5",
+     "x": 3.68,
+     "y": 7.35,
+     "w": 0.6,
+     "d": 0.6,
+     "h": null,
+     "rotationDeg": 180,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bookshelf",
+     "roomId": "L0-R5",
+     "x": 2.77,
+     "y": 6.4,
+     "w": 1.6,
+     "d": 0.35,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "armchair",
+     "roomId": "L0-R5",
+     "x": 4.3,
+     "y": 5.95,
+     "w": 0.8,
+     "d": 0.8,
+     "h": null,
+     "rotationDeg": 315,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "rug",
+     "roomId": "L0-R6",
+     "x": 8.79,
+     "y": 6.95,
+     "w": 1.5,
+     "d": 2.2,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "console",
+     "roomId": "L0-R6",
+     "x": 9.95,
+     "y": 6.6,
+     "w": 1.2,
+     "d": 0.35,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "plant",
+     "roomId": "L0-R6",
+     "x": 7.72,
+     "y": 8.05,
+     "w": 0.5,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "washer",
+     "roomId": "L0-R7",
+     "x": 10.6,
+     "y": 8.06,
+     "w": 0.68,
+     "d": 0.66,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "dryer",
+     "roomId": "L0-R7",
+     "x": 11.32,
+     "y": 8.06,
+     "w": 0.68,
+     "d": 0.66,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "cabinet",
+     "roomId": "L0-R7",
+     "x": 11.98,
+     "y": 6.25,
+     "w": 1.4,
+     "d": 0.45,
+     "h": 0.9,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
     }
    ]
   },
@@ -395,11 +1472,31 @@
    "name": "Upper floor",
    "elevationM": 3,
    "heightM": 3,
+   "ceilingHeightM": 2.95,
+   "outline": [
+    [
+     0,
+     0
+    ],
+    [
+     12.2,
+     0
+    ],
+    [
+     12.2,
+     8.4
+    ],
+    [
+     0,
+     8.4
+    ]
+   ],
    "rooms": [
     {
-     "id": "L1R0",
+     "id": "L1-R0",
      "name": "Primary bedroom",
      "type": "bedroom",
+     "unitId": "U-1",
      "polygon": [
       [
        0,
@@ -418,12 +1515,14 @@
        4.03
       ]
      ],
-     "areaM2": 13.7
+     "areaM2": 13.7,
+     "floorFinish": "wood"
     },
     {
-     "id": "L1R1",
+     "id": "L1-R1",
      "name": "Primary bath",
      "type": "bath",
+     "unitId": "U-1",
      "polygon": [
       [
        3.4,
@@ -442,12 +1541,14 @@
        2.22
       ]
      ],
-     "areaM2": 4.62
+     "areaM2": 4.62,
+     "floorFinish": "tile"
     },
     {
-     "id": "L1R2",
+     "id": "L1-R2",
      "name": "Closet",
      "type": "closet",
+     "unitId": "U-1",
      "polygon": [
       [
        3.4,
@@ -466,12 +1567,14 @@
        4.03
       ]
      ],
-     "areaM2": 3.78
+     "areaM2": 3.78,
+     "floorFinish": "wood"
     },
     {
-     "id": "L1R3",
+     "id": "L1-R3",
      "name": "Bedroom 2",
      "type": "bedroom",
+     "unitId": "U-1",
      "polygon": [
       [
        5.48,
@@ -490,12 +1593,14 @@
        4.03
       ]
      ],
-     "areaM2": 13.55
+     "areaM2": 13.55,
+     "floorFinish": "wood"
     },
     {
-     "id": "L1R4",
+     "id": "L1-R4",
      "name": "Bedroom 4",
      "type": "bedroom",
+     "unitId": "U-1",
      "polygon": [
       [
        8.84,
@@ -514,12 +1619,14 @@
        4.03
       ]
      ],
-     "areaM2": 13.55
+     "areaM2": 13.55,
+     "floorFinish": "wood"
     },
     {
-     "id": "L1R5",
+     "id": "L1-R5",
      "name": "Bedroom 3",
      "type": "bedroom",
+     "unitId": "U-1",
      "polygon": [
       [
        0,
@@ -538,12 +1645,14 @@
        8.4
       ]
      ],
-     "areaM2": 12.04
+     "areaM2": 12.04,
+     "floorFinish": "wood"
     },
     {
-     "id": "L1R6",
+     "id": "L1-R6",
      "name": "Linen",
      "type": "linen",
+     "unitId": "U-1",
      "polygon": [
       [
        3.8,
@@ -562,12 +1671,14 @@
        8.4
       ]
      ],
-     "areaM2": 3.17
+     "areaM2": 3.17,
+     "floorFinish": "wood"
     },
     {
-     "id": "L1R7",
+     "id": "L1-R7",
      "name": "Bathroom",
      "type": "bath",
+     "unitId": "U-1",
      "polygon": [
       [
        7.4,
@@ -586,12 +1697,14 @@
        8.4
       ]
      ],
-     "areaM2": 7.61
+     "areaM2": 7.61,
+     "floorFinish": "tile"
     },
     {
-     "id": "L1R8",
+     "id": "L1-R8",
      "name": "Bathroom",
      "type": "bath",
+     "unitId": "U-1",
      "polygon": [
       [
        9.8,
@@ -610,248 +1723,1233 @@
        8.4
       ]
      ],
-     "areaM2": 7.61
+     "areaM2": 7.61,
+     "floorFinish": "tile"
+    },
+    {
+     "id": "L1-ST",
+     "name": "Stair",
+     "type": "stair",
+     "unitId": "U-1",
+     "polygon": [
+      [
+       4.8,
+       5.23
+      ],
+      [
+       7.4,
+       5.23
+      ],
+      [
+       7.4,
+       8.4
+      ],
+      [
+       4.8,
+       8.4
+      ]
+     ],
+     "areaM2": 8.24,
+     "floorFinish": "wood"
+    },
+    {
+     "id": "L1-H0",
+     "name": "Hall",
+     "type": "hall",
+     "unitId": "U-1",
+     "polygon": [
+      [
+       0,
+       4.03
+      ],
+      [
+       12.2,
+       4.03
+      ],
+      [
+       12.2,
+       5.23
+      ],
+      [
+       0,
+       5.23
+      ]
+     ],
+     "areaM2": 14.64,
+     "floorFinish": "wood"
+    }
+   ],
+   "walls": [
+    {
+     "id": "L1-W0",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 0,
+     "x2": 3.4,
+     "y2": 0,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W1",
+     "kind": "interior",
+     "x1": 3.4,
+     "y1": 0,
+     "x2": 3.4,
+     "y2": 2.22,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W2",
+     "kind": "interior",
+     "x1": 3.4,
+     "y1": 2.22,
+     "x2": 3.4,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W3",
+     "kind": "interior",
+     "x1": 0,
+     "y1": 4.03,
+     "x2": 3.4,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W4",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 0,
+     "x2": 0,
+     "y2": 4.03,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W5",
+     "kind": "exterior",
+     "x1": 3.4,
+     "y1": 0,
+     "x2": 5.48,
+     "y2": 0,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W6",
+     "kind": "interior",
+     "x1": 5.48,
+     "y1": 0,
+     "x2": 5.48,
+     "y2": 2.22,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W7",
+     "kind": "interior",
+     "x1": 3.4,
+     "y1": 2.22,
+     "x2": 5.48,
+     "y2": 2.22,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W8",
+     "kind": "interior",
+     "x1": 5.48,
+     "y1": 2.22,
+     "x2": 5.48,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W9",
+     "kind": "interior",
+     "x1": 3.4,
+     "y1": 4.03,
+     "x2": 5.48,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W10",
+     "kind": "exterior",
+     "x1": 5.48,
+     "y1": 0,
+     "x2": 8.84,
+     "y2": 0,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W11",
+     "kind": "interior",
+     "x1": 8.84,
+     "y1": 0,
+     "x2": 8.84,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W12",
+     "kind": "interior",
+     "x1": 5.48,
+     "y1": 4.03,
+     "x2": 8.84,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W13",
+     "kind": "exterior",
+     "x1": 8.84,
+     "y1": 0,
+     "x2": 12.2,
+     "y2": 0,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W14",
+     "kind": "exterior",
+     "x1": 12.2,
+     "y1": 0,
+     "x2": 12.2,
+     "y2": 4.03,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W15",
+     "kind": "interior",
+     "x1": 8.84,
+     "y1": 4.03,
+     "x2": 12.2,
+     "y2": 4.03,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W16",
+     "kind": "interior",
+     "x1": 0,
+     "y1": 5.23,
+     "x2": 3.8,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W17",
+     "kind": "interior",
+     "x1": 3.8,
+     "y1": 5.23,
+     "x2": 3.8,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W18",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 8.4,
+     "x2": 3.8,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W19",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 5.23,
+     "x2": 0,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W20",
+     "kind": "interior",
+     "x1": 3.8,
+     "y1": 5.23,
+     "x2": 4.8,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W21",
+     "kind": "interior",
+     "x1": 4.8,
+     "y1": 5.23,
+     "x2": 4.8,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W22",
+     "kind": "exterior",
+     "x1": 3.8,
+     "y1": 8.4,
+     "x2": 4.8,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W23",
+     "kind": "interior",
+     "x1": 7.4,
+     "y1": 5.23,
+     "x2": 9.8,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W24",
+     "kind": "interior",
+     "x1": 9.8,
+     "y1": 5.23,
+     "x2": 9.8,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W25",
+     "kind": "exterior",
+     "x1": 7.4,
+     "y1": 8.4,
+     "x2": 9.8,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W26",
+     "kind": "interior",
+     "x1": 7.4,
+     "y1": 5.23,
+     "x2": 7.4,
+     "y2": 8.4,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W27",
+     "kind": "interior",
+     "x1": 9.8,
+     "y1": 5.23,
+     "x2": 12.2,
+     "y2": 5.23,
+     "thicknessM": 0.12
+    },
+    {
+     "id": "L1-W28",
+     "kind": "exterior",
+     "x1": 12.2,
+     "y1": 5.23,
+     "x2": 12.2,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W29",
+     "kind": "exterior",
+     "x1": 9.8,
+     "y1": 8.4,
+     "x2": 12.2,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W30",
+     "kind": "exterior",
+     "x1": 4.8,
+     "y1": 8.4,
+     "x2": 7.4,
+     "y2": 8.4,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W31",
+     "kind": "exterior",
+     "x1": 12.2,
+     "y1": 4.03,
+     "x2": 12.2,
+     "y2": 5.23,
+     "thicknessM": 0.3
+    },
+    {
+     "id": "L1-W32",
+     "kind": "exterior",
+     "x1": 0,
+     "y1": 4.03,
+     "x2": 0,
+     "y2": 5.23,
+     "thicknessM": 0.3
     }
    ],
    "openings": [
     {
-     "kind": "interior",
-     "x1": 2.33,
-     "y1": 4.03,
-     "x2": 3.15,
-     "y2": 4.03
+     "id": "L1-O0",
+     "kind": "door",
+     "wallId": "L1-W3",
+     "offsetM": 2.33,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R0",
+      "L1-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 4.53,
-     "y1": 4.03,
-     "x2": 5.23,
-     "y2": 4.03
+     "id": "L1-O1",
+     "kind": "door",
+     "wallId": "L1-W9",
+     "offsetM": 1.13,
+     "widthM": 0.7,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R2",
+      "L1-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 5.73,
-     "y1": 4.03,
-     "x2": 6.55,
-     "y2": 4.03
+     "id": "L1-O2",
+     "kind": "door",
+     "wallId": "L1-W12",
+     "offsetM": 0.25,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R3",
+      "L1-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 9.09,
-     "y1": 4.03,
-     "x2": 9.91,
-     "y2": 4.03
+     "id": "L1-O3",
+     "kind": "door",
+     "wallId": "L1-W15",
+     "offsetM": 0.25,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R4",
+      "L1-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 2.73,
-     "y1": 5.23,
-     "x2": 3.55,
-     "y2": 5.23
+     "id": "L1-O4",
+     "kind": "door",
+     "wallId": "L1-W16",
+     "offsetM": 2.73,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R5",
+      "L1-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 3.95,
-     "y1": 5.23,
-     "x2": 4.65,
-     "y2": 5.23
+     "id": "L1-O5",
+     "kind": "door",
+     "wallId": "L1-W20",
+     "offsetM": 0.15,
+     "widthM": 0.7,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R6",
+      "L1-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 7.65,
-     "y1": 5.23,
-     "x2": 8.47,
-     "y2": 5.23
+     "id": "L1-O6",
+     "kind": "door",
+     "wallId": "L1-W23",
+     "offsetM": 0.25,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R7",
+      "L1-H0"
+     ]
     },
     {
-     "kind": "interior",
-     "x1": 10.05,
-     "y1": 5.23,
-     "x2": 10.87,
-     "y2": 5.23
+     "id": "L1-O7",
+     "kind": "door",
+     "wallId": "L1-W27",
+     "offsetM": 0.25,
+     "widthM": 0.82,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R8",
+      "L1-H0"
+     ]
     },
     {
+     "id": "L1-O8",
      "kind": "window",
-     "x1": 0.93,
-     "y1": 0,
-     "x2": 2.47,
-     "y2": 0,
+     "wallId": "L1-W0",
+     "offsetM": 0.93,
+     "widthM": 1.54,
      "sillM": 0.75,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-R0",
+      "outside"
+     ]
     },
     {
+     "id": "L1-O9",
      "kind": "window",
-     "x1": 4.09,
-     "y1": 0,
-     "x2": 4.79,
-     "y2": 0,
+     "wallId": "L1-W5",
+     "offsetM": 0.69,
+     "widthM": 0.7,
      "sillM": 1.5,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-R1",
+      "outside"
+     ]
     },
     {
+     "id": "L1-O10",
      "kind": "window",
-     "x1": 6.41,
-     "y1": 0,
-     "x2": 7.92,
-     "y2": 0,
+     "wallId": "L1-W10",
+     "offsetM": 0.93,
+     "widthM": 1.51,
      "sillM": 0.75,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-R3",
+      "outside"
+     ]
     },
     {
+     "id": "L1-O11",
      "kind": "window",
-     "x1": 9.77,
-     "y1": 0,
-     "x2": 11.28,
-     "y2": 0,
+     "wallId": "L1-W13",
+     "offsetM": 0.93,
+     "widthM": 1.51,
      "sillM": 0.75,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-R4",
+      "outside"
+     ]
     },
     {
+     "id": "L1-O12",
      "kind": "window",
-     "x1": 8.25,
-     "y1": 8.4,
-     "x2": 8.95,
-     "y2": 8.4,
+     "wallId": "L1-W25",
+     "offsetM": 0.85,
+     "widthM": 0.7,
      "sillM": 1.5,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-R7",
+      "outside"
+     ]
     },
     {
+     "id": "L1-O13",
      "kind": "window",
-     "x1": 10.65,
-     "y1": 8.4,
-     "x2": 11.35,
-     "y2": 8.4,
+     "wallId": "L1-W29",
+     "offsetM": 0.85,
+     "widthM": 0.7,
      "sillM": 1.5,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-R8",
+      "outside"
+     ]
     },
     {
+     "id": "L1-O14",
      "kind": "window",
-     "x1": 12.2,
-     "y1": 6.47,
-     "x2": 12.2,
-     "y2": 7.17,
+     "wallId": "L1-W28",
+     "offsetM": 1.24,
+     "widthM": 0.7,
      "sillM": 1.5,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-R8",
+      "outside"
+     ]
     },
     {
+     "id": "L1-O15",
      "kind": "window",
-     "x1": 5.5,
-     "y1": 8.4,
-     "x2": 6.7,
-     "y2": 8.4,
+     "wallId": "L1-W30",
+     "offsetM": 0.7,
+     "widthM": 1.2,
      "sillM": 1.1,
-     "headM": 2.2
+     "headM": 2.2,
+     "connects": [
+      "L1-ST",
+      "outside"
+     ]
+    },
+    {
+     "id": "L1-O16",
+     "kind": "door",
+     "wallId": "L1-W2",
+     "offsetM": 0.13,
+     "widthM": 0.8,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R0",
+      "L1-R2"
+     ]
+    },
+    {
+     "id": "L1-O17",
+     "kind": "door",
+     "wallId": "L1-W7",
+     "offsetM": 0.35,
+     "widthM": 0.75,
+     "sillM": null,
+     "headM": 2.1,
+     "connects": [
+      "L1-R1",
+      "L1-R2"
+     ]
     }
    ],
-   "stairs": [
+   "balconies": [],
+   "furnishings": [
     {
-     "polygon": [
-      [
-       4.8,
-       5.23
-      ],
-      [
-       7.4,
-       5.23
-      ],
-      [
-       7.4,
-       8.4
-      ],
-      [
-       4.8,
-       8.4
-      ]
-     ],
-     "direction": "down"
+     "type": "rug",
+     "roomId": "L1-R0",
+     "x": 1.4,
+     "y": 2,
+     "w": 2.2,
+     "d": 2.4,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bed",
+     "roomId": "L1-R0",
+     "x": 1.07,
+     "y": 2,
+     "w": 1.6,
+     "d": 2.1,
+     "h": null,
+     "rotationDeg": 90,
+     "size": "queen",
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "nightstand",
+     "roomId": "L1-R0",
+     "x": 0.25,
+     "y": 0.85,
+     "w": 0.48,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "nightstand",
+     "roomId": "L1-R0",
+     "x": 0.25,
+     "y": 3.15,
+     "w": 0.48,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "dresser",
+     "roomId": "L1-R0",
+     "x": 3.15,
+     "y": 1,
+     "w": 1.2,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bench",
+     "roomId": "L1-R0",
+     "x": 2.4,
+     "y": 2,
+     "w": 1.2,
+     "d": 0.4,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bathtub",
+     "roomId": "L1-R1",
+     "x": 4.44,
+     "y": 0.48,
+     "w": 1.6,
+     "d": 0.78,
+     "h": null,
+     "rotationDeg": 180,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "vanity",
+     "roomId": "L1-R1",
+     "x": 5.22,
+     "y": 1.45,
+     "w": 1.2,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": true,
+     "wide": null
+    },
+    {
+     "type": "toilet",
+     "roomId": "L1-R1",
+     "x": 3.75,
+     "y": 1.85,
+     "w": 0.4,
+     "d": 0.68,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "wardrobe",
+     "roomId": "L1-R2",
+     "x": 5.2,
+     "y": 3.1,
+     "w": 1.5,
+     "d": 0.55,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "wardrobe",
+     "roomId": "L1-R2",
+     "x": 4.2,
+     "y": 3.76,
+     "w": 1.2,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "rug",
+     "roomId": "L1-R3",
+     "x": 7.4,
+     "y": 2.1,
+     "w": 2,
+     "d": 2.4,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bed",
+     "roomId": "L1-R3",
+     "x": 7.79,
+     "y": 2.1,
+     "w": 1.6,
+     "d": 2.1,
+     "h": null,
+     "rotationDeg": 270,
+     "size": "queen",
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "nightstand",
+     "roomId": "L1-R3",
+     "x": 8.6,
+     "y": 0.95,
+     "w": 0.48,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "nightstand",
+     "roomId": "L1-R3",
+     "x": 8.6,
+     "y": 3.25,
+     "w": 0.48,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "wardrobe",
+     "roomId": "L1-R3",
+     "x": 5.76,
+     "y": 2,
+     "w": 1.4,
+     "d": 0.55,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "desk",
+     "roomId": "L1-R3",
+     "x": 6.6,
+     "y": 0.38,
+     "w": 1.1,
+     "d": 0.55,
+     "h": null,
+     "rotationDeg": 180,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L1-R3",
+     "x": 6.6,
+     "y": 0.95,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bed",
+     "roomId": "L1-R4",
+     "x": 11.68,
+     "y": 2.55,
+     "w": 1,
+     "d": 2,
+     "h": null,
+     "rotationDeg": 270,
+     "size": "twin",
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "nightstand",
+     "roomId": "L1-R4",
+     "x": 11.93,
+     "y": 1.25,
+     "w": 0.45,
+     "d": 0.4,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "desk",
+     "roomId": "L1-R4",
+     "x": 10,
+     "y": 0.38,
+     "w": 1.1,
+     "d": 0.55,
+     "h": null,
+     "rotationDeg": 180,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "chair",
+     "roomId": "L1-R4",
+     "x": 10,
+     "y": 0.95,
+     "w": 0.46,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bookshelf",
+     "roomId": "L1-R4",
+     "x": 9.03,
+     "y": 2,
+     "w": 1.2,
+     "d": 0.35,
+     "h": 1.2,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "rug",
+     "roomId": "L1-R4",
+     "x": 10.6,
+     "y": 2.4,
+     "w": 1.6,
+     "d": 1.6,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bed",
+     "roomId": "L1-R5",
+     "x": 1.6,
+     "y": 7.33,
+     "w": 1.6,
+     "d": 2.1,
+     "h": null,
+     "rotationDeg": 0,
+     "size": "queen",
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "nightstand",
+     "roomId": "L1-R5",
+     "x": 0.5,
+     "y": 8.15,
+     "w": 0.48,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "nightstand",
+     "roomId": "L1-R5",
+     "x": 2.7,
+     "y": 8.15,
+     "w": 0.48,
+     "d": 0.42,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "dresser",
+     "roomId": "L1-R5",
+     "x": 0.27,
+     "y": 5.95,
+     "w": 1.1,
+     "d": 0.5,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "rug",
+     "roomId": "L1-R5",
+     "x": 1.6,
+     "y": 6.9,
+     "w": 2.4,
+     "d": 1.8,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "shelves",
+     "roomId": "L1-R6",
+     "x": 4.3,
+     "y": 8.17,
+     "w": 0.9,
+     "d": 0.4,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "bathtub",
+     "roomId": "L1-R7",
+     "x": 8.6,
+     "y": 7.99,
+     "w": 1.6,
+     "d": 0.75,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "toilet",
+     "roomId": "L1-R7",
+     "x": 7.75,
+     "y": 6.3,
+     "w": 0.4,
+     "d": 0.68,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "vanity",
+     "roomId": "L1-R7",
+     "x": 9.55,
+     "y": 6.25,
+     "w": 0.9,
+     "d": 0.48,
+     "h": null,
+     "rotationDeg": 270,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "shower",
+     "roomId": "L1-R8",
+     "x": 11.68,
+     "y": 7.86,
+     "w": 1,
+     "d": 1,
+     "h": null,
+     "rotationDeg": 0,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "toilet",
+     "roomId": "L1-R8",
+     "x": 10.14,
+     "y": 7.95,
+     "w": 0.4,
+     "d": 0.68,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
+    },
+    {
+     "type": "vanity",
+     "roomId": "L1-R8",
+     "x": 10.1,
+     "y": 6.05,
+     "w": 0.8,
+     "d": 0.48,
+     "h": null,
+     "rotationDeg": 90,
+     "size": null,
+     "sink": null,
+     "cooktop": null,
+     "double": null,
+     "wide": null
     }
    ]
   }
  ],
- "garage": {
-  "cars": 2,
-  "polygon": [
-   [
-    -7,
-    1.8
-   ],
-   [
-    0,
-    1.8
-   ],
-   [
-    0,
-    8.4
-   ],
-   [
-    -7,
-    8.4
-   ]
-  ]
- },
- "porch": {
-  "polygon": [
-   [
-    1.83,
-    8.4
-   ],
-   [
-    7.93,
-    8.4
-   ],
-   [
-    7.93,
-    10.6
-   ],
-   [
-    1.83,
-    10.6
-   ]
-  ]
- },
- "roof": {
-  "type": "gable",
-  "pitch": 0.83,
-  "eaveM": 0.45,
-  "ridgeAxis": "x",
-  "ridgeHeightM": 9.5
- },
- "materials": {
-  "structure": "wood-frame",
-  "cladding": "board-batten",
-  "roofing": "metal",
-  "palette": [
-   {
-    "name": "Barn white battens",
-    "hex": "#efece4",
-    "use": "walls"
-   },
-   {
-    "name": "Black steel",
-    "hex": "#26282a",
-    "use": "windows"
-   },
-   {
-    "name": "Galvalume",
-    "hex": "#a7adb1",
-    "use": "roof"
-   },
-   {
-    "name": "Fir porch",
-    "hex": "#b07a4a",
-    "use": "porch"
-   }
-  ]
- },
- "features": [
-  "Covered porch at the entry",
-  "Heat-pump heating and cooling, triple glazing, solar-ready roof",
-  "A study by the entry for working from home",
-  "Stacked stair with a window on the landing",
-  "Gable roof with trim eaves"
+ "stairs": [
+  {
+   "id": "S-A-0",
+   "shape": "switchback",
+   "fromLevel": 0,
+   "toLevel": 1,
+   "x": 4.8,
+   "y": 5.23,
+   "widthM": 2.6,
+   "depthM": 3.17,
+   "accessSide": "front"
+  }
  ],
- "cautions": [
-  "Slope and soil are simulated until a survey and real terrain data are attached.",
-  "Check local zoning for setbacks, height limits and lot coverage before publishing."
- ]
+ "elevators": [],
+ "exterior": {
+  "roof": {
+   "type": "gable",
+   "pitch": 0.83,
+   "eaveM": 0.45,
+   "ridgeAxis": "x",
+   "ridgeHeightM": 9.5
+  },
+  "garage": {
+   "cars": 2,
+   "polygon": [
+    [
+     -7,
+     1.8
+    ],
+    [
+     0,
+     1.8
+    ],
+    [
+     0,
+     8.4
+    ],
+    [
+     -7,
+     8.4
+    ]
+   ],
+   "heightM": 3
+  },
+  "porch": {
+   "polygon": [
+    [
+     1.83,
+     8.4
+    ],
+    [
+     7.93,
+     8.4
+    ],
+    [
+     7.93,
+     10.6
+    ],
+    [
+     1.83,
+     10.6
+    ]
+   ]
+  },
+  "parking": [],
+  "materials": {
+   "structure": "wood-frame",
+   "cladding": "board-batten",
+   "roofing": "metal",
+   "palette": [
+    {
+     "name": "Barn white battens",
+     "hex": "#efece4",
+     "use": "walls"
+    },
+    {
+     "name": "Black steel",
+     "hex": "#26282a",
+     "use": "windows"
+    },
+    {
+     "name": "Galvalume",
+     "hex": "#a7adb1",
+     "use": "roof"
+    },
+    {
+     "name": "Fir porch",
+     "hex": "#b07a4a",
+     "use": "accent"
+    }
+   ]
+  }
+ }
 }

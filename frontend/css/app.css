@@ -270,11 +270,13 @@ tfoot td { font-weight: 600; }
 .plan { overflow: visible; width: 100%; height: auto; }
 .plan-room { fill: rgba(255, 255, 255, 0.03); }
 .plan-room-living, .plan-room-kitchen, .plan-room-dining, .plan-room-family { fill: rgba(255, 177, 92, 0.07); }
-.plan-wall { fill: none; stroke: var(--muted); stroke-width: 0.08; }
+.plan-wall { fill: none; stroke: var(--muted); stroke-linecap: square; }
+.plan-wall-exterior { stroke: var(--ink); }
+.plan-wall-party { stroke: #cdd5df; }
 .plan-exterior { fill: none; stroke: var(--ink); stroke-width: 0.24; }
 .plan-garage { fill: rgba(255, 255, 255, 0.02); stroke: var(--faint); stroke-width: 0.1; stroke-dasharray: 0.4 0.25; }
 .plan-porch { fill: none; stroke: var(--faint); stroke-width: 0.07; stroke-dasharray: 0.25 0.2; }
-.plan-gap { stroke: var(--panel-2); stroke-width: 0.32; }
+.plan-gap { stroke: var(--panel-2); }
 .plan-window { stroke: #8fb8e0; stroke-width: 0.06; }
 .plan-door { stroke: var(--ink); stroke-width: 0.06; }
 .plan-door-entry, .plan-door-patio { stroke: var(--amber); stroke-width: 0.09; }
@@ -286,6 +288,7 @@ tfoot td { font-weight: 600; }
 .plan-label { font: 500 0.42px var(--text); fill: var(--ink); }
 .plan-label-quiet { fill: var(--faint); }
 .plan-area { font: 400 0.32px var(--text); fill: var(--faint); }
+.plan-unit { font: 600 0.36px var(--text); fill: var(--amber); }
 .plan-dim { stroke: var(--faint); stroke-width: 0.035; }
 .plan-dim-text { font: 400 0.34px var(--text); fill: var(--faint); }
 .plan-thumb .plan-exterior { stroke-width: 0.3; }
@@ -322,6 +325,9 @@ tfoot td { font-weight: 600; }
 .walk-start p { color: var(--muted); }
 .walk-touch { display: none; gap: 8px; justify-content: center; }
 @media (pointer: coarse) { .walk-touch { display: flex; } .walk-start.is-hidden { display: grid; top: auto; bottom: 20px; transform: translateX(-50%); padding: 10px; } .walk-start.is-hidden p { display: none; } }
+.walk-lift { position: absolute; right: var(--margin); top: 50%; transform: translateY(-50%); display: grid; gap: 6px; padding: 10px; border-radius: 12px; background: var(--panel); box-shadow: var(--shadow); }
+.walk-lift-label { font-size: 0.8125rem; color: var(--muted); text-align: center; }
+.walk-lift .btn[aria-pressed='true'] { border-color: var(--amber); color: var(--amber); }
 .walk-note { position: absolute; left: var(--margin); bottom: var(--margin); font-size: 0.8125rem; color: var(--muted); background: var(--panel); padding: 6px 10px; border-radius: 8px; }
 
 /* Phone */
