@@ -101,6 +101,18 @@ export function setBasemap(map, mode) {
   if (b3d) map.setPaintProperty(b3d.id, 'fill-extrusion-opacity', mode === 'satellite' ? 0.6 : 0.85);
 }
 
+// Evening: the land dims so lit windows read; buildings darken with it.
+export function setEvening(map, on) {
+  if (map.getLayer('satellite')) {
+    map.setPaintProperty('satellite', 'raster-brightness-max', on ? 0.42 : 1);
+    map.setPaintProperty('satellite', 'raster-saturation', on ? -0.35 : 0);
+  }
+  const b3d = map.getStyle().layers.find((l) => l.type === 'fill-extrusion');
+  if (b3d) map.setPaintProperty(b3d.id, 'fill-extrusion-color', on ? '#59606b' : '#d9dee6');
+  const bg = map.getStyle().layers.find((l) => l.type === 'background');
+  if (bg) map.setPaintProperty(bg.id, 'background-color', on ? '#1c2330' : '#f8f4f0');
+}
+
 // The visitor's location as a pulsing marker.
 export function locationMarker(map, lngLat) {
   const el = document.createElement('div');

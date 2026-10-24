@@ -175,7 +175,9 @@ export function createHouseLayer(map) {
       const sun = new THREE.DirectionalLight(0xffffff, 2.2);
       sun.position.set(-0.4, -0.7, 1).normalize();
       scene.add(sun);
-      scene.add(new THREE.HemisphereLight(0xdfe8f5, 0x3a3226, 1.1));
+      const sky = new THREE.HemisphereLight(0xdfe8f5, 0x3a3226, 1.1);
+      scene.add(sky);
+      state.lights = { sun, sky };
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
       renderer.autoClear = false;
     },
@@ -265,7 +267,11 @@ export function createHouseLayer(map) {
     },
     setNight(on) {
       state.night = on;
-      if (state.model) state.model.userData.glassMat.emissiveIntensity = on ? 0.9 : 0;
+      if (state.model) state.model.userData.glassMat.emissiveIntensity = on ? 1.1 : 0;
+      if (state.lights) {
+        state.lights.sun.intensity = on ? 0.5 : 2.2;
+        state.lights.sky.intensity = on ? 0.45 : 1.1;
+      }
       map.triggerRepaint();
     },
     get design() { return state.design; },

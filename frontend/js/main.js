@@ -1,7 +1,7 @@
 // TerraSim: the globe, the fly-down, outlining land, the brief, sending, and the house on its lot.
 
 import { settings, store } from './store.js';
-import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setGlobe } from './map/map.js';
+import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setGlobe, setEvening } from './map/map.js';
 import { createOutliner } from './map/draw.js';
 import { createHouseLayer } from './map/house-layer.js';
 import { measure, problemsFor, placeOnLot, inFootprint } from './lib/place.js';
@@ -148,7 +148,7 @@ toolbar.addEventListener('click', (e) => {
   if (act === 'outline') startOutline();
   if (act === 'basemap') { app.basemap = app.basemap === 'satellite' ? 'street' : 'satellite'; setBasemap(map, app.basemap); renderToolbar(); }
   if (act === 'tilt') { app.tilted = !app.tilted; map.easeTo({ pitch: app.tilted ? 58 : 0, duration: 900 }); renderToolbar(); }
-  if (act === 'night') { app.night = !app.night; house.setNight(app.night); renderToolbar(); }
+  if (act === 'night') { app.night = !app.night; house.setNight(app.night); setEvening(map, app.night); renderToolbar(); }
   if (act === 'locate') locate();
 });
 
@@ -329,7 +329,7 @@ async function openHouse() {
     preview: !!design.previewOn,
     onWalk: () => openWalk(design),
     shareUrl: () => (design.previewOn ? shareLink({ preview: true }) : `${location.href.split('#')[0]}#l=${design.id}`),
-    onNight: (on) => { app.night = on; house.setNight(on); renderToolbar(); },
+    onNight: (on) => { app.night = on; house.setNight(on); setEvening(map, on); renderToolbar(); },
   }));
 }
 
@@ -357,7 +357,13 @@ document.querySelector('[data-open="catalog"]').addEventListener('click', async 
       setMode('house');
       const c = l.design.placement.footprint[0];
       map.flyTo({ center: c, zoom: 18.3, pitch: 60, bearing: -30, duration: 4500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
-      map.once('moveend', () => { setGlobe(map, false); house.show(l.design, placement); frameHouse(placement); setTimeout(openHouse, 2600); });
+      map.once('moveend', () => {
+        setGlobe(map, false);
+        if (l.design.site?.outline) outliner.load(l.design.site.outline);
+        house.show(l.design, placement);
+        frameHouse(placement);
+        setTimeout(openHouse, 2600);
+      });
     },
   }));
 });
