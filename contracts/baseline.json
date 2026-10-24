@@ -1,0 +1,194 @@
+{
+  "request": {
+    "schema": "terrasim.design-request/2",
+    "id": null,
+    "housingType": null,
+    "site": {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[null, null]]]
+      },
+      "properties": {
+        "areaM2": null,
+        "perimeterM": null,
+        "centroid": [null, null],
+        "setbackM": null
+      }
+    },
+    "brief": {
+      "floors": null,
+      "areaM2": null,
+      "unitCount": null,
+      "bedrooms": null,
+      "bathrooms": null,
+      "residents": null,
+      "roomType": null,
+      "budgetUSD": null
+    },
+    "advanced": {
+      "style": null,
+      "quality": null,
+      "garage": null,
+      "parkingSpaces": null,
+      "structure": null,
+      "cladding": null,
+      "roofing": null,
+      "priorities": [],
+      "extras": [],
+      "unitMix": {
+        "studio": null,
+        "oneBed": null,
+        "twoBed": null,
+        "threeBed": null
+      },
+      "bathroomSharing": null,
+      "commonSpaces": [],
+      "notes": null
+    },
+    "aiDecides": [],
+    "mode": null,
+    "builder": {
+      "name": null,
+      "company": null,
+      "email": null,
+      "landowner": null,
+      "permission": null
+    },
+    "client": {
+      "displayUnits": null,
+      "createdAt": null
+    }
+  },
+
+  "design": {
+    "schema": "terrasim.design/2",
+    "id": null,
+    "requestId": null,
+    "createdAt": null,
+    "housingType": null,
+
+    "title": null,
+    "summary": null,
+    "description": [],
+    "siteResponse": [],
+    "style": null,
+
+    "floors": null,
+    "unitCount": null,
+    "bedrooms": null,
+    "bathrooms": null,
+    "residents": null,
+    "finishedAreaM2": null,
+    "grossAreaM2": null,
+
+    "site": {
+      "outline": [[null, null]],
+      "areaM2": null
+    },
+    "placement": {
+      "origin": [null, null],
+      "xAxisBearingDeg": null,
+      "footprint": [[null, null]]
+    },
+    "size": {
+      "widthM": null,
+      "depthM": null,
+      "heightM": null
+    },
+
+    "units": [
+      {
+        "id": null,
+        "name": null,
+        "kind": null,
+        "levelIndex": null,
+        "bedrooms": null,
+        "bathrooms": null,
+        "residents": null,
+        "areaM2": null
+      }
+    ],
+
+    "levels": [
+      {
+        "index": null,
+        "name": null,
+        "elevationM": null,
+        "heightM": null,
+        "rooms": [
+          {
+            "id": null,
+            "name": null,
+            "type": null,
+            "unitId": null,
+            "polygon": [[null, null]],
+            "areaM2": null
+          }
+        ],
+        "openings": [
+          {
+            "kind": null,
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null,
+            "sillM": null,
+            "headM": null
+          }
+        ],
+        "stairs": [
+          {
+            "polygon": [[null, null]],
+            "direction": null
+          }
+        ],
+        "furnishings": [
+          {
+            "type": null,
+            "x": null,
+            "y": null,
+            "w": null,
+            "d": null,
+            "h": null,
+            "rotationDeg": null,
+            "size": null,
+            "sink": null,
+            "cooktop": null,
+            "double": null,
+            "wide": null
+          }
+        ]
+      }
+    ],
+
+    "garage": {
+      "cars": null,
+      "polygon": [[null, null]]
+    },
+    "porch": {
+      "polygon": [[null, null]]
+    },
+    "roof": {
+      "type": null,
+      "pitch": null,
+      "eaveM": null,
+      "ridgeAxis": null,
+      "ridgeHeightM": null
+    },
+    "materials": {
+      "structure": null,
+      "cladding": null,
+      "roofing": null,
+      "palette": [
+        {
+          "name": null,
+          "hex": null,
+          "use": null
+        }
+      ]
+    },
+    "features": [],
+    "cautions": []
+  }
+}
