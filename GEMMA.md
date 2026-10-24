@@ -139,8 +139,19 @@ Rules the interface relies on:
 - **Room `type`** picks colours and floor finish in the walkthrough. Known types: `living`, `kitchen`,
   `dining`, `family`, `entry`, `mudroom`, `laundry`, `powder`, `office`, `bedroom`, `bath`, `closet`,
   `linen`. Unknown types still draw.
-- **Opening `kind`**: `window`, `entry`, `patio`, `garage`, `interior`. Exterior openings must lie on
-  the outer walls (x = 0, x = width, y = 0, y = depth) to show on the 3D model.
+- **Opening `kind`**: `window`, `entry`, `patio`, `garage`, `interior`, `passage` (a doorless opening).
+  Exterior openings must lie on the outer walls (x = 0, x = width, y = 0, y = depth) to show on the 3D
+  model.
+- **Walls come from room outlines.** The walkthrough draws a wall along every room edge, except:
+  between two open-plan rooms (`living`, `kitchen`, `dining`, `family`) there is no wall, and where an
+  open-plan room meets space that isn't a room (a hall), the interface leaves a wide cased opening. Any
+  other room is reached only through its `interior`/`passage` openings, so every closed room needs one.
+- **Halls** don't need to be rooms: the floor covers the whole footprint, so space between rooms is
+  walkable hall.
+- **Stairs** are given once, on the lower level, as their outline (`direction: "up"`), plus a matching
+  outline on the upper level (`direction: "down"`). The interface builds a two-flight switchback inside
+  the outline: the foot and the top are both on the outline's low-y side, so that side should face a
+  hall. An outline about 2.6 m by 3.2 m fits a 3 m floor-to-floor height.
 - **Roof `type`**: `gable`, `hip` or `flat`. `pitch` is rise over run.
 - **Palette `use`**: the 3D model colours walls from an item whose `use` contains "wall", the roof
   from "roof", and window frames from "window" or "trim".
