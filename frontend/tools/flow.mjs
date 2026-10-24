@@ -22,18 +22,24 @@ await withBrowser(async (browser) => {
   await page.goto(base + '/');
   await page.waitForTimeout(5000);
   await shot('01-globe');
-  await page.mouse.click(VW / 2, VH * 0.3);
+  // The location marker flies home; a click anywhere else on the globe would fly there instead.
+  await page.click('.you');
   await page.waitForTimeout(9000);
   await shot('02-arrived');
   await page.click('[data-act="outline"]');
   await page.waitForTimeout(1200);
   // A lot around the map centre.
-  const pts = mobile ? [[110, 300], [280, 290], [300, 470], [120, 480]] : [[620, 420], [820, 400], [860, 560], [640, 590]];
+  const pts = mobile ? [[110, 420], [280, 410], [300, 580], [120, 590]] : [[620, 420], [820, 400], [860, 560], [640, 590]];
   for (const [x, y] of pts) { await page.mouse.click(x, y); await page.waitForTimeout(250); }
   await shot('03-drawing');
   if (mobile) await page.click('[data-h="finish"]'); else await page.keyboard.press('Enter');
   await page.waitForTimeout(1200);
   await shot('04-brief');
+  // The brief: a house, described in words, with every required box filled.
+  await page.click('.type-option:has(input[value=house])');
+  await page.fill('#q-designPrompt', 'A bright modern farmhouse that opens to the view, with a big kitchen at its heart.');
+  for (const [f, v] of [['floors', '2'], ['areaM2', '2200'], ['bedrooms', '3'], ['bathrooms', '2.5'], ['budgetUSD', '650000']]) await page.fill(`#q-${f}`, v);
+  await shot('04b-brief-filled');
   await page.click('[data-send]');
   await page.waitForTimeout(4500);
   await shot('05-not-sent');
