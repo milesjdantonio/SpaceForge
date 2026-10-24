@@ -7,12 +7,22 @@
       "type": "Feature",
       "geometry": {
         "type": "Polygon",
-        "coordinates": [[[null, null]]]
+        "coordinates": [
+          [
+            [
+              null,
+              null
+            ]
+          ]
+        ]
       },
       "properties": {
         "areaM2": null,
         "perimeterM": null,
-        "centroid": [null, null],
+        "centroid": [
+          null,
+          null
+        ],
         "setbackM": null
       }
     },
@@ -59,14 +69,12 @@
       "createdAt": null
     }
   },
-
   "design": {
     "schema": "terrasim.design/2",
     "id": null,
     "requestId": null,
     "createdAt": null,
     "housingType": null,
-
     "overview": {
       "title": null,
       "summary": null,
@@ -76,7 +84,6 @@
       "cautions": [],
       "style": null
     },
-
     "totals": {
       "floors": null,
       "levelsBelowGround": null,
@@ -88,24 +95,45 @@
       "grossAreaM2": null,
       "parkingSpaces": null
     },
-
     "site": {
-      "outline": [[null, null]],
-      "areaM2": null
+      "outline": [
+        [
+          null,
+          null
+        ]
+      ],
+      "areaM2": null,
+      "soil": {
+        "source": null,
+        "name": null,
+        "uscsClass": null,
+        "bearingPsf": null,
+        "shrinkSwell": null,
+        "depthToBedrockIn": null,
+        "depthToWaterTableIn": null,
+        "foundation": null,
+        "foundationReason": null,
+        "note": null
+      }
     },
-
     "placement": {
-      "origin": [null, null],
+      "origin": [
+        null,
+        null
+      ],
       "xAxisBearingDeg": null,
-      "footprint": [[null, null]]
+      "footprint": [
+        [
+          null,
+          null
+        ]
+      ]
     },
-
     "size": {
       "widthM": null,
       "depthM": null,
       "heightM": null
     },
-
     "units": [
       {
         "id": null,
@@ -119,7 +147,6 @@
         "areaM2": null
       }
     ],
-
     "levels": [
       {
         "index": null,
@@ -127,20 +154,28 @@
         "elevationM": null,
         "heightM": null,
         "ceilingHeightM": null,
-        "outline": [[null, null]],
-
+        "outline": [
+          [
+            null,
+            null
+          ]
+        ],
         "rooms": [
           {
             "id": null,
             "name": null,
             "type": null,
             "unitId": null,
-            "polygon": [[null, null]],
+            "polygon": [
+              [
+                null,
+                null
+              ]
+            ],
             "areaM2": null,
             "floorFinish": null
           }
         ],
-
         "walls": [
           {
             "id": null,
@@ -152,7 +187,6 @@
             "thicknessM": null
           }
         ],
-
         "openings": [
           {
             "id": null,
@@ -162,19 +196,25 @@
             "widthM": null,
             "sillM": null,
             "headM": null,
-            "connects": [null, null]
+            "connects": [
+              null,
+              null
+            ]
           }
         ],
-
         "balconies": [
           {
             "id": null,
             "unitId": null,
-            "polygon": [[null, null]],
+            "polygon": [
+              [
+                null,
+                null
+              ]
+            ],
             "railing": null
           }
         ],
-
         "furnishings": [
           {
             "type": null,
@@ -194,7 +234,6 @@
         ]
       }
     ],
-
     "stairs": [
       {
         "id": null,
@@ -208,7 +247,6 @@
         "accessSide": null
       }
     ],
-
     "elevators": [
       {
         "id": null,
@@ -220,7 +258,6 @@
         "doorSide": null
       }
     ],
-
     "exterior": {
       "roof": {
         "type": null,
@@ -231,15 +268,30 @@
       },
       "garage": {
         "cars": null,
-        "polygon": [[null, null]],
+        "polygon": [
+          [
+            null,
+            null
+          ]
+        ],
         "heightM": null
       },
       "porch": {
-        "polygon": [[null, null]]
+        "polygon": [
+          [
+            null,
+            null
+          ]
+        ]
       },
       "parking": [
         {
-          "polygon": [[null, null]],
+          "polygon": [
+            [
+              null,
+              null
+            ]
+          ],
           "spaces": null,
           "covered": null
         }
@@ -256,59 +308,80 @@
           }
         ]
       }
-    }
-  },
-
-  "estimate": {
-    "schema": "terrasim.estimate/1",
-    "designId": null,
-    "currency": null,
-    "asOf": null,
-    "buildCost": {
-      "low": null,
-      "expected": null,
-      "high": null,
-      "perSqFt": null,
-      "confidence": null,
-      "lines": [
+    },
+    "cost": {
+      "currency": null,
+      "asOf": null,
+      "buildCost": {
+        "low": null,
+        "expected": null,
+        "high": null,
+        "perSqFt": null,
+        "confidence": null,
+        "lines": [
+          {
+            "id": null,
+            "name": null,
+            "amount": null
+          }
+        ],
+        "assumptions": []
+      },
+      "breakdown": {
+        "materials": null,
+        "installedWork": null,
+        "labor": null,
+        "siteWork": null,
+        "overheadAndProfit": null,
+        "permitsAndDesign": null,
+        "total": null,
+        "perSqFt": null,
+        "perM2": null,
+        "wageFactor": null,
+        "budgetUSD": null,
+        "overBudgetBy": null
+      },
+      "materials": [
         {
           "id": null,
           "name": null,
-          "amount": null
+          "quantity": null,
+          "unit": null,
+          "unitCost": null,
+          "cost": null
         }
       ],
-      "assumptions": []
-    },
-    "materials": [
-      {
-        "id": null,
-        "name": null,
-        "quantity": null,
-        "unit": null,
-        "unitCost": null,
-        "cost": null
-      }
-    ],
-    "overTime": {
-      "years": null,
-      "assumptions": {
-        "inflation": null,
-        "appreciation": null
+      "overTime": {
+        "years": null,
+        "assumptions": {
+          "inflation": null,
+          "appreciation": null
+        },
+        "rows": [
+          {
+            "year": null,
+            "maintenance": null,
+            "energy": null,
+            "replacements": null,
+            "value": null
+          }
+        ],
+        "events": [
+          {
+            "year": null,
+            "name": null,
+            "amount": null
+          }
+        ]
       },
-      "rows": [
+      "suppliers": [
         {
-          "year": null,
-          "maintenance": null,
-          "energy": null,
-          "replacements": null,
-          "value": null
-        }
-      ],
-      "events": [
-        {
-          "year": null,
-          "name": null,
-          "amount": null
+          "Name": null,
+          "Type": null,
+          "Address": null,
+          "Phone": null,
+          "Website": null,
+          "Miles": null
         }
       ]
     }

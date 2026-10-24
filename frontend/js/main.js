@@ -14,7 +14,7 @@ import { renderBriefPanel } from './panels/brief.js';
 import { buildRequest } from './api/request.js';
 import { renderSending } from './panels/send.js';
 import { renderHousePanel, renderDesignProblems } from './panels/house.js';
-import { checkDesign } from './lib/design.js';
+import { checkDesign, footprintOutside } from './lib/design.js';
 import { renderCatalog, renderSites } from './panels/lists.js';
 import { mountRive } from './rive.js';
 import { createStarfield } from './map/stars.js';
@@ -38,6 +38,10 @@ const app = {
   estimates: new Map(), // design id -> estimate that came with it
 };
 
+// Declared early: a share link opens the brief (and the hint) before the rest of this file runs.
+const hintPin = { el: null, rive: null, replay: false }; // the drawing hint's Rive pin
+let moving = null;                                       // a building being dragged within its land
+
 function setMode(mode) {
   app.mode = mode;
   body.dataset.mode = mode;
@@ -47,15 +51,21 @@ function setMode(mode) {
 // ---- boot --------------------------------------------------------------------------------------
 // When the site is served by the design service itself (housecost -serve), its API is at /api on
 // the same address: use it unless another one was chosen with ?api=.
+// Opened locally from another server (npm start on :5173), it also looks for the service on :8000.
 if (!config.apiBaseUrl) {
-  try {
-    const res = await fetch('/api/health', { signal: AbortSignal.timeout(1500) });
-    const h = res.ok ? await res.json() : null;
-    if (h?.ok) {
-      config.apiBaseUrl = `${location.origin}/api`;
-      if (h.key === false) console.warn('[TerraSim] The design service has no Gemini API key yet; designs will fail until one is added.');
-    }
-  } catch {}
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+  const bases = [`${location.origin}/api`, ...(local && location.port !== '8000' ? ['http://localhost:8000/api'] : [])];
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}/health`, { signal: AbortSignal.timeout(1500) });
+      const h = res.ok ? await res.json() : null;
+      if (h?.ok) {
+        config.apiBaseUrl = base;
+        if (h.key === false) console.warn('[TerraSim] The design service has no Gemini API key yet; designs will fail until one is added.');
+        break;
+      }
+    } catch {}
+  }
 }
 
 const { map, stopSpin, startSpin } = await createMap($('#map'));
@@ -114,17 +124,65 @@ map.on('click', (e) => {
     arrive([e.lngLat.lng, e.lngLat.lat], { zoom: 16.2 });
     return;
   }
+  if (app.justMoved && Date.now() - app.justMoved < 400) return;
   if (app.mode === 'house' || app.mode === 'explore' || app.mode === 'failed') {
     const p = house.placement;
     if (p && inFootprint([e.lngLat.lng, e.lngLat.lat], p.footprint)) openHouse();
   }
 });
 map.on('mousemove', (e) => {
-  if (outliner.active) return;
+  if (outliner.active || moving) return;
   const p = house.placement;
   const over = p && map.getZoom() > 14 && inFootprint([e.lngLat.lng, e.lngLat.lat], p.footprint);
-  map.getCanvas().style.cursor = over ? 'pointer' : app.mode === 'globe' ? 'crosshair' : '';
+  map.getCanvas().style.cursor = over ? 'grab' : app.mode === 'globe' ? 'crosshair' : '';
 });
+
+// ---- moving the building within its land -------------------------------------------------------
+// Press on the building and drag: it follows the pointer, but only to spots where every corner
+// stays inside the outlined land. A press without a drag still opens the building's panel.
+const landOf = (design) => (design.previewOn ? app.site?.ring : design.site?.outline) ?? null;
+const shift = (pts, dx, dy) => pts.map(([x, y]) => [x + dx, y + dy]);
+function startMove(e) {
+  const p = house.placement, design = house.design;
+  if (!p || !design || outliner.active || map.getZoom() < 15) return;
+  if (!['house', 'explore', 'failed'].includes(app.mode)) return;
+  if (!inFootprint([e.lngLat.lng, e.lngLat.lat], p.footprint)) return;
+  const land = landOf(design);
+  if (!land) return;
+  e.preventDefault();
+  map.dragPan.disable();
+  moving = { start: e.lngLat, from: p, land, last: p, moved: false };
+  map.getCanvas().style.cursor = 'grabbing';
+}
+function dragMove(e) {
+  if (!moving) return;
+  const dx = e.lngLat.lng - moving.start.lng, dy = e.lngLat.lat - moving.start.lat;
+  const footprint = shift(moving.from.footprint, dx, dy);
+  if (Math.abs(dx) + Math.abs(dy) > 1e-7) moving.moved = true;
+  // Only accept spots fully inside the land; otherwise the building stays at its last good spot.
+  if (footprintOutside(footprint, moving.land)) return;
+  const [ox, oy] = moving.from.origin;
+  moving.last = { ...moving.from, origin: [ox + dx, oy + dy], footprint };
+  house.move(moving.last);
+}
+function endMove() {
+  if (!moving) return;
+  const { moved, last } = moving;
+  moving = null;
+  map.dragPan.enable();
+  map.getCanvas().style.cursor = '';
+  if (!moved) return;
+  const design = house.design;
+  design.placement = { ...design.placement, origin: last.origin, footprint: last.footprint };
+  if (!design.sample) api.keepLocal(design, design.cost ? null : app.estimates.get(design.id) ?? null);
+  app.justMoved = Date.now();
+}
+map.on('mousedown', startMove);
+map.on('touchstart', (e) => { if (e.points?.length === 1) startMove(e); });
+map.on('mousemove', dragMove);
+map.on('touchmove', dragMove);
+map.on('mouseup', endMove);
+map.on('touchend', endMove);
 
 // Space shows behind the globe whenever the map is zoomed out far enough to see it.
 const syncSpace = () => {
@@ -138,6 +196,8 @@ syncSpace();
 // Zooming far out by hand eases back into globe mode where the camera already is: nothing is
 // cleared and the camera isn't moved, so it never fights the scroll wheel.
 const WORLD_ZOOM = 3;
+// The opening view of the globe (the same as createMap's).
+const HOME_VIEW = { center: [-40, 28], zoom: 1.9 };
 function enterGlobeMode() {
   if (outliner.active) outliner.cancel();
   if (!wide()) closePanel();
@@ -148,19 +208,36 @@ function enterGlobeMode() {
   globeHint();
   placeChip.hidden = true;
 }
+// Zoomed all the way out, the Earth goes back to where it started: upright, facing north, beside
+// the intro. It waits until the scroll wheel has stopped, so the two never fight.
+let homeTimer = 0, homePending = false;
+function goHomeWhenStill() {
+  clearTimeout(homeTimer);
+  homeTimer = setTimeout(() => {
+    if (!homePending || app.mode !== 'globe') return;
+    if (map.isMoving()) { goHomeWhenStill(); return; }
+    homePending = false;
+    map.easeTo({ center: HOME_VIEW.center, zoom: HOME_VIEW.zoom, pitch: 0, bearing: 0, duration: 1600, padding: globePadding() });
+    map.once('moveend', () => { if (app.mode === 'globe') startSpin(); });
+  }, 450);
+}
 map.on('zoomend', () => {
   const z = map.getZoom();
-  if (z < WORLD_ZOOM && ['explore', 'house', 'failed', 'brief'].includes(app.mode)) enterGlobeMode();
+  if (z < WORLD_ZOOM && ['explore', 'house', 'failed', 'brief'].includes(app.mode)) {
+    enterGlobeMode();
+    homePending = true;
+  }
+  if (homePending) goHomeWhenStill();
   // Zooming in on the globe by hand leaves the intro.
-  if (app.mode === 'globe' && z >= 6) leaveGlobe();
+  if (app.mode === 'globe' && z >= 6) { homePending = false; leaveGlobe(); }
 });
+map.on('zoomstart', () => clearTimeout(homeTimer));
 
 // The Globe button: back out to the whole Earth, keeping the outline and any building.
 function toWorld() {
   enterGlobeMode();
   closePanel();
-  const c = map.getCenter();
-  map.easeTo({ center: [c.lng, Math.max(-50, Math.min(50, c.lat))], zoom: 1.9, pitch: 0, bearing: 0, duration: 2200, padding: globePadding() });
+  map.easeTo({ center: HOME_VIEW.center, zoom: HOME_VIEW.zoom, pitch: 0, bearing: 0, duration: 2200, padding: globePadding() });
   map.once('moveend', () => { if (app.mode === 'globe') startSpin(); });
 }
 
@@ -174,6 +251,15 @@ async function arrive(lngLat, { zoom = 17.6 } = {}) {
   const atYou = app.you && Math.abs(lngLat[0] - app.you[0]) < 1e-6 && Math.abs(lngLat[1] - app.you[1]) < 1e-6;
   toast(atYou ? 'You’re here. Pan around, then outline the land you want to build on.' : 'Pan around, then outline the land you want to build on.');
 }
+
+// Where the satellite service has no imagery, the street map shows instead; say so once in a while.
+let noImageryAt = 0;
+addEventListener('terrasim:no-imagery', (e) => {
+  if (app.basemap !== 'satellite' || e.detail.z < 13 || map.getZoom() < 13) return;
+  if (Date.now() - noImageryAt < 90000) return;
+  noImageryAt = Date.now();
+  toast('No satellite imagery for this spot at this zoom, so the street map shows instead. Zoom out a little to see imagery.');
+});
 
 // ---- finding your way: controls, place name, search -------------------------------------------
 const controls = $('#map-controls');
@@ -350,8 +436,61 @@ function startOutline() {
   outliner.start();
   setMode('drawing');
   hint.hidden = false;
+  placeHint();
+  // Slide out, and drop the pin.
+  hint.classList.remove('is-out');
+  void hint.offsetWidth;
+  hint.classList.add('is-out');
+  hintPin.replay = true;
   updateHint({ ring: [], closed: false });
 }
+
+// The hint sits in the bottom-left corner; drag its grip to move it anywhere (remembered).
+function placeHint() {
+  const pos = store.get('hintPos', null);
+  if (!pos) { hint.style.left = ''; hint.style.top = ''; hint.style.bottom = ''; hint.classList.remove('is-moved'); return; }
+  const r = hint.getBoundingClientRect();
+  const x = Math.max(8, Math.min(innerWidth - Math.max(r.width, 200) - 8, pos.x));
+  const y = Math.max(8, Math.min(innerHeight - Math.max(r.height, 120) - 8, pos.y));
+  Object.assign(hint.style, { left: `${x}px`, top: `${y}px`, bottom: 'auto' });
+  hint.classList.add('is-moved');
+}
+hint.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest('[data-grip]');
+  if (!grip) return;
+  e.preventDefault();
+  const r = hint.getBoundingClientRect();
+  const off = { x: e.clientX - r.left, y: e.clientY - r.top };
+  grip.setPointerCapture(e.pointerId);
+  hint.classList.add('is-dragging');
+  const move = (ev) => {
+    const x = Math.max(8, Math.min(innerWidth - r.width - 8, ev.clientX - off.x));
+    const y = Math.max(8, Math.min(innerHeight - r.height - 8, ev.clientY - off.y));
+    Object.assign(hint.style, { left: `${x}px`, top: `${y}px`, bottom: 'auto' });
+    hint.classList.add('is-moved');
+  };
+  const up = () => {
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', up);
+    hint.classList.remove('is-dragging');
+    const nr = hint.getBoundingClientRect();
+    store.set('hintPos', { x: nr.left, y: nr.top });
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', up);
+});
+hint.addEventListener('keydown', (e) => {
+  // Arrow keys on the grip move the box too; Home puts it back in its corner.
+  const grip = e.target.closest('[data-grip]');
+  if (!grip) return;
+  if (e.key === 'Home') { store.set('hintPos', null); placeHint(); e.preventDefault(); return; }
+  const d = { ArrowLeft: [-20, 0], ArrowRight: [20, 0], ArrowUp: [0, -20], ArrowDown: [0, 20] }[e.key];
+  if (!d) return;
+  e.preventDefault();
+  const r = hint.getBoundingClientRect();
+  store.set('hintPos', { x: r.left + d[0], y: r.top + d[1] });
+  placeHint();
+});
 
 function updateHint({ ring, closed }) {
   if (!outliner.active && !closed) return;
@@ -365,8 +504,12 @@ function updateHint({ ring, closed }) {
   // Until the first corner, a short loop shows how outlining works.
   const demo = n === 0 ? (hint.querySelector('.hint-demo') ?? null) : null;
   hint.innerHTML = `
+    <div class="hint-head">
+      <span class="hint-pin" aria-hidden="true"></span>
+      <p class="hint-msg">${msg}</p>
+      <button type="button" class="hint-grip" data-grip aria-label="Move this box (arrow keys; Home puts it back)" title="Drag to move">${icon('grip')}</button>
+    </div>
     ${n === 0 ? '<div class="hint-demo" aria-hidden="true"></div>' : ''}
-    <p class="hint-msg">${msg}</p>
     <dl class="hint-facts num">
       <div><dt>Corners</dt><dd>${n}</dd></div>
       <div><dt>Area</dt><dd>${m && n >= 3 ? fmt.land(m.areaM2) : '–'}</dd></div>
@@ -382,6 +525,15 @@ function updateHint({ ring, closed }) {
     if (demo) slot.replaceWith(demo);
     else mountRive(slot, { src: 'assets/rive/outline.riv', fit: 'cover' });
   }
+  // The pin keeps its Rive animation across updates; it drops again each time outlining starts.
+  const pinSlot = hint.querySelector('.hint-pin');
+  if (hintPin.el) pinSlot.replaceWith(hintPin.el);
+  else {
+    hintPin.el = pinSlot;
+    hintPin.rive = mountRive(pinSlot, { src: 'assets/rive/pin.riv', stateMachine: 'Pin' });
+    hintPin.replay = false;
+  }
+  if (hintPin.replay) { hintPin.rive?.fire('drop'); hintPin.replay = false; }
 }
 hint.addEventListener('click', (e) => {
   const h = e.target.closest('[data-h]')?.dataset.h;
@@ -439,6 +591,7 @@ function openBrief() {
   openPanel((el) => renderBriefPanel(el, {
     site: app.site,
     measure: measure(app.site.ring),
+    coverage: api.coverage(measure(app.site.ring).centroid),
     onEditOutline: () => { closePanel(); outliner.load(app.site.ring); toast('Drag the corners to adjust the outline.'); setMode('explore'); },
     onChange: (patch) => { Object.assign(app.site, patch); if (patch.form) store.set('lastForm', patch.form); if (patch.builder) store.set('builder', patch.builder); saveSite(); },
     onSend: () => send(),
@@ -449,6 +602,9 @@ async function send() {
   setMode('sending');
   const request = buildRequest(app.site);
   app.site.lastRequestId = request.id;
+  // The lot lights up while the design is made; the building grows out of it when it arrives.
+  house.hide();
+  house.generating(app.site.ring);
   openPanel((el) => renderSending(el, {
     request,
     run: (onProgress) => api.createDesign(request, { onProgress }),
@@ -457,12 +613,14 @@ async function send() {
       app.site.designId = design.id;
       saveSite();
       api.keepLocal(design, estimate);
+      house.stopGenerating();
       showDesign(design, estimate);
     },
     onFailed: (err) => {
       app.site.status = 'not-sent';
       app.site.lastError = err.code ?? 'error';
       saveSite();
+      house.stopGenerating();
       setMode('failed');
     },
     onRetry: () => send(),
@@ -498,6 +656,7 @@ function showDesign(design, estimate) {
     house.show(design, placement);
     frameHouse(placement);
     setTimeout(openHouse, 2600);
+    setTimeout(() => toast('Drag the building to move it anywhere inside your land.'), 3200);
   });
 }
 
@@ -522,7 +681,7 @@ async function previewSample() {
   setMode('house');
   closePanel();
   if (!placement.fits) toast('The sample house is bigger than this lot, so it hangs over the outline.');
-  else toast('Sample house placed on your lot. Click it for details.');
+  else toast('Sample house placed on your lot. Click it for details, or drag it to move it within your land.');
   frameHouse(placement);
   setTimeout(() => openHouse(), 2900);
 }
@@ -545,7 +704,8 @@ function frameHouse(placement, { duration = 1800 } = {}) {
 async function openHouse() {
   const design = house.design;
   if (!design) return;
-  let estimate = app.estimates.get(design.id) ?? null;
+  // The design carries its own cost (contracts/FIELDS.md, `cost`); older files came with a separate estimate.
+  let estimate = design.cost ?? app.estimates.get(design.id) ?? null;
   if (!estimate) {
     try { estimate = await api.estimate(design.id); } catch { estimate = null; }
   }

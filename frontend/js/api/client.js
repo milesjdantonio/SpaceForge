@@ -59,13 +59,14 @@ export const api = {
     if (res?.jobId && !res.design && !res.designId) {
       onProgress?.({ status: 'queued', message: 'The design service accepted the request.' });
       const started = Date.now();
-      let last = '';
+      let since = 0;
       for (;;) {
-        await sleep(2000);
+        await sleep(1000);
         if (signal?.aborted) throw new DOMException('Stopped', 'AbortError');
-        const job = await call(`/designs/jobs/${encodeURIComponent(res.jobId)}`, { signal });
-        const note = `${job.status}:${job.message ?? ''}`;
-        if (note !== last) { last = note; onProgress?.(job); }
+        // `since` asks only for log lines not yet seen (services without a log ignore it).
+        const job = await call(`/designs/jobs/${encodeURIComponent(res.jobId)}?since=${since}`, { signal });
+        if (typeof job.logTotal === 'number') since = job.logTotal;
+        onProgress?.(job);
         if (job.status === 'done') { res = job; break; }
         if (job.status === 'failed') {
           const err = new Error(job.error || 'The design service couldn’t finish this design.');
@@ -85,7 +86,10 @@ export const api = {
     let estimate = body?.estimate ?? null;
     if (!design && body?.designId) {
       design = await call(`/designs/${encodeURIComponent(body.designId)}`, { signal });
-      try { estimate = await call(`/designs/${encodeURIComponent(body.designId)}/estimate`, { signal }); } catch { estimate = null; }
+      // The design carries its cost; a separate estimate is only fetched for services that don't.
+      if (!design?.cost) {
+        try { estimate = await call(`/designs/${encodeURIComponent(body.designId)}/estimate`, { signal }); } catch { estimate = null; }
+      }
     }
     if (!design) {
       console.warn('[TerraSim] The design service replied without a design:', res);
@@ -94,6 +98,13 @@ export const api = {
       throw err;
     }
     return { design, estimate };
+  },
+
+  // Whether the service has site data for a spot: { covered, message }. null when unknown (no
+  // service, or one without this endpoint), so nothing is blocked on a guess.
+  async coverage([lng, lat]) {
+    if (!config.apiBaseUrl) return null;
+    try { return await call(`/coverage?lng=${lng}&lat=${lat}`); } catch { return null; }
   },
 
   // Keeps a received design in this browser (the newest 12), so it can be reopened.

@@ -67,6 +67,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
         <p class="lead-text">${esc(design.overview.summary)}</p>
         ${design.overview.description.map((p) => `<p>${esc(p)}</p>`).join('')}
         ${design.overview.features?.length ? `<h3 class="group-title">Features</h3><ul class="ticks">${design.overview.features.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+        ${soilBlock(design.site?.soil)}
         <h3 class="group-title">How it answers the land</h3>
         <ul class="ticks">${design.overview.siteResponse.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
         <h3 class="group-title">Materials</h3>
@@ -84,7 +85,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
       body.querySelector('.plan-box').append(renderPlan(design, { level, className: 'plan plan-panel' }));
     }
     if (!estimate && ['cost', 'materials', 'time'].includes(tab)) {
-      body.innerHTML = '<p class="empty">No estimate came with this design. The design service sends it as a separate file (terrasim.estimate/1).</p>';
+      body.innerHTML = '<p class="empty">No cost came with this design. The design service puts it in the design file as “cost”.</p>';
       return;
     }
     if (tab === 'cost') {
@@ -99,7 +100,9 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
           <tbody>${cost.lines.map((l) => `<tr><td>${l.name}</td><td class="r">${fmt.money(l.amount)}</td><td class="bar-cell"><span style="width:${(l.amount / max * 100).toFixed(1)}%"></span></td></tr>`).join('')}</tbody>
           <tfoot><tr><td>Expected total</td><td class="r">${fmt.money(cost.expected)}</td><td></td></tr></tfoot>
         </table>
-        <ul class="ticks">${cost.assumptions.map((a) => `<li>${a}</li>`).join('')}</ul>`;
+        ${breakdownBlock(estimate.breakdown)}
+        <ul class="ticks">${cost.assumptions.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
+        ${suppliersBlock(estimate.suppliers)}`;
     }
     if (tab === 'materials') {
       const total = estimate.materials.reduce((s, m) => s + m.cost, 0);
@@ -196,4 +199,42 @@ export function renderDesignProblems(el, { design, result, onClose }) {
     ${result.errors.length > 12 ? `<p class="note">And ${result.errors.length - 12} more.</p>` : ''}
     ${result.warnings.length ? `<details class="request"><summary>${result.warnings.length} smaller ${result.warnings.length === 1 ? 'issue' : 'issues'}</summary><ul class="ticks">${result.warnings.map((w) => `<li>${esc(w.message)}</li>`).join('')}</ul></details>` : ''}`;
   el.querySelector('[data-close]').addEventListener('click', () => onClose?.());
+}
+
+// The soil under the building and the foundation chosen for it (design.site.soil).
+function soilBlock(soil) {
+  if (!soil) return '';
+  const rows = [
+    ['Soil', [soil.name, soil.uscsClass && `class ${soil.uscsClass}`].filter(Boolean).join(', ')],
+    ['Bearing', soil.bearingPsf ? `${fmt.int(soil.bearingPsf)} psf` : null],
+    ['Shrink-swell', soil.shrinkSwell],
+    ['Bedrock', soil.depthToBedrockIn ? `${soil.depthToBedrockIn} in down` : null],
+    ['Water table', soil.depthToWaterTableIn ? `${soil.depthToWaterTableIn} in down` : null],
+    ['Foundation', soil.foundation],
+  ].filter(([, v]) => v);
+  if (!rows.length) return '';
+  return `<h3 class="group-title">The ground</h3>
+    <dl class="facts">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+    ${soil.foundationReason ? `<p class="note">${esc(soil.foundationReason)}${soil.source ? ` Soil data: ${esc(soil.source)}.` : ''}</p>` : ''}`;
+}
+
+// Where the money goes, and how it sits against the budget (cost.breakdown).
+function breakdownBlock(b) {
+  if (!b) return '';
+  const rows = [['Materials', b.materials], ['Installed work', b.installedWork], ['Labor', b.labor], ['Site work', b.siteWork],
+    ['Overhead and profit', b.overheadAndProfit], ['Permits and design', b.permitsAndDesign]].filter(([, v]) => v);
+  const budget = b.budgetUSD
+    ? (b.overBudgetBy ? `<p class="problem">${fmt.money(b.overBudgetBy)} over the ${fmt.money(b.budgetUSD)} budget.</p>` : `<p class="note">Within the ${fmt.money(b.budgetUSD)} budget.</p>`)
+    : '';
+  return `<h3 class="group-title">Where the money goes</h3>${budget}
+    <table class="lines num"><tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td class="r">${fmt.money(v)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total</td><td class="r">${fmt.money(b.total)}</td></tr></tfoot></table>
+    ${b.wageFactor ? `<p class="note">Labor is priced at ${Math.round(b.wageFactor * 100)}% of the national average, from local construction wages.</p>` : ''}`;
+}
+
+// Building suppliers near the land (cost.suppliers).
+function suppliersBlock(list) {
+  if (!list?.length) return '';
+  return `<h3 class="group-title">Suppliers nearby</h3>
+    <table class="lines num"><tbody>${list.map((s) => `<tr><td>${esc(s.Name)}<span class="unit"> · ${esc(String(s.Type || '').replace(/_/g, ' '))}</span></td><td class="r">${s.Miles != null ? `${Number(s.Miles).toFixed(1)} mi` : ''}</td></tr>`).join('')}</tbody></table>`;
 }

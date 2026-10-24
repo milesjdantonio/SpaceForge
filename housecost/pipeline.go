@@ -240,6 +240,7 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		frame.ToLngLat(Pt{maxE, maxN})[0], frame.ToLngLat(Pt{maxE, maxN})[1]}
 
 	// 3. site data
+	fmt.Fprintln(log, "Gathering site data: soil, elevation, climate, flood zone, seismic, wages...")
 	site, err := dp.FetchSite(SiteQuery{Centroid: Pt{cLng, cLat}, Footprint: fpCentre,
 		FootprintFt: [2]float64{f0.l.W / MPerFt, f0.l.D / MPerFt}, SiteBox: box, SetbackM: setback,
 		SiteAreaM2: siteArea, SiteDimsFt: [2]float64{(maxE - minE) / MPerFt, (maxN - minN) / MPerFt}})
@@ -340,6 +341,7 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	d.RequestID = or(sv(r.ID), "REQ-local")
 	d.CreatedAt = now.UTC().Format(time.RFC3339)
 	finishDesign(d, p, l, fin.sp, frame, ring, siteArea)
+	d.Site.Soil = soilSummary(site, a)
 
 	if probs := CheckDesign(d, ring, setback); len(probs) > 0 {
 		out.Design = d
@@ -370,6 +372,7 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	}
 
 	// 8. quantities, prices, suppliers, estimate
+	fmt.Fprintln(log, "Pricing: nearby suppliers, quantities, labor and site work...")
 	var sups []Supplier
 	if dp.Suppliers != nil {
 		if sups, err = dp.Suppliers(cLat, cLng); err != nil {
@@ -393,6 +396,14 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	if len(sups) > 25 {
 		sups = sups[:25]
 	}
+	// The design carries its own cost, so one file holds everything the website shows.
+	near := sups
+	if len(near) > 8 {
+		near = near[:8]
+	}
+	d.Cost = &DesignCost{Currency: est.Currency, AsOf: est.AsOf, BuildCost: est.BuildCost, Breakdown: cs,
+		Materials: est.Materials, OverTime: est.OverTime, Suppliers: near}
+	fmt.Fprintln(log, "Design ready.")
 	out.Report.LineItems, out.Report.CostSummary, out.Report.Suppliers = lines, cs, sups
 	out.Report.Warnings = dedupe(warnings)
 	return out, nil
@@ -469,4 +480,16 @@ func nz(s []string) []string {
 		return []string{}
 	}
 	return s
+}
+
+// soilSummary records the soil under the building and the foundation chosen for it.
+func soilSummary(s Site, a Assessment) *SiteSoil {
+	so := s.Soil
+	name := ""
+	if len(so.Components) > 0 {
+		name = so.Components[0].Component
+	}
+	return &SiteSoil{Source: "USDA Soil Data Access", SoilName: name, USCS: so.GoverningUSCS, BearingPSF: so.GoverningBearing,
+		ShrinkSwell: so.ShrinkSwell, BedrockIn: so.MinBedrockIn, WaterTableIn: so.MinWaterIn,
+		Foundation: humanize(a.FoundationType), FoundationWhy: a.FoundationReason, Note: so.Note}
 }

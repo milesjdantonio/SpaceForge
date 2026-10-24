@@ -44,15 +44,15 @@ type SiteFeature struct {
 type Brief struct {
 	// The user's own description of the building and its style: the base of the brief
 	// (contracts/FIELDS.md). The numbers below win where they disagree with it.
-	DesignPrompt *string `json:"designPrompt"`
-	Floors    *int     `json:"floors"`
-	AreaM2    *float64 `json:"areaM2"`
-	UnitCount *int     `json:"unitCount"`
-	Bedrooms  *int     `json:"bedrooms"`
-	Bathrooms *float64 `json:"bathrooms"`
-	Residents *int     `json:"residents"`
-	RoomType  *string  `json:"roomType"`
-	BudgetUSD *float64 `json:"budgetUSD"`
+	DesignPrompt *string  `json:"designPrompt"`
+	Floors       *int     `json:"floors"`
+	AreaM2       *float64 `json:"areaM2"`
+	UnitCount    *int     `json:"unitCount"`
+	Bedrooms     *int     `json:"bedrooms"`
+	Bathrooms    *float64 `json:"bathrooms"`
+	Residents    *int     `json:"residents"`
+	RoomType     *string  `json:"roomType"`
+	BudgetUSD    *float64 `json:"budgetUSD"`
 }
 
 type UnitMix struct {
@@ -211,8 +211,9 @@ func ValidateRequest(r Request) []string {
 			add("brief.roomType must be single, double or suite for a dorm")
 		}
 	} else {
-		if b.AreaM2 == nil || *b.AreaM2 < 12 {
-			add("brief.areaM2 is required (living area per home, at least 12 m²)")
+		// null = the user left the size to Gemma (it chooses areaM2 in the design program).
+		if b.AreaM2 != nil && *b.AreaM2 < 12 {
+			add("brief.areaM2 must be at least 12 m² (or null to let the design system choose)")
 		}
 		if b.Bedrooms == nil || *b.Bedrooms < 0 || *b.Bedrooms > 8 {
 			add("brief.bedrooms is required (0–8)")
@@ -295,6 +296,19 @@ type Design struct {
 	Stairs      []DStair     `json:"stairs"`
 	Elevators   []DElevator  `json:"elevators"`
 	Exterior    Exterior     `json:"exterior"`
+	// What it costs, in the same file as the design (contracts/FIELDS.md, `cost`).
+	Cost *DesignCost `json:"cost,omitempty"`
+}
+
+// DesignCost is the estimate plus the cost breakdown, the budget check and nearby suppliers.
+type DesignCost struct {
+	Currency  string       `json:"currency"`
+	AsOf      string       `json:"asOf"`
+	BuildCost BuildCost    `json:"buildCost"`
+	Breakdown *CostSummary `json:"breakdown"`
+	Materials []EMaterial  `json:"materials"`
+	OverTime  OverTime     `json:"overTime"`
+	Suppliers []Supplier   `json:"suppliers"`
 }
 
 type Overview struct {
@@ -320,8 +334,23 @@ type DesignTotals struct {
 }
 
 type DSite struct {
-	Outline []Pt    `json:"outline"`
-	AreaM2  float64 `json:"areaM2"`
+	Outline []Pt      `json:"outline"`
+	AreaM2  float64   `json:"areaM2"`
+	Soil    *SiteSoil `json:"soil,omitempty"`
+}
+
+// SiteSoil is what the soil survey found under the building, and what the design did about it.
+type SiteSoil struct {
+	Source        string `json:"source"`
+	SoilName      string `json:"name"`
+	USCS          string `json:"uscsClass"`
+	BearingPSF    *int   `json:"bearingPsf"`
+	ShrinkSwell   string `json:"shrinkSwell"`
+	BedrockIn     *int   `json:"depthToBedrockIn"`
+	WaterTableIn  *int   `json:"depthToWaterTableIn"`
+	Foundation    string `json:"foundation"`
+	FoundationWhy string `json:"foundationReason"`
+	Note          string `json:"note,omitempty"`
 }
 
 type Placement struct {

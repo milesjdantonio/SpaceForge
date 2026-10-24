@@ -16,6 +16,7 @@ type Program struct {
 	HousingType     string
 	Floors          int
 	AreaM2          float64
+	AreaFromGemma   bool // the user left the size to Gemma
 	UnitCount       int
 	Bedrooms        int
 	Bathrooms       float64
@@ -62,6 +63,10 @@ func DefaultProgram(r Request) Program {
 		Roofing: or(sv(a.Roofing), "asphalt-shingle"), RoofType: "gable", RoofPitch: 0.5,
 		Priorities: a.Priorities, Extras: a.Extras, CommonSpaces: a.CommonSpaces,
 		BathroomSharing: or(sv(a.BathroomSharing), "hall")}
+	if b.AreaM2 == nil && ht != "dorm" {
+		// A first guess for sizing; Gemma chooses the real figure in the design program.
+		p.AreaM2, p.AreaFromGemma = defaultArea(ht, iv(b.Bedrooms), fv(b.Bathrooms)), true
+	}
 	switch ht {
 	case "house":
 		p.UnitCount = 1
@@ -149,6 +154,7 @@ type ProgramReply struct {
 	UnitMix                                      map[string]int
 	BathroomSharing                              string
 	Palette                                      []PaletteColor
+	AreaM2                                       *float64 // only when the user left brief.areaM2 to Gemma
 	Text                                         ProgramText
 }
 
@@ -181,6 +187,13 @@ func ParseProgram(text string) (ProgramReply, error) {
 			fe.add("%s: must be a list of strings", k)
 		}
 		return l
+	}
+	if v, ok := m["areaM2"]; ok && v != nil {
+		if f, ok := asFloat(v); ok {
+			pr.AreaM2 = &f
+		} else {
+			fe.add("areaM2: must be a number or null")
+		}
 	}
 	optInt := func(k string) *int {
 		v, ok := m[k]
@@ -241,6 +254,7 @@ func ParseProgram(text string) (ProgramReply, error) {
 	} else {
 		fe.add("palette: field required (a list)")
 	}
+	normalizeProgram(&pr)
 	return pr, fe.err()
 }
 
@@ -261,6 +275,14 @@ func ValidateProgram(pr ProgramReply, r Request, s Site, a Assessment) []string 
 		}
 	}
 	keep("style", adv.Style, pr.Style, Styles)
+	if r.Brief.AreaM2 == nil && ht != "dorm" {
+		lo, hi := areaRange(ht)
+		if pr.AreaM2 == nil {
+			add("areaM2: the user left the living area to you; give it in m² (%.0f–%.0f for %s).", lo, hi, ht)
+		} else if *pr.AreaM2 < lo || *pr.AreaM2 > hi {
+			add("areaM2: %.0f m² is outside %.0f–%.0f m² for %s.", *pr.AreaM2, lo, hi, ht)
+		}
+	}
 	keep("quality", adv.Quality, pr.Quality, Qualities)
 	keep("structure", adv.Structure, pr.Structure, Structures)
 	keep("cladding", adv.Cladding, pr.Cladding, Claddings)
@@ -383,12 +405,18 @@ func ValidateProgram(pr ProgramReply, r Request, s Site, a Assessment) []string 
 	if len(pr.Text.SiteResponse) < 2 || !strings.Contains(sr, "slope") {
 		add("siteResponse needs at least two lines, including what the building does about the measured slope.")
 	}
+	if s.Soil.GoverningUSCS != "" && !strings.Contains(sr, "soil") && !strings.Contains(sr, "clay") && !strings.Contains(sr, "sand") && !strings.Contains(sr, "rock") {
+		add("siteResponse needs a line on the measured soil (its class, bearing or shrink-swell) and what the building does about it.")
+	}
 	return e
 }
 
 // Merge applies Gemma's reply to the program.
 func (p Program) Merge(pr ProgramReply) Program {
 	p.Style, p.Quality, p.Structure, p.Cladding, p.Roofing = pr.Style, pr.Quality, pr.Structure, pr.Cladding, pr.Roofing
+	if p.AreaFromGemma && pr.AreaM2 != nil {
+		p.AreaM2 = *pr.AreaM2
+	}
 	p.RoofType, p.RoofPitch = pr.RoofType, pr.RoofPitch
 	if pr.GarageCars != nil && !isMulti(p.HousingType) {
 		p.GarageCars = *pr.GarageCars
@@ -424,6 +452,7 @@ const programExample = `{
  "style": "<one of the style values>", "quality": "<essential | standard | premium>",
  "structure": "<structure value>", "cladding": "<cladding value>", "roofing": "<roofing value>",
  "roofType": "<gable | hip | flat>", "roofPitch": 0.5,
+ "areaM2": "<only if brief.areaM2 is null: the living area per home in m² you choose (the whole home for house/tiny-home, the average for apartment/condo); otherwise null>",
  "garageCars": "<0-3 for house/tiny-home/townhouse/duplex (per home), else null>",
  "parkingSpaces": "<whole site, for apartment/condo/dorm, else null>",
  "extras": ["<any of: office porch deck basement balconies roof-terrace>"],
@@ -453,10 +482,23 @@ ASSESSMENT: verdict %s; foundation %s; risks: %s
 SIZING: %s
 
 The user's DESCRIPTION (brief.designPrompt, in their own words) is the base of the request. Follow
-it: pick the style value closest to what it describes, take its feel, materials and colours into the
+it: pick the style value closest to what it describes (write the code exactly, for example
+farmhouse rather than "modern farmhouse"; the same for cladding and roofing, and put the nuance in the
+description), take its feel, materials and colours into the
 program, keep or avoid what it asks when the site and numbers allow, and say in the description
 how the design follows it (in cautions when something it asks can't be done). Where it disagrees
 with a number in brief, the number wins.
+
+SOIL (from the USDA survey, in SITE above: soil.governing_uscs_class, governing_bearing_psf,
+shrink_swell, min_depth_to_bedrock_in, min_depth_to_water_table_in) shapes the building, not only the
+foundation: low bearing or high shrink-swell favours lighter structures, fewer floors and simple,
+compact footprints; shallow bedrock or a high water table rules out basements and favours a slab or
+crawlspace; poorly drained soils favour raised floors. Say in siteResponse what the soil is and what
+the building does about it.
+
+LIVING AREA: if brief.areaM2 is null, the user left the size to you. Choose areaM2 from the bedrooms,
+bathrooms, housing type, budget and lot; use roughly these ranges: house 70–400, tiny-home 15–40,
+townhouse and duplex 60–250 per home, apartment and condo 35–150 average per home.
 
 Decide:
 - style, quality, structure, cladding, roofing (keep the user's non-null choices; choose the rest
@@ -489,4 +531,90 @@ func sortedKeys(m map[string]int) []string {
 	}
 	sort.Strings(ks)
 	return ks
+}
+
+// areaRange is what Gemma may choose when the user leaves the living area to it (m² per home).
+func areaRange(ht string) (float64, float64) {
+	switch ht {
+	case "tiny-home":
+		return 12, 45
+	case "townhouse", "duplex":
+		return 50, 350
+	case "apartment", "condo":
+		return 30, 250
+	default:
+		return 50, 900
+	}
+}
+
+// defaultArea is the first guess at living area for sizing, before Gemma chooses.
+func defaultArea(ht string, bedrooms int, baths float64) float64 {
+	switch ht {
+	case "tiny-home":
+		return 28
+	case "townhouse", "duplex":
+		return 55 + 25*float64(bedrooms) + 6*baths
+	case "apartment", "condo":
+		return 35 + 22*float64(bedrooms)
+	default:
+		return 60 + 30*float64(bedrooms) + 8*baths
+	}
+}
+
+// normalizeProgram maps Gemma's wording onto the allowed values before the checks run, so a reply
+// like "modern farmhouse" or "standing seam metal" (natural when the user describes the style in
+// their own words) counts as farmhouse or metal instead of costing a retry. Values that match
+// nothing are left as they are, and the checks say so. List items Gemma added that match nothing
+// (a "view" priority) are dropped; the user's own choices are checked separately and always kept.
+func normalizeProgram(pr *ProgramReply) {
+	pr.Style = closestChoice(pr.Style, Styles)
+	pr.Quality = closestChoice(pr.Quality, Qualities)
+	pr.Structure = closestChoice(pr.Structure, Structures)
+	pr.Cladding = closestChoice(pr.Cladding, Claddings)
+	pr.Roofing = closestChoice(pr.Roofing, Roofings)
+	pr.Priorities = onlyKnown(pr.Priorities, PriorityValues)
+	pr.Extras = onlyKnown(pr.Extras, ExtraValues)
+	for i := range pr.Palette {
+		pr.Palette[i].Use = closestChoice(pr.Palette[i].Use, PaletteUses)
+	}
+}
+
+// closestChoice returns v if it's allowed; otherwise the allowed value found in it that ends last
+// ("modern farmhouse" -> farmhouse, the noun), the longest on a tie; otherwise v unchanged.
+func closestChoice(v string, allowed []string) string {
+	key := strings.ToLower(strings.TrimSpace(v))
+	key = strings.NewReplacer(" and ", "-", "&", "-", "_", "-", " ", "-").Replace(key)
+	if contains(allowed, key) {
+		return key
+	}
+	best, bestEnd := "", -1
+	for _, a := range allowed {
+		if i := strings.LastIndex(key, a); i >= 0 {
+			if end := i + len(a); end > bestEnd || (end == bestEnd && len(a) > len(best)) {
+				best, bestEnd = a, end
+			}
+		}
+	}
+	if best == "" {
+		// Words like "standing seam metal roof" or "vinyl lap siding": try each allowed value's
+		// last word ("siding" -> lap-siding) as a fallback.
+		for _, a := range allowed {
+			parts := strings.Split(a, "-")
+			if last := parts[len(parts)-1]; len(last) > 3 && strings.Contains(key, last) {
+				return a
+			}
+		}
+		return v
+	}
+	return best
+}
+
+func onlyKnown(list, allowed []string) []string {
+	out := []string{}
+	for _, x := range list {
+		if c := closestChoice(x, allowed); contains(allowed, c) && !contains(out, c) {
+			out = append(out, c)
+		}
+	}
+	return out
 }

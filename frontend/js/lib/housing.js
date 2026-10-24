@@ -90,6 +90,7 @@ export function briefFor(type, answers) {
   for (const f of BRIEF_FIELDS) {
     if (f === 'designPrompt') { out[f] = String(answers.designPrompt ?? '').trim() || null; continue; }
     if (f === 'budgetUSD') { out[f] = answers.noBudgetLimit ? null : answers.budgetUSD ?? null; continue; }
+    if (f === 'areaM2' && answers.areaByAI) { out[f] = null; continue; }
     const r = rules[f];
     if (!r) out[f] = null;
     else if (r.fixed != null) out[f] = r.fixed;
@@ -126,6 +127,7 @@ export function briefProblems(type, answers, fmtArea) {
       if (!v) problems[f] = 'Choose single rooms, double rooms or suites.';
       continue;
     }
+    if (f === 'areaM2' && answers.areaByAI) continue;
     const [lo, hi] = rules[f];
     if (v == null || v === '' || Number.isNaN(v)) { problems[f] = EMPTY[f](type); continue; }
     if (v < lo || v > hi) {

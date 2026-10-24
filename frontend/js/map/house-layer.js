@@ -223,6 +223,9 @@ function placementMatrix(placement) {
   return m;
 }
 
+// Bright tile colours for the building's rise.
+const GLOW = ['#ff8a2a', '#ffb15c', '#ffd27a', '#ff9d4c'];
+
 export function createHouseLayer(map) {
   const state = { design: null, model: null, placement: null, rise: 1, riseStart: 0, night: false, tiles: null };
   let renderer, scene, camera;
@@ -244,17 +247,23 @@ export function createHouseLayer(map) {
       renderer.autoClear = false;
     },
     render(a, b) {
-      if (!state.model) return;
+      if (!state.model && !gen.mesh) return;
       const args = b ?? a;
       // Mercator-space matrix (the globe has flattened to mercator by street zoom).
       const matrix = args.defaultProjectionData?.mainMatrix ?? args.modelViewProjectionMatrix;
       if (!matrix || map.getZoom() < 13) return;
-      animate();
-      const world = new THREE.Matrix4().fromArray(matrix);
-      camera.projectionMatrix = world.multiply(placementMatrix(state.placement));
       renderer.resetState();
-      renderer.render(scene, camera);
-      if (state.rise < 1) map.triggerRepaint();
+      if (state.model) {
+        animate();
+        camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(placementMatrix(state.placement));
+        renderer.render(scene, camera);
+      }
+      if (gen.mesh) {
+        animateGen();
+        camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(placementMatrix(gen.placement));
+        renderer.render(genScene, camera);
+      }
+      if (state.rise < 1 || gen.mesh) map.triggerRepaint();
     },
   };
 
@@ -297,10 +306,87 @@ export function createHouseLayer(map) {
       }
     }
     const geo = new THREE.BoxGeometry(cell * 0.86, cell * 0.86, 1);
-    const tileMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#ffb15c'), roughness: 0.6, transparent: true, opacity: 0.85 });
+    const tileMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#ffb15c'), emissive: new THREE.Color('#ff8a2a'), emissiveIntensity: 0.9, roughness: 0.5, transparent: true, opacity: 0.9 });
     const mesh = new THREE.InstancedMesh(geo, tileMat, cells.length);
+    const c = new THREE.Color();
+    cells.forEach((cell, i) => mesh.setColorAt(i, c.set(GLOW[i % GLOW.length])));
     mesh.userData.cells = cells;
     return mesh;
+  }
+
+  // ---- the generation grid: the whole lot lights up while the design service works --------------
+  const gen = { mesh: null, placement: null, start: 0, end: 0, cells: null };
+  let genScene = null;
+  function ensureGenScene() {
+    if (genScene) return;
+    genScene = new THREE.Scene();
+    genScene.add(new THREE.AmbientLight(0xffffff, 1.2));
+    const d = new THREE.DirectionalLight(0xffffff, 1.4);
+    d.position.set(-0.3, -0.6, 1).normalize();
+    genScene.add(d);
+  }
+  // Lays a grid of tiles over the outlined land ([lng, lat] ring), in metres east (x) and north (y).
+  function makeGenGrid(ring) {
+    const lng0 = Math.min(...ring.map((p) => p[0])), lat0 = Math.min(...ring.map((p) => p[1]));
+    const mLat = 111320, mLng = 111320 * Math.cos((lat0 * Math.PI) / 180);
+    const local = ring.map(([lng, lat]) => [(lng - lng0) * mLng, (lat - lat0) * mLat]);
+    const W = Math.max(...local.map((p) => p[0])), D = Math.max(...local.map((p) => p[1]));
+    const cell = Math.max(1.4, Math.sqrt((W * D) / 900)); // about 900 tiles at most
+    const inside = (x, y) => {
+      let k = false;
+      for (let i = 0, j = local.length - 1; i < local.length; j = i++) {
+        if ((local[i][1] > y) !== (local[j][1] > y) && x < ((local[j][0] - local[i][0]) * (y - local[i][1])) / (local[j][1] - local[i][1]) + local[i][0]) k = !k;
+      }
+      return k;
+    };
+    const cx = W / 2, cy = D / 2, R = Math.hypot(cx, cy) || 1;
+    const cells = [];
+    for (let x = cell / 2; x < W; x += cell) {
+      for (let y = cell / 2; y < D; y += cell) {
+        if (!inside(x, y)) continue;
+        const d = Math.hypot(x - cx, y - cy) / R;
+        cells.push({ x, y, d, phase: Math.random() * Math.PI * 2, h: 0.6 + Math.random() * 1.4 });
+      }
+    }
+    const geo = new THREE.BoxGeometry(cell * 0.82, cell * 0.82, 1);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: new THREE.Color('#ff8a2a'), emissiveIntensity: 0.65, roughness: 0.4, metalness: 0.1, transparent: true, opacity: 0.88 });
+    const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, cells.length));
+    mesh.count = cells.length;
+    gen.cells = cells;
+    gen.cell = cell;
+    gen.placement = { origin: [lng0, lat0], xAxisBearingDeg: 90 };
+    return mesh;
+  }
+  // Rise from the ground in a ring from the middle; then waves of light and height roll across the
+  // lot; when the design arrives (or fails) the tiles sink back into the ground.
+  const GEN_COLORS = ['#ff8a2a', '#ffb15c', '#ffd27a', '#ff6a1a', '#fff1d0'].map((h) => new THREE.Color(h));
+  function animateGen() {
+    const now = performance.now();
+    const t = (now - gen.start) / 1000;
+    const ending = gen.end ? Math.min(1, (now - gen.end) / 1400) : 0;
+    const dummy = new THREE.Object3D();
+    const col = new THREE.Color();
+    gen.cells.forEach((c, i) => {
+      const rise = Math.max(0, Math.min(1, t * 0.9 - c.d * 0.8));
+      const ease = 1 - Math.pow(1 - rise, 3);
+      const wave = 0.5 + 0.5 * Math.sin(t * 2.2 - c.d * 9 + c.phase * 0.25);
+      const sweep = Math.max(0, 1 - Math.abs(((t * 0.35) % 1.4) - 0.2 - (c.x / (gen.cells.at(-1)?.x || 1)))) ** 6;
+      const h = Math.max(0.03, ease * (0.25 + c.h * (0.35 + 0.65 * wave) + sweep * 2.2) * (1 - ending));
+      dummy.position.set(c.x, c.y, h / 2);
+      dummy.scale.set(1, 1, h);
+      dummy.updateMatrix();
+      gen.mesh.setMatrixAt(i, dummy.matrix);
+      const k = Math.min(GEN_COLORS.length - 1, Math.floor((wave * 0.7 + sweep) * GEN_COLORS.length));
+      gen.mesh.setColorAt(i, col.copy(GEN_COLORS[Math.max(0, k)]).lerp(GEN_COLORS[4], sweep * 0.6));
+    });
+    gen.mesh.instanceMatrix.needsUpdate = true;
+    if (gen.mesh.instanceColor) gen.mesh.instanceColor.needsUpdate = true;
+    gen.mesh.material.emissiveIntensity = 0.55 + 0.25 * Math.sin(t * 3);
+    if (ending >= 1) {
+      genScene.remove(gen.mesh);
+      gen.mesh.geometry.dispose();
+      gen.mesh = null;
+    }
   }
 
   return {
@@ -318,6 +404,26 @@ export function createHouseLayer(map) {
       state.riseStart = performance.now();
       if (state.rise >= 1) { state.model.scale.set(1, 1, 1); if (state.tiles) state.tiles.visible = false; }
       this.setNight(state.night);
+      map.triggerRepaint();
+    },
+    // While a design is being made: a glowing grid rises over the outlined land ([lng, lat] ring).
+    generating(ring) {
+      ensureGenScene();
+      if (gen.mesh) { genScene.remove(gen.mesh); gen.mesh.geometry.dispose(); }
+      gen.mesh = makeGenGrid(ring);
+      gen.start = performance.now();
+      gen.end = 0;
+      genScene.add(gen.mesh);
+      map.triggerRepaint();
+    },
+    // The design arrived or failed: the grid sinks back into the ground.
+    stopGenerating() {
+      if (gen.mesh && !gen.end) gen.end = performance.now();
+      map.triggerRepaint();
+    },
+    // Moves the building to a new placement without replaying its rise.
+    move(placement) {
+      state.placement = placement;
       map.triggerRepaint();
     },
     hide() {

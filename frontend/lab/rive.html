@@ -34,7 +34,7 @@
 <script type="module">
   // Entries are "file" or "file:Artboard" for files with several artboards.
   const TYPES = ['House', 'Tiny', 'Townhouse', 'Duplex', 'Apartment', 'Condo', 'Dorm'].map((a) => `types:${a}`);
-  const ALL = ['forge', 'mark', 'outline', ...TYPES];
+  const ALL = ['forge', 'mark', 'outline', 'pin', ...TYPES];
   const params = new URLSearchParams(location.search);
   const files = params.get('file') ? params.get('file').split(',').flatMap((f) => (f === 'types' ? TYPES : [f])) : ALL;
   window.__rive = {};
