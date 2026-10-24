@@ -175,6 +175,10 @@ export function checkDesign(d) {
     if (!Array.isArray(e.levels) || e.levels.some((x) => x < 0 || x > maxLevel)) err(6, `Elevator ${e.id} stops at a level that doesn’t exist.`);
   }
 
+  // Rule 8: the building stands inside the land that was outlined.
+  const outsideCorners = footprintOutside(d.placement.footprint, d.site?.outline);
+  if (outsideCorners) err(8, `The building goes outside the outlined land (${outsideCorners} of its corners are past the boundary).`);
+
   // Rule 4: every room can be reached from a building entry.
   const unreachable = reachability(d);
   if (unreachable.length) {
@@ -297,4 +301,11 @@ function overlapAny(p, q, r, s) {
   const lo = Math.max(0, Math.min(t(r), t(s))), hi = Math.min(len, Math.max(t(r), t(s)));
   if (hi - lo < 0.01) return null;
   return { a: [p[0] + ux * lo, p[1] + uy * lo], b: [p[0] + ux * hi, p[1] + uy * hi] };
+}
+
+// How many footprint corners lie outside the site outline (both [lng, lat]); 0 when inside or when
+// there's no outline to compare with. Lng/lat is treated as flat, which is exact enough for a lot.
+export function footprintOutside(footprint, outline) {
+  if (!Array.isArray(footprint) || !Array.isArray(outline) || outline.length < 3) return 0;
+  return footprint.filter(([x, y]) => !pointInPolygon(x, y, outline)).length;
 }

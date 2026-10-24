@@ -13,7 +13,7 @@ the stored file as is.
 |---|---|---|
 | **request** | The `request` part of [baseline.json](baseline.json), as the website sent it. | `request.id` |
 | **design** | The `design` part, as Gemma returned it. This is the render file. | `design.id` |
-| **estimate** | The `terrasim.estimate/1` file ([GEMMA.md](../GEMMA.md) section 3). | `estimate.designId` |
+| **estimate** | Optional: the cost now travels inside the design as `design.cost`; a separate `terrasim.estimate/1` is kept only for older services. | `estimate.designId` |
 | **job** | Progress of one request while Gemma works. | `jobId` |
 
 A design is never edited. A changed brief makes a new request and a new design, so a link to a
@@ -84,7 +84,7 @@ Base URL goes in `frontend/js/config.js` (`apiBaseUrl`). Errors are any non-2xx 
 1. The user fills the form. The website checks every required box, builds the request and sends
    `POST /designs`.
 2. The server saves the request, creates a job (`queued`) and passes the request to Gemma.
-3. Gemma returns a design and an estimate. The server checks `design.schema`, saves both, and marks
+3. Gemma returns a design (with its cost inside). The server checks `design.schema`, saves both, and marks
    the job `done` with the `designId`. If Gemma fails or returns a file that doesn't match the
    contract, the job is `failed` with a plain message.
 4. The website sees `done`, loads `GET /designs/{id}`, checks the file, and draws it on the map.

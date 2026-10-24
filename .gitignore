@@ -35,3 +35,8 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+# Design service (housecost): the Gemini key and local outputs
+APIKey.txt
+housecost/gemma_log/
+housecost/results/
+housecost/*.result.json
