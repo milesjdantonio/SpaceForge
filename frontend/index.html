@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TerraSim · See the house that fits your land</title>
+  <meta name="description" content="Find your land on the globe, outline it, and see the house TerraSim's design system draws for it, standing among everything around it.">
+  <meta name="theme-color" content="#070b11">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/hanken-grotesk-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/zodiak-300.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/",
+        "maplibre-gl": "./vendor/maplibre/maplibre-gl.mjs"
+      }
+    }
+  </script>
+</head>
+<body data-mode="globe">
+  <div id="map" class="map" aria-label="Map"></div>
+
+  <header class="bar" id="bar">
+    <a class="brand" href="#/" aria-label="TerraSim, back to the globe">
+      <span class="brand-mark" data-rive="mark" aria-hidden="true"></span>
+      <span class="brand-name">terrasim</span>
+    </a>
+    <nav class="bar-nav" aria-label="Main">
+      <button type="button" class="bar-link" data-open="sites">My sites</button>
+      <button type="button" class="bar-link" data-open="catalog">Catalog</button>
+    </nav>
+    <div class="units" role="group" aria-label="Units">
+      <button type="button" data-units="imperial" aria-pressed="true">ft</button>
+      <button type="button" data-units="metric" aria-pressed="false">m</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="intro" id="intro" aria-labelledby="intro-title">
+      <h1 class="intro-title" id="intro-title">terrasim</h1>
+      <p class="intro-sentence">Find your land, outline it, and see the house that belongs there, standing among everything around it.</p>
+      <p class="intro-hint" id="intro-hint" aria-live="polite">Finding your location…</p>
+    </section>
+
+    <div class="toolbar" id="toolbar" hidden></div>
+    <div class="draw-hint" id="draw-hint" hidden aria-live="polite"></div>
+    <aside class="panel" id="panel" hidden aria-live="polite"></aside>
+  </main>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+  <dialog class="dialog" id="dialog"></dialog>
+  <div class="walk" id="walk" hidden></div>
+
+  <noscript><p class="noscript">TerraSim needs JavaScript for the map.</p></noscript>
+
+  <script src="vendor/rive/rive.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

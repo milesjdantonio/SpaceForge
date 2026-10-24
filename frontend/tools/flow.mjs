@@ -1,0 +1,56 @@
+// Drives the main flow in a headless browser and screenshots each step.
+//   node tools/flow.mjs [--out dir]
+import { mkdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { withBrowser } from './browser.mjs';
+
+const args = process.argv.slice(2);
+const oi = args.indexOf('--out');
+const out = resolve(oi >= 0 ? args[oi + 1] : join(process.env.TEMP || '.', 'terrasim-flow'));
+mkdirSync(out, { recursive: true });
+const base = 'http://127.0.0.1:5173';
+
+await withBrowser(async (browser) => {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, geolocation: { latitude: 35.6402, longitude: -82.5925 }, permissions: ['geolocation'] });
+  const page = await ctx.newPage();
+  const logs = [];
+  page.on('console', (m) => { if (m.type() === 'error') logs.push(m.text()); });
+  page.on('pageerror', (e) => logs.push('pageerror: ' + e.message));
+  const shot = async (name) => { await page.screenshot({ path: join(out, name + '.png') }); console.log('shot', name); };
+  await page.goto(base + '/');
+  await page.waitForTimeout(5000);
+  await shot('01-globe');
+  await page.mouse.click(720, 300);
+  await page.waitForTimeout(9000);
+  await shot('02-arrived');
+  await page.click('[data-act="outline"]');
+  await page.waitForTimeout(1200);
+  // A lot around the map centre.
+  const pts = [[620, 420], [820, 400], [860, 560], [640, 590]];
+  for (const [x, y] of pts) { await page.mouse.click(x, y); await page.waitForTimeout(250); }
+  await shot('03-drawing');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(1200);
+  await shot('04-brief');
+  await page.click('[data-send]');
+  await page.waitForTimeout(4500);
+  await shot('05-not-sent');
+  await page.click('[data-a="preview"]');
+  await page.waitForTimeout(3500);
+  await shot('06-house-rising');
+  await page.waitForTimeout(3500);
+  await shot('07-house-panel');
+  await page.click('[data-tab="plans"]');
+  await page.waitForTimeout(500);
+  await shot('08-plans');
+  await page.click('[data-tab="cost"]');
+  await page.waitForTimeout(400);
+  await shot('09-cost');
+  await page.click('[data-tab="time"]');
+  await page.waitForTimeout(400);
+  await shot('10-time');
+  await page.click('[data-walk]');
+  await page.waitForTimeout(2500);
+  await shot('11-walk');
+  if (logs.length) console.log('console:\n  ' + [...new Set(logs)].join('\n  '));
+}, { maxSeconds: 170 });
