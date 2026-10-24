@@ -42,6 +42,9 @@ type SiteFeature struct {
 }
 
 type Brief struct {
+	// The user's own description of the building and its style: the base of the brief
+	// (contracts/FIELDS.md). The numbers below win where they disagree with it.
+	DesignPrompt *string `json:"designPrompt"`
 	Floors    *int     `json:"floors"`
 	AreaM2    *float64 `json:"areaM2"`
 	UnitCount *int     `json:"unitCount"`

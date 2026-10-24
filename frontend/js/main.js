@@ -7,6 +7,7 @@ import { createHouseLayer } from './map/house-layer.js';
 import { measure, problemsFor, placeOnLot, inFootprint } from './lib/place.js';
 import { fmt } from './format.js';
 import { api } from './api/client.js';
+import { config } from './config.js';
 import { icon } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { renderBriefPanel } from './panels/brief.js';
@@ -44,6 +45,19 @@ function setMode(mode) {
 }
 
 // ---- boot --------------------------------------------------------------------------------------
+// When the site is served by the design service itself (housecost -serve), its API is at /api on
+// the same address: use it unless another one was chosen with ?api=.
+if (!config.apiBaseUrl) {
+  try {
+    const res = await fetch('/api/health', { signal: AbortSignal.timeout(1500) });
+    const h = res.ok ? await res.json() : null;
+    if (h?.ok) {
+      config.apiBaseUrl = `${location.origin}/api`;
+      if (h.key === false) console.warn('[TerraSim] The design service has no Gemini API key yet; designs will fail until one is added.');
+    }
+  } catch {}
+}
+
 const { map, stopSpin, startSpin } = await createMap($('#map'));
 createStarfield($('#stars'), map);
 const outliner = createOutliner(map, {

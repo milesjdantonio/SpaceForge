@@ -452,6 +452,12 @@ ASSESSMENT: verdict %s; foundation %s; risks: %s
 
 SIZING: %s
 
+The user's DESCRIPTION (brief.designPrompt, in their own words) is the base of the request. Follow
+it: pick the style value closest to what it describes, take its feel, materials and colours into the
+program, keep or avoid what it asks when the site and numbers allow, and say in the description
+how the design follows it (in cautions when something it asks can't be done). Where it disagrees
+with a number in brief, the number wins.
+
 Decide:
 - style, quality, structure, cladding, roofing (keep the user's non-null choices; choose the rest
   to suit the climate, hazards and style). Rough build cost per m² of floor: essential ≈ $1,600,

@@ -119,6 +119,9 @@ func run() error {
 	thinking := flag.String("thinking", "minimal", "how much Gemma reasons before answering: minimal, low, medium, high, or default")
 	request := flag.String("request", "", "TerraSim design request JSON (website format); writes design + estimate + report")
 	outPath := flag.String("out", "", "where to write the result JSON (default: <request>.result.json)")
+	serveMode := flag.Bool("serve", false, "run the TerraSim website and design API (see server.go)")
+	addr := flag.String("addr", ":8000", "address for -serve")
+	siteDir := flag.String("site", filepath.Join("..", "frontend"), "the website folder for -serve")
 	flag.Parse()
 
 	newGemma := func() (*Gemma, error) {
@@ -134,6 +137,9 @@ func run() error {
 			g.Thinking = t
 		}
 		return g, nil
+	}
+	if *serveMode {
+		return serve(*addr, *siteDir, *model, *keyFile, newGemma)
 	}
 	if *request != "" {
 		return runRequestFile(*request, *outPath, newGemma)
