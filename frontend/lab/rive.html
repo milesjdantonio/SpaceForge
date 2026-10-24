@@ -32,33 +32,37 @@
 <main id="grid"></main>
 <script src="../vendor/rive/rive.js"></script>
 <script type="module">
-  const ALL = ['forge', 'stamp', 'mark', 'crane', 'compass', 'pin', 'save', 'drafting'];
+  // Entries are "file" or "file:Artboard" for files with several artboards.
+  const TYPES = ['House', 'Tiny', 'Townhouse', 'Duplex', 'Apartment', 'Condo', 'Dorm'].map((a) => `types:${a}`);
+  const ALL = ['forge', 'mark', 'outline', ...TYPES];
   const params = new URLSearchParams(location.search);
-  const files = params.get('file') ? params.get('file').split(',') : ALL;
+  const files = params.get('file') ? params.get('file').split(',').flatMap((f) => (f === 'types' ? TYPES : [f])) : ALL;
   window.__rive = {};
   rive.RuntimeLoader.setWasmUrl(new URL('../vendor/rive/rive.wasm', location.href).href);
 
-  for (const name of files) {
+  for (const entry of files) {
+    const [name, artboard] = entry.split(':');
     const sec = document.createElement('section');
-    sec.innerHTML = `<h2>${name}.riv</h2><canvas width="680" height="510"></canvas><div class="controls"></div><div class="status">Loading…</div>`;
+    sec.innerHTML = `<h2>${name}.riv${artboard ? ` · ${artboard}` : ''}</h2><canvas width="680" height="510"></canvas><div class="controls"></div><div class="status">Loading…</div>`;
     document.getElementById('grid').append(sec);
     const canvas = sec.querySelector('canvas');
     const status = sec.querySelector('.status');
     const controls = sec.querySelector('.controls');
-    const report = { name, loaded: false };
-    window.__rive[name] = report;
+    const report = { name: entry, loaded: false };
+    window.__rive[entry] = report;
     rive.Rive.suppressDeprecationWarnings = ['default-state-machine', 'state-machine-inputs'];
     // First load reads the file's contents; if it has a state machine, it is remounted running it.
     const mount = (smName) => {
       const r = new rive.Rive({
         src: `../assets/rive/${name}.riv`,
         canvas,
+        artboard,
         autoplay: true,
         stateMachines: smName,
         onLoad: () => {
           r.resizeDrawingSurfaceToCanvas();
           const contents = r.contents;
-          const ab = contents?.artboards?.[0];
+          const ab = contents?.artboards?.find((a) => !artboard || a.name === artboard) ?? contents?.artboards?.[0];
           report.artboard = ab?.name;
           report.animations = ab?.animations ?? [];
           report.stateMachines = (ab?.stateMachines ?? []).map((s) => ({ name: s.name, inputs: s.inputs }));
@@ -101,7 +105,7 @@
             }
           }
           status.textContent = `${report.artboard}: ${report.animations.length} animations · ${report.stateMachines.map((s) => `${s.name} (${s.inputs.map((i) => i.name).join(', ')})`).join('; ') || 'no state machine'}`;
-          window.__rive[name].instance = r;
+          window.__rive[entry].instance = r;
         },
         onLoadError: (e) => {
           report.error = String(e?.data ?? e);

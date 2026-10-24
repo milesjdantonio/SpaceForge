@@ -16,8 +16,17 @@ const AMBER = COLORS.amber, EMBER = COLORS.ember;
 // A small builder for one artboard: boxes, gable roofs and windows in isometric space.
 function drawing(f, name, k, center, compose) {
   const ab = f.artboard({ name, width: W, height: H });
-  const P = iso(center[0], center[1], k);
-  const body = ab.node(null, { name: 'body' });
+  // Points are drawn about (0, 0) and remembered, so the finished drawing can be centred and
+  // scaled to fit the artboard.
+  const seen = [];
+  const project = iso(0, 0, k);
+  const P = (p) => { const q = project(p); seen.push(q); return q; };
+  void center;
+  const frame = ab.node(null, { name: 'frame' });
+  const shadow = ab.shape(frame, { name: 'shadow' });
+  const shadowEllipse = ab.ellipse(shadow, { w: 10, h: 10 });
+  ab.fill(shadow, '#000000', { alpha: 0.3 });
+  const body = ab.node(frame, { name: 'body' });
   const strokes = [], windows = [], roofs = [];
   const poly = (pts, fill, { line = true, kind } = {}) => {
     const s = ab.shape(body);
@@ -62,11 +71,17 @@ function drawing(f, name, k, center, compose) {
     },
     poly,
   };
-  // A soft ground shadow under everything.
-  const shadow = ab.shape(null, { name: 'shadow' });
-  ab.ellipse(shadow, { x: center[0], y: H - 14, w: W * 0.62, h: 10 });
-  ab.fill(shadow, '#000000', { alpha: 0.28 });
   compose(api);
+
+  // Fit: centre the drawing with a margin, and lay a soft shadow under its base.
+  const xs = seen.map((p) => p[0]), ys = seen.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const scale = Math.min((W - 20) / (x1 - x0), (H - 22) / (y1 - y0), 1.8);
+  frame.props.scaleX = scale;
+  frame.props.scaleY = scale;
+  frame.props.x = W / 2 - ((x0 + x1) / 2) * scale;
+  frame.props.y = (H - 6) / 2 - ((y0 + y1) / 2) * scale + 2;
+  Object.assign(shadowEllipse.props, { x: (x0 + x1) / 2, y: y1 - 1, width: (x1 - x0) * 0.86, height: 9 / scale });
 
   // Animations. Layer "Lift": rest / up. Layer "Light": intro (draws in), off, on.
   const trims = strokes.map((s) => ab.trim(s, { end: 1 }));

@@ -348,7 +348,10 @@ function updateHint({ ring, closed }) {
   const msg = n === 0 ? `${verb} the first corner of the land.`
     : n < 3 ? `${verb} the next corner.`
     : touch ? 'Keep tapping corners. Tap the first corner, or Finish, when you’re done.' : 'Keep clicking corners. Click the first corner, or press Enter, to finish.';
+  // Until the first corner, a short loop shows how outlining works.
+  const demo = n === 0 ? (hint.querySelector('.hint-demo') ?? null) : null;
   hint.innerHTML = `
+    ${n === 0 ? '<div class="hint-demo" aria-hidden="true"></div>' : ''}
     <p class="hint-msg">${msg}</p>
     <dl class="hint-facts num">
       <div><dt>Corners</dt><dd>${n}</dd></div>
@@ -360,6 +363,11 @@ function updateHint({ ring, closed }) {
       <button type="button" class="btn btn-small btn-quiet" data-h="cancel">Cancel</button>
       <button type="button" class="btn btn-small btn-primary" data-h="finish" ${n >= 3 ? '' : 'disabled'}>Finish</button>
     </div>`;
+  if (n === 0) {
+    const slot = hint.querySelector('.hint-demo');
+    if (demo) slot.replaceWith(demo);
+    else mountRive(slot, { src: 'assets/rive/outline.riv', fit: 'cover' });
+  }
 }
 hint.addEventListener('click', (e) => {
   const h = e.target.closest('[data-h]')?.dataset.h;

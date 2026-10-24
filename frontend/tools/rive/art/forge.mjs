@@ -10,7 +10,7 @@ import { COLORS, iso, mix } from '../helpers.mjs';
 
 const W = 800, H = 520;
 const N = 8;                 // grid tiles per side
-const K = 34;                // pixels per grid unit
+const K = 42;                // pixels per grid unit
 const B = [2.6, 5.4];        // building footprint, both axes
 const FLOORS = 5;
 const STOREY = 0.62;         // grid units per floor
@@ -19,7 +19,7 @@ const TOP = FLOORS * STOREY;
 export default function build() {
   const f = new RivFile();
   const ab = f.artboard({ name: 'Forge', width: W, height: H });
-  const P = iso(W / 2, 135, K);
+  const P = iso(W / 2, 105, K);
   const unit = P([0, 0, 0])[1] - P([0, 0, 1])[1];
 
   // Colours.
@@ -74,35 +74,7 @@ export default function build() {
   track(scan, 'y', { idle: 0, working: [[0, 0, EASE.linear], [SWEEP, dy * N], [SWEEP + 1, 0, 'hold'], [240, 0]], done: 0, failed: 0 });
   track(scan, 'opacity', { idle: 0, working: [[0, 0], [12, 1], [SWEEP - 14, 1], [SWEEP, 0, 'hold'], [240, 0]], done: 0, failed: 0 });
 
-  // ---- the massing, solid (shown when done) --------------------------------------------------
   const [b0, b1] = B;
-  const solid = ab.node(null, { name: 'solid', opacity: 0 });
-  const face = (pts, c) => { const s = ab.shape(solid); ab.path(s, pts.map(P)); ab.fill(s, c); ab.stroke(s, ink, 1, { alpha: 0.25 }); return s; };
-  face([[b0, b1, 0], [b1, b1, 0], [b1, b1, TOP], [b0, b1, TOP]], faceL);   // front-left face (y = b1)
-  face([[b1, b0, 0], [b1, b1, 0], [b1, b1, TOP], [b1, b0, TOP]], faceR);   // front-right face (x = b1)
-  face([[b0, b0, TOP], [b1, b0, TOP], [b1, b1, TOP], [b0, b1, TOP]], faceT);
-  track(solid, 'opacity', { idle: 0, working: 0, done: [[0, 0, EASE.inOut], [45, 1]], failed: 0 });
-
-  // Windows on the two front faces, lit one by one when done.
-  const lights = ab.node(null, { name: 'windows' });
-  let w = 0;
-  for (let fl = 0; fl < FLOORS; fl++) {
-    const z0 = fl * STOREY + 0.18, z1 = z0 + 0.3;
-    for (let k = 0; k < 3; k++) {
-      const a = b0 + 0.35 + k * 0.85, c = a + 0.45;
-      for (const side of ['L', 'R']) {
-        const pts = side === 'L'
-          ? [[a, b1, z0], [c, b1, z0], [c, b1, z1], [a, b1, z1]]
-          : [[b1, a, z0], [b1, c, z0], [b1, c, z1], [b1, a, z1]];
-        const s = ab.shape(lights, { name: `win-${fl}-${k}-${side}`, opacity: 0 });
-        ab.path(s, pts.map(P));
-        ab.fill(s, side === 'L' ? COLORS.ember : mix(COLORS.ember, '#ffffff', 0.2));
-        const start = 50 + ((w * 37) % 60);
-        track(s, 'opacity', { idle: 0, working: 0, done: [[0, 0, 'hold'], [start, 0, EASE.out], [start + 14, 0.95]], failed: 0 });
-        w++;
-      }
-    }
-  }
 
   // ---- floor plates, rising one by one --------------------------------------------------------
   const plates = [];
@@ -148,6 +120,45 @@ export default function build() {
       done: [[0, plateTop, EASE.inOut], [45, faceT]],
       failed: [[0, plateTop, EASE.inOut], [50, tileDim]],
     });
+  }
+
+  // ---- the massing, solid (shown when done) --------------------------------------------------
+  // Drawn after the plates: its front faces are nearest the viewer, and a lower plate's top face
+  // would otherwise paint over the walls above it.
+  // Faded in through the paint's alpha (colour keys), which every runtime applies reliably.
+  const clear = (c) => `${c}00`;
+  const solid = ab.node(null, { name: 'solid' });
+  const face = (pts, c) => {
+    const s = ab.shape(solid);
+    ab.path(s, pts.map(P));
+    const fill = ab.fill(s, c, { alpha: 0 });
+    track(fill, 'colorValue', { idle: clear(c), working: clear(c), done: [[0, clear(c), EASE.inOut], [45, c]], failed: clear(c) });
+    return s;
+  };
+  face([[b0, b1, 0], [b1, b1, 0], [b1, b1, TOP], [b0, b1, TOP]], faceL);   // front-left face (y = b1)
+  face([[b1, b0, 0], [b1, b1, 0], [b1, b1, TOP], [b1, b0, TOP]], faceR);   // front-right face (x = b1)
+  face([[b0, b0, TOP], [b1, b0, TOP], [b1, b1, TOP], [b0, b1, TOP]], faceT);
+
+  // Windows on the two front faces, lit one by one when done.
+  const lights = ab.node(null, { name: 'windows' });
+  let w = 0;
+  for (let fl = 0; fl < FLOORS; fl++) {
+    const z0 = fl * STOREY + 0.18, z1 = z0 + 0.3;
+    for (let k = 0; k < 3; k++) {
+      const a = b0 + 0.35 + k * 0.85, c = a + 0.45;
+      for (const side of ['L', 'R']) {
+        const pts = side === 'L'
+          ? [[a, b1, z0], [c, b1, z0], [c, b1, z1], [a, b1, z1]]
+          : [[b1, a, z0], [b1, c, z0], [b1, c, z1], [b1, a, z1]];
+        const s = ab.shape(lights, { name: `win-${fl}-${k}-${side}` });
+        ab.path(s, pts.map(P));
+        const lit = side === 'L' ? COLORS.ember : mix(COLORS.ember, '#ffffff', 0.2);
+        const fill = ab.fill(s, lit, { alpha: 0 });
+        const start = 50 + ((w * 37) % 60);
+        track(fill, 'colorValue', { idle: clear(lit), working: clear(lit), done: [[0, clear(lit), 'hold'], [start, clear(lit), EASE.out], [start + 14, `${lit}f2`]], failed: clear(lit) });
+        w++;
+      }
+    }
   }
 
   // ---- corner lines drawing upward, and a height bracket --------------------------------------
