@@ -17,6 +17,7 @@
       }
     },
     "brief": {
+      "designPrompt": null,
       "floors": null,
       "areaM2": null,
       "unitCount": null,
@@ -27,7 +28,6 @@
       "budgetUSD": null
     },
     "advanced": {
-      "style": null,
       "quality": null,
       "garage": null,
       "parkingSpaces": null,
@@ -43,8 +43,7 @@
         "threeBed": null
       },
       "bathroomSharing": null,
-      "commonSpaces": [],
-      "notes": null
+      "commonSpaces": []
     },
     "aiDecides": [],
     "mode": null,

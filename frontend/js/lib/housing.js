@@ -69,13 +69,26 @@ export function requiredFields(type) {
   return [...order.filter((f) => rules[f] && !rules[f].fixed), 'budgetUSD'];
 }
 
-export const BRIEF_FIELDS = ['floors', 'areaM2', 'unitCount', 'bedrooms', 'bathrooms', 'residents', 'roomType', 'budgetUSD'];
+export const BRIEF_FIELDS = ['designPrompt', 'floors', 'areaM2', 'unitCount', 'bedrooms', 'bathrooms', 'residents', 'roomType', 'budgetUSD'];
+
+// The design prompt: the user's own description of the building and its style. It is the base of
+// what Gemma is asked for; the boxes below it add the numbers.
+export const PROMPT_MIN = 15;
+export const PROMPT_MAX = 1000;
+export function promptProblem(text) {
+  const t = String(text ?? '').trim();
+  if (!t) return 'Describe the building and its style in a sentence or two.';
+  if (t.length < PROMPT_MIN) return 'Add a little more: a style, a feeling, or rooms you need.';
+  if (t.length > PROMPT_MAX) return `Keep it under ${PROMPT_MAX} characters.`;
+  return '';
+}
 
 // Builds the brief sent to Gemma: every field present, null where it doesn't apply.
 export function briefFor(type, answers) {
   const rules = BRIEF_RULES[type] || {};
   const out = {};
   for (const f of BRIEF_FIELDS) {
+    if (f === 'designPrompt') { out[f] = String(answers.designPrompt ?? '').trim() || null; continue; }
     if (f === 'budgetUSD') { out[f] = answers.noBudgetLimit ? null : answers.budgetUSD ?? null; continue; }
     const r = rules[f];
     if (!r) out[f] = null;
@@ -97,7 +110,9 @@ const EMPTY = {
 // One problem per required box that is empty or out of range, keyed by field.
 export function briefProblems(type, answers, fmtArea) {
   const problems = {};
-  if (!type) return { housingType: 'Choose what you’re building.' };
+  const prompt = promptProblem(answers.designPrompt);
+  if (prompt) problems.designPrompt = prompt;
+  if (!type) return { housingType: 'Choose what you’re building.', ...problems };
   const rules = BRIEF_RULES[type];
   for (const f of requiredFields(type)) {
     const v = answers[f];
@@ -124,15 +139,16 @@ export function briefProblems(type, answers, fmtArea) {
 
 // ---- Advanced -----------------------------------------------------------------------------------
 
-export const STYLES = [
-  ['modern', 'Modern', 'Flat roofs, long glass walls'],
-  ['farmhouse', 'Farmhouse', 'Steep gables, a deep porch'],
-  ['craftsman', 'Craftsman', 'Low gables, deep eaves'],
-  ['cabin', 'Cabin', 'Steep roof, timber walls'],
-  ['mediterranean', 'Mediterranean', 'Stucco, low tile hips'],
-  ['prairie', 'Prairie', 'Long, low, wide eaves'],
-  ['contemporary', 'Contemporary', 'Mixed materials and forms'],
-  ['brick-traditional', 'Brick traditional', 'Brick, a symmetrical front'],
+// Style ideas the prompt box offers as one-click additions to the user's text.
+export const STYLE_IDEAS = [
+  ['Modern', 'modern, with a flat roof and long glass walls'],
+  ['Farmhouse', 'farmhouse, with steep gables and a deep porch'],
+  ['Craftsman', 'craftsman, with low gables and deep eaves'],
+  ['Cabin', 'a cabin, with a steep roof and timber walls'],
+  ['Mediterranean', 'Mediterranean, with stucco and a low tile roof'],
+  ['Prairie', 'prairie style, long and low with wide eaves'],
+  ['Contemporary', 'contemporary, mixing materials and forms'],
+  ['Brick', 'traditional brick with a symmetrical front'],
 ];
 export const QUALITY = [['essential', 'Essential'], ['standard', 'Standard'], ['premium', 'Premium']];
 export const STRUCTURE = [['wood-frame', 'Wood frame'], ['steel-frame', 'Steel frame'], ['concrete', 'Concrete'], ['mass-timber', 'Mass timber'], ['masonry', 'Masonry']];
@@ -145,23 +161,23 @@ export const COMMON_SPACES = [['lobby', 'Lobby'], ['lounge', 'Lounge'], ['study'
 export const UNIT_MIX = [['studio', 'Studios'], ['oneBed', '1 bed'], ['twoBed', '2 bed'], ['threeBed', '3 bed']];
 
 export const EMPTY_ADVANCED = {
-  style: null, quality: null, garage: null, parkingSpaces: null,
+  quality: null, garage: null, parkingSpaces: null,
   structure: null, cladding: null, roofing: null,
   priorities: [], extras: [],
   unitMix: { studio: null, oneBed: null, twoBed: null, threeBed: null },
-  bathroomSharing: null, commonSpaces: [], notes: null,
+  bathroomSharing: null, commonSpaces: [],
 };
 
-// Which advanced questions a type shows.
+// Which advanced questions a type shows. Style and anything else the user wants are in their own
+// words, in the design prompt.
 export function advancedFields(type) {
-  const f = ['style', 'quality'];
+  const f = ['quality'];
   if (['house', 'tiny-home', 'townhouse', 'duplex'].includes(type)) f.push('garage');
   if (isSharedBuilding(type)) f.push('parkingSpaces');
   f.push('structure', 'cladding', 'roofing', 'priorities', 'extras');
   if (type === 'apartment' || type === 'condo') f.push('unitMix');
   if (type === 'dorm') f.push('bathroomSharing');
   if (isSharedBuilding(type)) f.push('commonSpaces');
-  f.push('notes');
   return f;
 }
 
@@ -170,7 +186,6 @@ export function advancedFor(type, adv) {
   const show = new Set(advancedFields(type));
   const out = structuredClone(EMPTY_ADVANCED);
   for (const k of Object.keys(out)) if (show.has(k) && adv[k] != null) out[k] = structuredClone(adv[k]);
-  if (out.notes === '') out.notes = null;
   return out;
 }
 
@@ -179,7 +194,6 @@ export function aiDecides(type, adv) {
   return advancedFields(type).filter((k) => {
     const v = adv[k];
     if (k === 'unitMix') return !v || Object.values(v).every((x) => x == null);
-    if (k === 'notes') return !v;
     if (Array.isArray(v)) return v.length === 0;
     return v == null;
   });

@@ -8,13 +8,13 @@ import { icon } from '../ui/icons.js';
 import { mountRive } from '../rive.js';
 import {
   HOUSING_TYPES, BRIEF_RULES, ROOM_TYPES, requiredFields, fieldLabel, fieldHint, briefProblems,
-  STYLES, QUALITY, STRUCTURE, CLADDING, ROOFING, PRIORITIES, EXTRAS, BATHROOM_SHARING, COMMON_SPACES, UNIT_MIX,
+  STYLE_IDEAS, PROMPT_MAX, QUALITY, STRUCTURE, CLADDING, ROOFING, PRIORITIES, EXTRAS, BATHROOM_SHARING, COMMON_SPACES, UNIT_MIX,
   EMPTY_ADVANCED, advancedFields, advancedProblems, aiDecides, typeName,
 } from '../lib/housing.js';
 
 export const EMPTY_FORM = {
   housingType: null,
-  answers: { floors: null, areaM2: null, unitCount: null, bedrooms: null, bathrooms: null, residents: null, roomType: null, budgetUSD: null, noBudgetLimit: false },
+  answers: { designPrompt: '', floors: null, areaM2: null, unitCount: null, bedrooms: null, bathrooms: null, residents: null, roomType: null, budgetUSD: null, noBudgetLimit: false },
   advanced: structuredClone(EMPTY_ADVANCED),
 };
 
@@ -74,6 +74,19 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
           </div>
           <p class="type-said" data-type-said aria-live="polite"></p>
           <p class="qerror" id="err-housingType" role="alert"></p>
+        </div>
+      </section>
+
+      <section class="qgroup" aria-labelledby="g-prompt">
+        <h3 class="group-title" id="g-prompt">Describe the design</h3>
+        <div class="qbox qbox-wide qbox-prompt" data-field="designPrompt">
+          <label class="qlabel" for="q-designPrompt">The building and its style, in your words</label>
+          <textarea id="q-designPrompt" name="designPrompt" class="input qcontrol prompt-input" rows="4" maxlength="${PROMPT_MAX}" placeholder="A bright modern farmhouse that opens to the view, with a big kitchen at its heart and a quiet office away from the bedrooms." aria-describedby="hint-designPrompt err-designPrompt">${esc(form.answers.designPrompt)}</textarea>
+          <div class="prompt-ideas" role="group" aria-label="Add a style to your description">
+            ${STYLE_IDEAS.map(([name, text]) => `<button type="button" class="idea" data-idea="${esc(text)}">${icon('plus')}<span>${name}</span></button>`).join('')}
+          </div>
+          <p class="qhint" id="hint-designPrompt">This is what the design system reads first. Say the style, how it should feel, and anything to keep or avoid. <span class="prompt-count num" data-count></span></p>
+          <p class="qerror" id="err-designPrompt" role="alert"></p>
         </div>
       </section>
 
@@ -204,15 +217,6 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     </fieldset>`;
 
     const parts = [];
-    if (show.has('style')) {
-      parts.push(`<fieldset class="qbox qbox-wide styles" data-field="style">
-        <legend class="qlabel">Style</legend>
-        <div class="style-grid">
-          <label class="style-option"><input type="radio" name="style" value="" ${adv.style == null ? 'checked' : ''}><span class="style-card"><span class="style-name">Decide for me</span><span class="style-blurb">Chosen for the land and climate</span></span></label>
-          ${STYLES.map(([id, name, blurb]) => `
-            <label class="style-option"><input type="radio" name="style" value="${id}" ${adv.style === id ? 'checked' : ''}><span class="style-card"><span class="style-name">${name}</span><span class="style-blurb">${blurb}</span></span></label>`).join('')}
-        </div></fieldset>`);
-    }
     if (show.has('quality')) parts.push(seg('quality', QUALITY, adv.quality, 'Finishes'));
     if (show.has('garage')) parts.push(seg('garage', [[0, 'None'], [1, '1 car'], [2, '2 cars'], [3, '3 cars']], adv.garage, type === 'townhouse' || type === 'duplex' ? 'Garage for each home' : 'Garage'));
     if (show.has('parkingSpaces')) {
@@ -239,10 +243,6 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     }
     if (show.has('bathroomSharing')) parts.push(seg('bathroomSharing', BATHROOM_SHARING, adv.bathroomSharing, 'Bathrooms'));
     if (show.has('commonSpaces')) parts.push(chips('commonSpaces', COMMON_SPACES, adv.commonSpaces, 'Shared spaces'));
-    parts.push(`<div class="qbox qbox-wide" data-field="notes">
-      <label class="qlabel" for="a-notes">Anything else</label>
-      <textarea class="input qcontrol" id="a-notes" name="notes" maxlength="600" placeholder="A view to keep, a tree to save, a room you need">${esc(adv.notes)}</textarea>
-    </div>`);
     advBody.innerHTML = parts.join('');
   }
 
@@ -266,7 +266,6 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     const adv = form.advanced;
     if (advBody.querySelector('[name]')) {
       const one = (k) => (formEl.elements[k] ? (fd.get(k) || null) : adv[k]);
-      adv.style = one('style');
       adv.quality = one('quality');
       adv.garage = formEl.elements.garage ? (fd.get('garage') === '' || fd.get('garage') == null ? null : Number(fd.get('garage'))) : adv.garage;
       adv.parkingSpaces = formEl.elements.parkingSpaces ? num(fd.get('parkingSpaces')) : adv.parkingSpaces;
@@ -278,8 +277,8 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       if (formEl.elements['mix-studio']) for (const [k] of UNIT_MIX) adv.unitMix[k] = num(fd.get(`mix-${k}`));
       adv.bathroomSharing = formEl.elements.bathroomSharing ? one('bathroomSharing') : adv.bathroomSharing;
       if (formEl.elements.commonSpaces || advBody.querySelector('[name="commonSpaces"]')) adv.commonSpaces = fd.getAll('commonSpaces');
-      adv.notes = String(fd.get('notes') ?? adv.notes ?? '').trim() || null;
     }
+    a.designPrompt = String(fd.get('designPrompt') ?? '');
     mode = fd.get('mode');
     Object.assign(builder, {
       name: String(fd.get('b-name') || '').trim(),
@@ -331,6 +330,8 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     el.querySelector('[data-adv-count]').textContent = chosen ? `${chosen} set` : '';
     syncTypeArt();
     el.querySelector('[data-type-said]').textContent = type ? HOUSING_TYPES.find((t) => t.id === type).blurb + '.' : '';
+    const n = form.answers.designPrompt.trim().length;
+    el.querySelector('[data-count]').textContent = n ? `${n} / ${PROMPT_MAX}` : '';
     showProblems(problems());
     onChange({ form: structuredClone(form), mode, builder: { ...builder } });
   }
@@ -364,6 +365,19 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     showProblems(problems());
   });
   formEl.addEventListener('click', (e) => {
+    // A style idea adds its words to the description, where the user can edit them.
+    const idea = e.target.closest('[data-idea]');
+    if (idea) {
+      const box = formEl.elements.designPrompt;
+      const cur = box.value.trim();
+      const add = idea.dataset.idea;
+      const text = cur ? `${cur}${/[.!?]$/.test(cur) ? '' : '.'} ${add[0].toUpperCase()}${add.slice(1)}.` : `${add[0].toUpperCase()}${add.slice(1)}.`;
+      box.value = text.slice(0, PROMPT_MAX);
+      box.focus();
+      box.setSelectionRange(box.value.length, box.value.length);
+      sync();
+      return;
+    }
     const step = e.target.closest('[data-step]');
     if (!step) return;
     const f = step.dataset.for;

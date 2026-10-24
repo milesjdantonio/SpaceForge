@@ -421,3 +421,12 @@ tfoot td { font-weight: 600; }
 .qgrid-3 { grid-template-columns: 1fr; }
 .qgrid-3 .qbox { grid-template-columns: 1fr minmax(0, 1.4fr); align-items: center; }
 .qbox .seg { background: var(--panel); }
+
+/* The design prompt: the user's own description, the base of what's asked for */
+.qbox-prompt .prompt-input { min-height: 112px; background: var(--panel); font-size: 1rem; line-height: 1.5; }
+.prompt-ideas { display: flex; flex-wrap: wrap; gap: 6px; }
+.idea { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 10px 0 7px; border: 1px solid var(--control); border-radius: 999px; background: transparent; color: var(--muted); font-size: 0.8125rem; cursor: pointer; }
+.idea:hover { color: var(--ink); border-color: var(--amber); }
+.idea svg { width: 13px; height: 13px; }
+.prompt-count { float: right; color: var(--faint); }
+.qgrid > .qbox[data-field='areaM2'] { grid-column: 1 / -1; }

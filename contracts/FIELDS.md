@@ -50,7 +50,7 @@ Conventions:
 | `site` | GeoJSON Feature | The land the user outlined. |
 | `brief` | object | The required questions (main form). Each one is its own box; the website won't send until every box that applies is filled. |
 | `advanced` | object | The optional questions (Advanced menu at the bottom of the form). `null` or `[]` means Gemma decides. |
-| `aiDecides` | string[] | Names of the `advanced` fields the user left for Gemma, for example `["style", "roofing"]`. Same information as the nulls, listed so a prompt can say it plainly. |
+| `aiDecides` | string[] | Names of the `advanced` fields the user left for Gemma, for example `["quality", "roofing"]`. Same information as the nulls, listed so a prompt can say it plainly. |
 | `mode` | string | `dream` (private, never listed) or `build` (a builder's public listing). |
 | `builder` | object or null | Only for `build`. `permission` must be `true`; the website won't send a listing without it. |
 | `client.displayUnits` | string | `imperial` or `metric`. Display only. |
@@ -72,6 +72,7 @@ Conventions:
 
 | Field | house | tiny-home | townhouse | duplex | apartment | condo | dorm |
 |---|---|---|---|---|---|---|---|
+| `designPrompt` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `floors` | ✓ 1–3 | ✓ 1–2 | ✓ 2–4 | ✓ 1–3 | ✓ 2–12 | ✓ 2–12 | ✓ 2–12 |
 | `areaM2` | ✓ living area | ✓ living area | ✓ per home | ✓ per home | ✓ average per home | ✓ average per home | – |
 | `unitCount` | 1 | 1 | ✓ 2–12 | 2 | ✓ 4–200 | ✓ 4–200 | – |
@@ -81,6 +82,11 @@ Conventions:
 | `roomType` | – | – | – | – | – | – | ✓ `single`, `double` or `suite` |
 | `budgetUSD` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
+- `designPrompt` is the user's own description of the building and its style, 15 to 1,000
+  characters, for example "A bright modern farmhouse that opens to the view, with a big kitchen at
+  its heart and a quiet office away from the bedrooms." It is the base of what Gemma is asked for:
+  style, feel, and anything to keep or avoid all come from here. The numbers in the other boxes
+  are firm requirements; where the text and a box disagree, the box wins.
 - `areaM2` never includes garages or parking.
 - `budgetUSD` is for the whole building. `null` here means the user ticked "No limit"; the website
   never sends an empty budget otherwise.
@@ -89,7 +95,6 @@ Conventions:
 
 | Field | Values | Applies to |
 |---|---|---|
-| `style` | `modern`, `farmhouse`, `craftsman`, `cabin`, `mediterranean`, `prairie`, `contemporary`, `brick-traditional` | all |
 | `quality` | `essential`, `standard`, `premium` | all |
 | `garage` | cars: `0`–`3` | house, tiny-home, townhouse (per home), duplex (per home) |
 | `parkingSpaces` | number, for the whole site | apartment, condo, dorm |
@@ -101,7 +106,8 @@ Conventions:
 | `unitMix` | counts of `studio`, `oneBed`, `twoBed`, `threeBed`; they add up to `unitCount` | apartment, condo |
 | `bathroomSharing` | `private`, `suite` (shared by a few rooms), `hall` (shared per floor) | dorm |
 | `commonSpaces` | any of `lobby`, `lounge`, `study`, `gym`, `laundry`, `kitchen`, `bike-storage`, `mail` | apartment, condo, dorm |
-| `notes` | free text, up to 600 characters | all |
+
+Style isn't a choice from a list: the user writes it in `designPrompt`.
 
 ---
 
@@ -143,7 +149,7 @@ The roof, garage, porch, parking and materials are in `exterior`.
 | `siteResponse` | One line per fact about this land and what the building does about it, for example "The lot slopes 8% to the east; the ground floor steps down with it." |
 | `features` | Short lines, for example "Covered porch at the entry", "Roof terrace for all residents". |
 | `cautions` | Things the user must check, for example zoning, height limits, parking rules. |
-| `style` | One of the style values. |
+| `style` | A short name for the style, in Gemma's words, taken from the design prompt, for example "Modern farmhouse". |
 
 ### `totals`: the numbers shown on the panel and the catalog
 

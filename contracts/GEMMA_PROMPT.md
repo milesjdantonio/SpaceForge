@@ -60,7 +60,20 @@ Use metres, square metres and USD throughout. Round lengths to 0.01 m and money 
 - `dorm`: `residents` beds in rooms off shared corridors, with shared bathrooms, lounges and study
   rooms. No `units`.
 
-**`brief`**
+**`brief.designPrompt`: the base of the brief**
+
+The user's own description of the building, for example "A bright modern farmhouse that opens to
+the view, with a big kitchen at its heart and a quiet office away from the bedrooms." Start from it:
+
+- The style, roof, materials, windows and feel come from this text. Name the style in
+  `overview.style` and say in `overview.description` how the design follows the description.
+- Rooms, views, things to keep or avoid that it mentions are requirements when they fit the land
+  and the numbers; when one can't be met, say so in `overview.cautions`.
+- The numbers in the other `brief` boxes are firm. Where the text and a box disagree (the text says
+  "two bedrooms", the box says 3), the box wins.
+- If the text gives no style, choose one that suits the land, the climate and the housing type.
+
+**`brief`: the numbers**
 
 - `floors`: storeys above ground. Match it exactly.
 - `areaM2`: finished area of each home (house, tiny home: the whole home; townhouse, duplex: per home;
@@ -77,15 +90,6 @@ Use metres, square metres and USD throughout. Round lengths to 0.01 m and money 
 
 **`advanced`** (when given)
 
-- `style`: sets the roof, proportions, windows and materials.
-  - `modern`: flat or low roof, large glass, simple forms.
-  - `farmhouse`: steep gables, board-and-batten, a deep porch.
-  - `craftsman`: low gables, deep eaves, tapered porch posts.
-  - `cabin`: steep roof, timber.
-  - `mediterranean`: stucco, low tile hip roof, arches.
-  - `prairie`: long and low, hip roof, wide eaves, bands of windows.
-  - `contemporary`: mixed materials, varied massing.
-  - `brick-traditional`: brick, symmetrical front, gable or hip roof.
 - `quality`: `essential` (simple finishes, vinyl and carpet), `standard`, `premium` (wood and stone,
   larger rooms, more glass). It changes `floorFinish`, room sizes and the estimate.
 - `garage`: cars per home. `parkingSpaces`: spaces for the whole site (garage plus outdoor parking).
@@ -112,7 +116,6 @@ Use metres, square metres and USD throughout. Round lengths to 0.01 m and money 
   - `suite`: one bath per two to four beds.
   - `hall`: a `shared-bath` per floor, about one toilet and one shower per eight residents.
 - `commonSpaces`: include each one as its own room.
-- `notes`: honour them when you can, and say in `overview.cautions` when you can't.
 
 **The site**
 
