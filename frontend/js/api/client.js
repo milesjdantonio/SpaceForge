@@ -1,4 +1,5 @@
-// The TerraSim API client. Shapes are documented in GEMMA.md (design and estimate) and API.md.
+// The TerraSim API client. Shapes are in contracts/FIELDS.md (request, design, estimate) and the
+// endpoints in contracts/STORAGE.md.
 
 import { config } from '../config.js';
 import { store } from '../store.js';
@@ -22,7 +23,7 @@ async function call(path, { method = 'GET', body, signal } = {}) {
     });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
-    const err = new Error('Couldn’t reach the design service. Check your connection and try again.');
+    const err = new Error(`Couldn’t reach the design service at ${config.apiBaseUrl}. Check it’s running and allows requests from this page (CORS).`);
     err.code = 'network';
     throw err;
   }
@@ -43,35 +44,80 @@ async function sample(name) {
   return sampleCache[name];
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const localDesigns = () => store.get('designs', []);
+
 export const api = {
   get connected() { return !!config.apiBaseUrl; },
+  get baseUrl() { return config.apiBaseUrl; },
 
-  // Sends a site and brief. Resolves with { jobId } when the service accepts it.
-  submitDesign(request, { signal } = {}) {
-    return call('/designs', { method: 'POST', body: request, signal });
+  // Sends a request and waits for the finished design. The service may answer with the design
+  // itself ({ design, estimate }), with { designId }, or with { jobId } to poll every 2 seconds.
+  // Resolves with { design, estimate }. onProgress gets job updates ({ status, progress, message }).
+  async createDesign(request, { onProgress, signal } = {}) {
+    let res = await call('/designs', { method: 'POST', body: request, signal });
+    if (res?.jobId && !res.design && !res.designId) {
+      onProgress?.({ status: 'queued', message: 'The design service accepted the request.' });
+      const started = Date.now();
+      let last = '';
+      for (;;) {
+        await sleep(2000);
+        if (signal?.aborted) throw new DOMException('Stopped', 'AbortError');
+        const job = await call(`/designs/jobs/${encodeURIComponent(res.jobId)}`, { signal });
+        const note = `${job.status}:${job.message ?? ''}`;
+        if (note !== last) { last = note; onProgress?.(job); }
+        if (job.status === 'done') { res = job; break; }
+        if (job.status === 'failed') {
+          const err = new Error(job.error || 'The design service couldn’t finish this design.');
+          err.code = 'job-failed';
+          throw err;
+        }
+        if (Date.now() - started > 15 * 60 * 1000) {
+          const err = new Error('The design is taking longer than 15 minutes. It may still arrive.');
+          err.code = 'timeout';
+          throw err;
+        }
+      }
+    }
+    // The reply may carry the design whole, nest it under "result", or give only its id.
+    const body = res?.result ?? res;
+    let design = body?.design ?? (body?.schema === 'terrasim.design/2' ? body : null);
+    let estimate = body?.estimate ?? null;
+    if (!design && body?.designId) {
+      design = await call(`/designs/${encodeURIComponent(body.designId)}`, { signal });
+      try { estimate = await call(`/designs/${encodeURIComponent(body.designId)}/estimate`, { signal }); } catch { estimate = null; }
+    }
+    if (!design) {
+      console.warn('[TerraSim] The design service replied without a design:', res);
+      const err = new Error('The design service answered, but without a design. Its reply is in the browser console.');
+      err.code = 'no-design';
+      throw err;
+    }
+    return { design, estimate };
   },
-  // Job status: { status: 'queued'|'running'|'done'|'failed', progress, message, designId, error }
-  job(jobId, { signal } = {}) {
-    return call(`/designs/jobs/${encodeURIComponent(jobId)}`, { signal });
+
+  // Keeps a received design in this browser (the newest 12), so it can be reopened.
+  keepLocal(design, estimate) {
+    store.update('designs', [], (list) => [{ design, estimate }, ...list.filter((x) => x.design?.id !== design.id)].slice(0, 12));
   },
 
   async design(id) {
     if (id === 'sample-0001') return sample('design');
-    const local = store.get('sheets', []).find((s) => s.design?.id === id);
+    const local = localDesigns().find((s) => s.design?.id === id);
     if (local) return local.design;
     return call(`/designs/${encodeURIComponent(id)}`);
   },
   async estimate(id) {
     if (id === 'sample-0001') return sample('estimate');
-    const local = store.get('sheets', []).find((s) => s.design?.id === id);
-    if (local?.estimate) return local.estimate;
+    const local = localDesigns().find((s) => s.design?.id === id);
+    if (local) return local.estimate;
     return call(`/designs/${encodeURIComponent(id)}/estimate`);
   },
 
   // Published listings. Without a backend, only the sample (when enabled).
   async listings() {
     if (!config.apiBaseUrl) return config.showSample ? [{ design: await sample('design'), estimate: await sample('estimate'), builder: { name: 'Sample builder', company: 'Sample listing' } }] : [];
-    return call('/listings');
+    try { return await call('/listings'); } catch { return []; }
   },
 
   sendInquiry(designId, message) {

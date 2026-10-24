@@ -429,7 +429,14 @@ async function send() {
   app.site.lastRequestId = request.id;
   openPanel((el) => renderSending(el, {
     request,
-    run: () => api.submitDesign(request),
+    run: (onProgress) => api.createDesign(request, { onProgress }),
+    onDone: ({ design, estimate }) => {
+      app.site.status = 'sent';
+      app.site.designId = design.id;
+      saveSite();
+      api.keepLocal(design, estimate);
+      showDesign(design, estimate);
+    },
     onFailed: (err) => {
       app.site.status = 'not-sent';
       app.site.lastError = err.code ?? 'error';

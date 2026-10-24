@@ -9,7 +9,7 @@ import { typeName } from '../lib/housing.js';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function renderSending(el, { request, run, onFailed, onRetry, onEdit, onPreview }) {
+export function renderSending(el, { request, run, onDone, onFailed, onRetry, onEdit, onPreview }) {
   el.innerHTML = `
     <header class="panel-head">
       <div>
@@ -44,13 +44,20 @@ export function renderSending(el, { request, run, onFailed, onRetry, onEdit, onP
     await wait(700);
     line(`Adding the brief: ${request.aiDecides.length ? `${request.aiDecides.length} choices left to the design system` : 'every choice made by you'}.`);
     await wait(650);
-    line('Contacting the design service…');
+    line(config.apiBaseUrl ? `Contacting the design service at ${config.apiBaseUrl}…` : 'Contacting the design service…');
     await wait(900);
     try {
-      const res = await run();
-      line('The service accepted the request.', 'ok');
+      const started = Date.now();
+      const res = await run((job) => {
+        const pct = typeof job.progress === 'number' ? ` (${Math.round(job.progress * 100)}%)` : '';
+        line(`${job.message || job.status}${pct}`);
+      });
+      const secs = Math.round((Date.now() - started) / 1000);
+      line(`Design received in ${secs} s: ${res.design.overview?.title ?? res.design.id}.`, 'ok');
       rive?.set('state', 2);
-      result.innerHTML = `<p class="ok-msg">Request ${res?.jobId ?? ''} is in the queue. The design will appear on your land when it’s ready.</p>`;
+      result.innerHTML = '<p class="ok-msg">Checking the design and placing it on your land…</p>';
+      await wait(1600);
+      onDone(res);
     } catch (err) {
       rive?.set('state', 3);
       slot.classList.add('is-failed');
@@ -59,10 +66,10 @@ export function renderSending(el, { request, run, onFailed, onRetry, onEdit, onP
       onFailed(err);
       result.innerHTML = `
         <div class="fail-card">
-          <h3 class="fail-title">${notConnected ? 'Not sent: the design service isn’t connected yet' : 'Not sent'}</h3>
+          <h3 class="fail-title">${notConnected ? 'Not sent: the design service isn’t connected yet' : 'The design didn’t come back'}</h3>
           <p>${notConnected
-            ? 'TerraSim’s design system (Gemma) will design a building for this land once its API is connected. Your outline and brief are saved under My sites, ready to send.'
-            : 'Your outline and brief are saved under My sites. Try again in a moment.'}</p>
+            ? 'TerraSim’s design system (Gemma) will design a building for this land once its API is connected. To test a server, open this page with ?api=http://your-server in the address. Your outline and brief are saved under My sites.'
+            : `${escapeHtml(err.message)} Your outline and brief are saved under My sites.`}</p>
           <div class="fail-actions">
             ${config.showSample ? `<button type="button" class="btn btn-primary" data-a="preview">${icon('house')}<span>Preview with the sample house</span></button>` : ''}
             <button type="button" class="btn" data-a="retry">${icon('retry')}<span>Try again</span></button>
