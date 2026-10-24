@@ -1,0 +1,45 @@
+/* TerraSim tokens: the map is the ground; dark solid panels float on it; amber marks action. */
+
+@font-face { font-family: 'Zodiak'; src: url('../assets/fonts/zodiak-100.woff2') format('woff2'); font-weight: 100; font-display: swap; }
+@font-face { font-family: 'Zodiak'; src: url('../assets/fonts/zodiak-300.woff2') format('woff2'); font-weight: 300; font-display: swap; }
+@font-face { font-family: 'Zodiak'; src: url('../assets/fonts/zodiak-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Hanken Grotesk'; src: url('../assets/fonts/hanken-grotesk-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Hanken Grotesk'; src: url('../assets/fonts/hanken-grotesk-latin-500-normal.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Hanken Grotesk'; src: url('../assets/fonts/hanken-grotesk-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+
+:root {
+  color-scheme: dark;
+
+  --space: #04070c;          /* behind the globe */
+  --panel: #0d131c;          /* floating panels */
+  --panel-2: #141c28;        /* a step up inside a panel */
+  --panel-3: #1b2533;
+  --border: #243142;
+  --control: #34455b;
+
+  --ink: #eef2f7;
+  --muted: #b3bfce;
+  --faint: #8e9cae;
+
+  --amber: #ff8a2a;
+  --amber-hover: #ff9d4c;
+  --amber-ink: #1b0e03;
+  --ember: #ffb15c;
+
+  --site: #ffb15c;           /* the outline drawn on the map */
+  --positive: #5fd39a;
+  --negative: #ff8f8f;
+  --warning: #ffc46b;
+
+  --display: 'Zodiak', 'Iowan Old Style', Georgia, serif;
+  --text: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --margin: clamp(12px, 2vw, 24px);
+  --radius: 8px;
+  --radius-small: 6px;
+  --bar-h: 60px;
+  --panel-w: min(440px, calc(100vw - 2 * var(--margin)));
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
