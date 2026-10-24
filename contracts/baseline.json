@@ -1,0 +1,316 @@
+{
+  "request": {
+    "schema": "terrasim.design-request/2",
+    "id": null,
+    "housingType": null,
+    "site": {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[null, null]]]
+      },
+      "properties": {
+        "areaM2": null,
+        "perimeterM": null,
+        "centroid": [null, null],
+        "setbackM": null
+      }
+    },
+    "brief": {
+      "designPrompt": null,
+      "floors": null,
+      "areaM2": null,
+      "unitCount": null,
+      "bedrooms": null,
+      "bathrooms": null,
+      "residents": null,
+      "roomType": null,
+      "budgetUSD": null
+    },
+    "advanced": {
+      "quality": null,
+      "garage": null,
+      "parkingSpaces": null,
+      "structure": null,
+      "cladding": null,
+      "roofing": null,
+      "priorities": [],
+      "extras": [],
+      "unitMix": {
+        "studio": null,
+        "oneBed": null,
+        "twoBed": null,
+        "threeBed": null
+      },
+      "bathroomSharing": null,
+      "commonSpaces": []
+    },
+    "aiDecides": [],
+    "mode": null,
+    "builder": {
+      "name": null,
+      "company": null,
+      "email": null,
+      "landowner": null,
+      "permission": null
+    },
+    "client": {
+      "displayUnits": null,
+      "createdAt": null
+    }
+  },
+
+  "design": {
+    "schema": "terrasim.design/2",
+    "id": null,
+    "requestId": null,
+    "createdAt": null,
+    "housingType": null,
+
+    "overview": {
+      "title": null,
+      "summary": null,
+      "description": [],
+      "siteResponse": [],
+      "features": [],
+      "cautions": [],
+      "style": null
+    },
+
+    "totals": {
+      "floors": null,
+      "levelsBelowGround": null,
+      "unitCount": null,
+      "bedrooms": null,
+      "bathrooms": null,
+      "residents": null,
+      "finishedAreaM2": null,
+      "grossAreaM2": null,
+      "parkingSpaces": null
+    },
+
+    "site": {
+      "outline": [[null, null]],
+      "areaM2": null
+    },
+
+    "placement": {
+      "origin": [null, null],
+      "xAxisBearingDeg": null,
+      "footprint": [[null, null]]
+    },
+
+    "size": {
+      "widthM": null,
+      "depthM": null,
+      "heightM": null
+    },
+
+    "units": [
+      {
+        "id": null,
+        "name": null,
+        "kind": null,
+        "levels": [],
+        "entryOpeningId": null,
+        "bedrooms": null,
+        "bathrooms": null,
+        "residents": null,
+        "areaM2": null
+      }
+    ],
+
+    "levels": [
+      {
+        "index": null,
+        "name": null,
+        "elevationM": null,
+        "heightM": null,
+        "ceilingHeightM": null,
+        "outline": [[null, null]],
+
+        "rooms": [
+          {
+            "id": null,
+            "name": null,
+            "type": null,
+            "unitId": null,
+            "polygon": [[null, null]],
+            "areaM2": null,
+            "floorFinish": null
+          }
+        ],
+
+        "walls": [
+          {
+            "id": null,
+            "kind": null,
+            "x1": null,
+            "y1": null,
+            "x2": null,
+            "y2": null,
+            "thicknessM": null
+          }
+        ],
+
+        "openings": [
+          {
+            "id": null,
+            "kind": null,
+            "wallId": null,
+            "offsetM": null,
+            "widthM": null,
+            "sillM": null,
+            "headM": null,
+            "connects": [null, null]
+          }
+        ],
+
+        "balconies": [
+          {
+            "id": null,
+            "unitId": null,
+            "polygon": [[null, null]],
+            "railing": null
+          }
+        ],
+
+        "furnishings": [
+          {
+            "type": null,
+            "roomId": null,
+            "x": null,
+            "y": null,
+            "w": null,
+            "d": null,
+            "h": null,
+            "rotationDeg": null,
+            "size": null,
+            "sink": null,
+            "cooktop": null,
+            "double": null,
+            "wide": null
+          }
+        ]
+      }
+    ],
+
+    "stairs": [
+      {
+        "id": null,
+        "shape": null,
+        "fromLevel": null,
+        "toLevel": null,
+        "x": null,
+        "y": null,
+        "widthM": null,
+        "depthM": null,
+        "accessSide": null
+      }
+    ],
+
+    "elevators": [
+      {
+        "id": null,
+        "x": null,
+        "y": null,
+        "widthM": null,
+        "depthM": null,
+        "levels": [],
+        "doorSide": null
+      }
+    ],
+
+    "exterior": {
+      "roof": {
+        "type": null,
+        "pitch": null,
+        "eaveM": null,
+        "ridgeAxis": null,
+        "ridgeHeightM": null
+      },
+      "garage": {
+        "cars": null,
+        "polygon": [[null, null]],
+        "heightM": null
+      },
+      "porch": {
+        "polygon": [[null, null]]
+      },
+      "parking": [
+        {
+          "polygon": [[null, null]],
+          "spaces": null,
+          "covered": null
+        }
+      ],
+      "materials": {
+        "structure": null,
+        "cladding": null,
+        "roofing": null,
+        "palette": [
+          {
+            "name": null,
+            "hex": null,
+            "use": null
+          }
+        ]
+      }
+    }
+  },
+
+  "estimate": {
+    "schema": "terrasim.estimate/1",
+    "designId": null,
+    "currency": null,
+    "asOf": null,
+    "buildCost": {
+      "low": null,
+      "expected": null,
+      "high": null,
+      "perSqFt": null,
+      "confidence": null,
+      "lines": [
+        {
+          "id": null,
+          "name": null,
+          "amount": null
+        }
+      ],
+      "assumptions": []
+    },
+    "materials": [
+      {
+        "id": null,
+        "name": null,
+        "quantity": null,
+        "unit": null,
+        "unitCost": null,
+        "cost": null
+      }
+    ],
+    "overTime": {
+      "years": null,
+      "assumptions": {
+        "inflation": null,
+        "appreciation": null
+      },
+      "rows": [
+        {
+          "year": null,
+          "maintenance": null,
+          "energy": null,
+          "replacements": null,
+          "value": null
+        }
+      ],
+      "events": [
+        {
+          "year": null,
+          "name": null,
+          "amount": null
+        }
+      ]
+    }
+  }
+}

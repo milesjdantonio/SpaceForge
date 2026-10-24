@@ -1,0 +1,601 @@
+{
+ "version": 1,
+ "at": "2026-10-24T15:35:10.724Z",
+ "seed": 1643590118,
+ "redraws": 0,
+ "input": {
+  "brief": "SpaceForge: draw any plot of land on a map and an AI forges a house design for that exact site, with build cost, materials and cost-over-time; others browse the designs and contact the developer",
+  "sector": "architecture",
+  "tone": "technical",
+  "have": [
+   "product-ui",
+   "illustration"
+  ],
+  "keep": [],
+  "avoid": [],
+  "sections": [
+   "how-it-works",
+   "showcase",
+   "gallery",
+   "stats",
+   "faq",
+   "cta",
+   "footer"
+  ],
+  "direction": "dark-room"
+ },
+ "imagery": "atmosphere",
+ "allow": [],
+ "direction": {
+  "id": "dark-room",
+  "name": "The dark room",
+  "sectors": [
+   "hospitality",
+   "restaurant",
+   "music",
+   "fashion",
+   "physical-product",
+   "finance",
+   "architecture",
+   "studio-portfolio",
+   "ai-product",
+   "personal-portfolio"
+  ],
+  "tones": [
+   "quiet",
+   "luxury"
+  ],
+  "needs": [],
+  "idea": "One dark field from top to bottom, and in it, lit things. Photographs and objects appear like exhibits in a dim gallery: each with space around it, each the brightest thing on its screen. Type is light, small and sparse. The darkness is not a theme switch; it is a room, and the page is a slow walk through it. It suits subjects sold on atmosphere and material: an evening restaurant, a metal card, a record, a house at dusk.",
+  "composition": "A single near-black or deep-toned ground runs the full page with no section bands. First screen: either the name at full width in a light weight along the bottom edge with one dim photograph above it, or one object or photograph centred at 40–50% of the viewport with a line of text beneath at 16–18px. Each later screen holds one or two lit items at a generous size (the main one 40–60% of the screen width) with its text set beside it at full reading size; the darkness frames the items, it does not replace content. Images vary in size but all share the same darkness at their edges so they sit in the ground without frames. Practical details come last in a simple two-column text block. The only solid light element on the page is the single primary action.",
+  "typography": "Light or regular weights; they glow on dark. Avoid heavy bold, which looks cheap on black. Headings 4–7vw at most; text 16–18px with leading 1.6 and a slightly lifted ink (not pure white).",
+  "typeClasses": [
+   "grotesk-light",
+   "serif-light-large",
+   "serif-display",
+   "extended-heavy"
+  ],
+  "colour": "A dark ground with a tint (blue-black, green-black, brown-black), a soft light ink, a dimmer ink for secondary text, and one warm or bright accent used once per screen at most.",
+  "paletteTags": [
+   "dark-neutral"
+  ],
+  "imagery": "Low-key photographs: dark backgrounds, one light source, subjects emerging from shadow. Their dark edges should blend into the page ground.",
+  "photoTreatment": "If a photograph's background is lighter than the page, darken the image slightly (`filter: brightness(0.85) contrast(1.05)`) rather than adding a frame.",
+  "sectionTags": [
+   "photo-led",
+   "quiet",
+   "object-led"
+  ],
+  "motion": "slow-crossfade",
+  "richness": "Light against dark, and the slow pacing.",
+  "pitfalls": "Grey text on black fails contrast quickly: check it. No glow effects, no neon accent, no coloured light blobs. A dark page with a bright busy photograph is not this direction; choose low-key images. Dark does not mean empty: every screen still carries its content at a readable size, and running text is a light ink at 7:1 or more, not a dim grey.",
+  "seenIn": [
+   "opl-kereliott",
+   "aww-moto-finance",
+   "aww-izanami",
+   "aww-cipher",
+   "opl-deeo-studio-2"
+  ],
+  "allow": [],
+  "photoTone": "dark"
+ },
+ "hero": {
+  "id": "inset-photo-wordmark-crossing",
+  "name": "Inset photograph, crossing wordmark",
+  "archetype": "split",
+  "directions": [
+   "split-stage",
+   "dark-room",
+   "name-as-monument"
+  ],
+  "needs": [],
+  "blueprint": "One deep, dark flat field. A tall portrait photograph fills the left 47% of the viewport, inset 20px from the top, left and bottom edges, with a 12px radius and object-fit: cover; it is position: sticky for the length of the page while the right side scrolls. Five text links at 15px sit top-right on a 32px margin, the last of them the single action. There is no logo at the top. In the right half, at 44% of the height and centred on that half's own axis, one supporting sentence in the light ink at 24px on up to three lines, max 26ch. Along the bottom runs the name in lowercase at clamp(120px, 12vw, 200px), light or regular weight, tracking -0.04em, on one line. It starts over the photograph's lower-right corner, overlapping the image by about 10% of the viewport width (z-index above it; mix-blend-mode: difference keeps the letters legible on the picture), and ends flush with the right margin, its baseline 40px above the bottom edge.",
+  "mobile": "The photograph takes the top 58% of the screen, inset 12px, with the same radius. The name runs under it at 21vw on one line, its ascenders overlapping the photograph's bottom edge by 3vw. The sentence follows at 17px, left-aligned on a 20px margin. Links reduce to a menu word and the action on the top row, set over the photograph.",
+  "headline": "The name in lowercase on one line, up to 9 characters at this size; a longer name drops to 9vw.",
+  "motion": "scaling-wordmark",
+  "seenIn": [
+   "aww-lxl-creative",
+   "opl-kereliott"
+  ]
+ },
+ "type": {
+  "id": "zodiak-hairline",
+  "name": "Zodiak / Hanken Grotesk",
+  "class": "serif-light-large",
+  "display": {
+   "family": "Zodiak",
+   "source": "fontshare",
+   "slug": "zodiak",
+   "weights": [
+    100,
+    300
+   ],
+   "italic": false,
+   "settings": "weight 100 above 96px, 300 for 28–36px statements · tracking -0.01em · leading 1.0 · capitals for the headline, sentence case for statements; never bold",
+   "css": "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n<link rel=\"preconnect\" href=\"https://api.fontshare.com\">\n<link rel=\"preconnect\" href=\"https://cdn.fontshare.com\" crossorigin>\n<link href=\"https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500&display=swap\" rel=\"stylesheet\">\n<link href=\"https://api.fontshare.com/v2/css?f[]=zodiak@100,300&display=swap\" rel=\"stylesheet\">"
+  },
+  "text": {
+   "family": "Hanken Grotesk",
+   "source": "google",
+   "weights": [
+    400,
+    500
+   ],
+   "italic": false,
+   "settings": "400 for body, 500 for emphasis · leading 1.5 · tracking 0",
+   "css": "<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n<link rel=\"preconnect\" href=\"https://api.fontshare.com\">\n<link rel=\"preconnect\" href=\"https://cdn.fontshare.com\" crossorigin>\n<link href=\"https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500&display=swap\" rel=\"stylesheet\">\n<link href=\"https://api.fontshare.com/v2/css?f[]=zodiak@100,300&display=swap\" rel=\"stylesheet\">"
+  },
+  "standsInFor": [
+   "PP Fragment",
+   "PP Editorial New Ultralight",
+   "Cardinal Classic Long"
+  ],
+  "note": "Hairline serif capitals set large enough that the thin strokes read as drawing, with a small neutral sans for everything practical. Suits lodges, spas, architecture and interiors; keep it on flat pale or dark fields where the strokes have full contrast.",
+  "seenIn": [
+   "aww-tengile-malamala-collection",
+   "opl-deeo-studio-2",
+   "aww-normal-is-boring",
+   "aww-white-desert"
+  ],
+  "links": [
+   "https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500&display=swap",
+   "https://api.fontshare.com/v2/css?f[]=zodiak@100,300&display=swap"
+  ],
+  "scale": {
+   "step-small": "clamp(0.8125rem, 0.79rem + 0.1vw, 0.875rem)",
+   "step-body": "clamp(1.125rem, 1.05rem + 0.3vw, 1.3125rem)",
+   "step-lead": "clamp(1.25rem, 1.1rem + 0.7vw, 1.625rem)",
+   "step-head": "clamp(2rem, 1.3rem + 3.2vw, 4rem)"
+  }
+ },
+ "palette": {
+  "id": "black-crimson",
+  "name": "Black and crimson",
+  "tags": [
+   "dark-neutral",
+   "mono-accent"
+  ],
+  "bg": "#0a0a0a",
+  "surface": "#151515",
+  "ink": "#efefef",
+  "muted": "#8c8c8c",
+  "accent": "#b11226",
+  "accentInk": "#ffffff",
+  "fields": [
+   {
+    "bg": "#efefef",
+    "ink": "#0a0a0a"
+   }
+  ],
+  "note": "Black with off-white text and mid-grey texture takes nearly the whole page, and the last sections may invert to off-white with black type. Deep crimson is scattered sparingly: a few characters in a heading, a slider fill, the one button.",
+  "seenIn": [
+   "opl-textmode-overlay"
+  ]
+ },
+ "photos": {
+  "set": "coast",
+  "title": "Coast",
+  "note": "sea, shoreline, cliffs, piers and beaches",
+  "treatment": "If a photograph's background is lighter than the page, darken the image slightly (`filter: brightness(0.85) contrast(1.05)`) rather than adding a frame.",
+  "others": [
+   "architecture",
+   "fog-and-quiet",
+   "texture",
+   "sky-and-space"
+  ],
+  "photos": [
+   {
+    "id": 641,
+    "alt": "Empty lifeguard chair on a beach at pastel dusk",
+    "tone": "mid",
+    "colours": [
+     "peach",
+     "slate blue",
+     "dusty teal"
+    ],
+    "mono": false,
+    "calm": "right",
+    "quality": 5,
+    "ratio": 1.5,
+    "by": "Fré Sonneveld",
+    "page": "https://unsplash.com/photos/2qLT_Rq-2tk"
+   },
+   {
+    "id": 77,
+    "alt": "Wooden jetty leading to a small pavilion over calm sea",
+    "tone": "mid",
+    "colours": [
+     "warm tan",
+     "pale teal",
+     "soft grey"
+    ],
+    "mono": false,
+    "calm": "top",
+    "quality": 5,
+    "ratio": 1.48,
+    "by": "May Pamintuan",
+    "page": "https://unsplash.com/photos/j9nfqTi5T5o"
+   },
+   {
+    "id": 853,
+    "alt": "Lone rock in a calm blue sea beneath a pastel sky",
+    "tone": "mid",
+    "colours": [
+     "sea blue",
+     "peach",
+     "pale pink"
+    ],
+    "mono": false,
+    "calm": "top",
+    "quality": 5,
+    "ratio": 1.51,
+    "by": "Stephen Radford",
+    "page": "https://unsplash.com/photos/674bDNKmnIk"
+   },
+   {
+    "id": 640,
+    "alt": "Aerial view of turquoise surf breaking onto golden sand",
+    "tone": "mid",
+    "colours": [
+     "sand",
+     "turquoise",
+     "white"
+    ],
+    "mono": false,
+    "calm": "bottom",
+    "quality": 5,
+    "ratio": 1.5,
+    "by": "Sarah Bürvenich",
+    "page": "https://unsplash.com/photos/vigsqYux_-8"
+   },
+   {
+    "id": 14,
+    "alt": "Rocky shoreline meeting a calm pale sea under hazy sky",
+    "tone": "mid",
+    "colours": [
+     "pale blue",
+     "warm brown"
+    ],
+    "mono": false,
+    "calm": "top",
+    "quality": 4,
+    "ratio": 1.5,
+    "by": "Paul Jarvis",
+    "page": "https://unsplash.com/photos/IQ1kOQTJrOQ"
+   },
+   {
+    "id": 374,
+    "alt": "Coastline with green headlands, a curving beach and turquoise sea",
+    "tone": "mid",
+    "colours": [
+     "turquoise",
+     "deep green",
+     "sky blue"
+    ],
+    "mono": false,
+    "calm": "top",
+    "quality": 4,
+    "ratio": 1.5,
+    "by": "Ma. Alejandra",
+    "page": "https://unsplash.com/photos/TDahcrcPhhA"
+   },
+   {
+    "id": 404,
+    "alt": "Waves breaking in white foam around a rugged brown rock",
+    "tone": "mid",
+    "colours": [
+     "grey blue",
+     "white",
+     "rust brown"
+    ],
+    "mono": false,
+    "calm": "left",
+    "quality": 4,
+    "ratio": 1.5,
+    "by": "Cole Patrick",
+    "page": "https://unsplash.com/photos/H28ODcp4EUk"
+   },
+   {
+    "id": 218,
+    "alt": "Calm turquoise bay between two limestone cliffs under storm clouds",
+    "tone": "mid",
+    "colours": [
+     "turquoise",
+     "slate grey",
+     "dark green"
+    ],
+    "mono": false,
+    "calm": "centre",
+    "quality": 4,
+    "ratio": 1.5,
+    "by": "Monika Majkowska",
+    "page": "https://unsplash.com/photos/Nq8LdWC7HnM"
+   }
+  ]
+ },
+ "motion": {
+  "id": "scaling-wordmark",
+  "name": "Scaling wordmark",
+  "description": "The giant name responds to the scroll: as the first screen leaves, the wordmark scales down a few percent (or grows from 0.94 to 1 as the footer arrives) on a scroll-linked timeline, so the monument feels heavy. Travel stays under 8%. Static fallback where scroll timelines are unsupported. Recipe: 'Scroll-linked progress' in references/motion.md, animating `scale`."
+ },
+ "sections": [
+  {
+   "id": "how-it-works-photographs-down-a-diagonal",
+   "role": "how-it-works",
+   "name": "Photographs down a diagonal",
+   "shape": "stack",
+   "tags": [
+    "photo-led",
+    "quiet"
+   ],
+   "directions": [
+    "uneven-photographs",
+    "place-carries-it",
+    "dark-room"
+   ],
+   "needs": [],
+   "blueprint": "Three stages, three photographs of different sizes placed along a falling diagonal on the 12-column grid. Stage one: a 3:4 portrait in columns 1–4. Stage two: a 1:1 square in columns 6–8, its top edge 220px lower than the first photograph's top. Stage three: a 16:10 landscape in columns 8–12, starting 180px below the bottom of the second. Each stage's text sits in the gap the stagger leaves: a paragraph of up to 36ch at 17px, top-aligned with its photograph and placed in the columns to its right (to its left for the third). Each paragraph opens with a bold run-in phrase that carries the order: 'On the first day', 'A week later', 'By the end'. Square corners; no arrows or connecting marks. The heading, two to four words at clamp(36px, 4vw, 64px) in a light weight, sits alone in columns 7–12 at the very top, level with the first photograph's top edge.",
+   "mobile": "The diagonal becomes alternating widths: the first photograph at 100%, the second at 62% flush right, the third at 78% flush left. Each paragraph follows its photograph on that photograph's left edge at 16px. 56px between stages. The heading sits above at 30px.",
+   "seenIn": [
+    "opl-fynza",
+    "opl-the-queue"
+   ]
+  },
+  {
+   "id": "showcase-band-of-unequal-panels",
+   "role": "showcase",
+   "name": "Band of unequal panels",
+   "shape": "strip",
+   "tags": [
+    "photo-led"
+   ],
+   "directions": [
+    "place-carries-it",
+    "uneven-photographs",
+    "name-as-monument",
+    "editorial-report",
+    "dark-room"
+   ],
+   "needs": [],
+   "blueprint": "A modest heading, then one wide band of pictures. The heading, two to four words at 36–44px, starts at column 3, left of centre, with 64px beneath it. The band spans the full viewport width edge to edge and is 68svh tall: four photographs standing side by side with no gaps and deliberately unequal widths, a flex row with flex-grow values of 5, 2, 3 and 2. Each panel is cropped with object-fit: cover to a tall slice, so the band reads as one folded view. The first panel carries a two-line title at 28px in paper colour at its top-left, 24px in, over a neutral scrim that covers only that corner. Hovering a panel raises its flex-grow to 6 over 500ms while the others give way; without hover the widths simply stay. One caption line at 16px sits under the band at the left margin.",
+   "mobile": "The heading sits on the margin at 28px. The band becomes a two-by-two block with no gaps, 84svh tall in total: the first row split 64/36 and the second 36/64, so the slices stay unequal. The title stays on the first panel. No hover behaviour.",
+   "seenIn": [
+    "aww-white-desert",
+    "aww-tengile-malamala-collection"
+   ]
+  },
+  {
+   "id": "gallery-photographs-around-a-heading",
+   "role": "gallery",
+   "name": "Photographs gathered round a heading",
+   "shape": "mosaic",
+   "tags": [
+    "photo-led",
+    "quiet"
+   ],
+   "directions": [
+    "uneven-photographs",
+    "place-carries-it",
+    "quiet-instrument",
+    "dark-room"
+   ],
+   "needs": [],
+   "blueprint": "A band about one screen tall on the plain page ground, used as the page's one deliberate rest. At its visual centre sits the heading, two lines at clamp(32px, 2.6vw, 40px) in a light weight, centred, with one sentence at 17px under it and a text link beneath that. Around it six to eight small photographs are scattered irregularly across the middle columns (x 320–1120; the outer 320px on each side stay empty, equally), each 160–200px wide at about 9:10, square corners, at different heights with 60–200px of air between them. Two of them come within 40px of the heading's block, which their drift never reaches, so the cluster reads as gathered round it rather than laid on a grid. No captions and no frames. Each photograph drifts at its own rate as the band passes (4–12% of its own height on a scroll-linked timeline), so the cluster loosens and tightens; under reduced motion it stays put. The pictures come from one place or one day and share one treatment.",
+   "mobile": "Five photographs at 30% of the width sit offset left and right around the centred heading, two above it and three below, none cut by an edge. The heading drops to 7vw on two lines.",
+   "seenIn": [
+    "aww-tengile-malamala-collection",
+    "aww-moto-finance"
+   ]
+  },
+  {
+   "id": "stats-bars-standing-on-the-edge",
+   "role": "stats",
+   "name": "Bars standing on the edge",
+   "shape": "full-bleed",
+   "tags": [
+    "ui-led",
+    "colour-field"
+   ],
+   "directions": [
+    "editorial-report",
+    "dark-room",
+    "dense-tiles",
+    "colour-chapters",
+    "product-performs"
+   ],
+   "needs": [],
+   "blueprint": "The product's own chart, drawn in HTML, is the whole section. A full-bleed field 90svh tall. Along its bottom edge stand ten to fourteen solid bars, one per true value (months, releases, cohorts), in a CSS grid spanning the full viewport width with 8px gaps and no side margins; heights are the values scaled so the tallest is 58vh. No axes, no grid, no legend; the chart's root is marked data-ui. Every bar is one tone two steps from the field except the one the page is about, which takes the accent. Three bars print their value directly above themselves at clamp(20px, 2vw, 30px), tabular. The headline figure sits top-left on the page margin at clamp(88px, 10vw, 168px), and its claim, two to five words at 28px, sits beneath it on the same margin. Hovering or focusing a bar shows its value and period above it.",
+   "mobile": "Bars run sideways: each a full-width row 28px tall growing from the left edge, 6px gaps, eight values at most. The headline figure sits above at 26vw with its claim at 22px. Three rows print their value at 17px inside the bar's right end. The accent row stays.",
+   "seenIn": [
+    "aww-alethia"
+   ]
+  },
+  {
+   "id": "faq-large-questions-answers-beside",
+   "role": "faq",
+   "name": "Large questions, answers beside",
+   "shape": "table",
+   "tags": [
+    "type-led"
+   ],
+   "directions": [
+    "editorial-report",
+    "type-only-statement",
+    "sentence-as-layout",
+    "name-as-monument",
+    "dark-room"
+   ],
+   "needs": [],
+   "blueprint": "Every answer is open; nothing collapses. Each question-and-answer pair is a row on the 12-column grid: the question in columns 1–6 at clamp(26px, 2.6vw, 40px), medium weight, leading 1.1, no more than two lines; its answer in columns 8–12 at 17–18px with leading 1.55 and a measure near 40ch, its first baseline level with the question's first baseline. Rows are separated by 72–88px of empty space and nothing else. Five to seven rows. The section heading, two or three words, is set at the same size as the questions but in the softer ink and sits as the first row's left cell with an empty right cell, so it reads as the top of the same table rather than a title above it. Because questions are large and answers small, the left column works as a scannable index.",
+   "mobile": "Each pair stacks: question at 24px, answer 12px beneath at 17px, then 56px of space before the next. The heading leads at the same 24px in the softer ink. Answers stay open; there is no accordion on the phone either.",
+   "seenIn": []
+  },
+  {
+   "id": "cta-question-at-both-edges",
+   "role": "cta",
+   "name": "Question at both edges",
+   "shape": "statement",
+   "tags": [
+    "type-led",
+    "poster"
+   ],
+   "directions": [
+    "type-only-statement",
+    "sentence-as-layout",
+    "dark-room",
+    "loud-flat-poster"
+   ],
+   "needs": [],
+   "blueprint": "For a closing choice between two answers: book or ask, this date or that, the tasting or the tour. A flat field exactly 100svh tall in the darkest tone. The question is a two-line heading at clamp(110px, 11vw, 168px), leading 1.0, centred, about 54% of the width: line one with its cap line 32px under the field's top edge, line two with its baseline 24px above the bottom edge. The band of about 560px between them is empty except for one row at its optical centre: two solid rectangular buttons, each about 200×56px with its label at 18px in medium weight, their inner edges 120px either side of the centre axis, and between them, exactly on the axis, the word 'or' at 18px in the soft ink. 16px under the row, centred, one line at 16px in the soft ink says what happens after either choice. The type above and below closes the empty band, so it reads as held breath rather than a gap.",
+   "mobile": "The question drops to 18vw, still two centred lines, line one 32px from the top and line two 24px above the bottom. The buttons stack at the centre at 72% of the width, 12px apart, with 'or' between them and the line of explanation under the second.",
+   "seenIn": []
+  },
+  {
+   "id": "footer-single-quiet-line",
+   "role": "footer",
+   "name": "A single quiet line",
+   "shape": "strip",
+   "tags": [
+    "quiet"
+   ],
+   "directions": [
+    "quiet-instrument",
+    "contact-sheet",
+    "product-performs",
+    "split-stage",
+    "dark-room",
+    "pinned-poster"
+   ],
+   "needs": [],
+   "blueprint": "No footer block at all. After at least 30svh of empty page ground, one baseline 30px above the bottom edge carries three items in the page's ordinary small text size (14–16px), the same size and weight as the navigation: at the left margin, what this is in three or four words; centred, two to five links separated by 24px of space; at the right margin, the year and a privacy link. Use a three-column grid (1fr auto 1fr) so the centre group is truly centred whatever the side lengths. No logo, no background change, no line above it, no columns. Links are in the full ink; the rest in the softer ink. If the page has a narrow text column, the three items may instead sit on that column's left edge as one wrapped line. The restraint only works if the page above has already made its invitation.",
+   "mobile": "Three short lines at 14px on the left margin with 8px between them: the description, the links on one wrapped line, then year and privacy. Links stay in the full ink. Leave 20svh of empty ground above and 24px below.",
+   "seenIn": [
+    "aww-studio-k95-3",
+    "aww-gil-huybrecht",
+    "opl-rows",
+    "opl-compile",
+    "opl-tiny-computer-co"
+   ]
+  }
+ ],
+ "references": [
+  {
+   "id": "opl-deeo-studio-2",
+   "name": "Deeo Studio",
+   "url": "https://deeo.studio",
+   "source": "One Page Love",
+   "kind": "studio-portfolio",
+   "score": 7,
+   "idea": "The studio's four letters as huge extruded iridescent 3D blocks tumbling across a black stage, with a quiet ultralight serif statement underneath.",
+   "mood": [
+    "glossy",
+    "dark",
+    "polished",
+    "tech-forward"
+   ],
+   "archetype": "giant-wordmark",
+   "hero": "Near-black viewport. Four extruded 3D letters, each roughly 45-60% of the viewport tall, are scattered at different depths and tilts across the top 80% of the screen: one cropped by the top-left corner, one lower and left of centre, a larger one upper-right, the last cropped by the right edge. Faces are dark glass; edges catch lilac, orange and holographic rainbow light. Over them runs a slim nav: bold caps wordmark top-left at a 60px margin, three small caps links (one with a tiny yellow tag) and an outlined rounded button top-right. Bottom-left, a light serif headline at about 72px begins and is cut by the fold after two lines.",
+   "type": "PP Editorial New Ultralight for the statement headline at about 5vw; PP Neue Montreal Book, Medium and Bold for nav, caps labels and project titles; Inter 14px body. A bold Neue Montreal line reaches 160px (11.1vw) lower on the page. Light serif against bold grotesk is the pairing.",
+   "colour": "#0d0d0d #ffffff #b79cf0 #ff5a1f #f5f5f5 #f0e68c — Near-black page with white type; colour comes from iridescent lilac, orange and rainbow reflections on the 3D letters and from each case-study thumbnail's own palette. The digest records one light grey section.",
+   "imagery": "Extruded glassy letterforms with holographic edge light on black; case studies as square-cornered wide video thumbnails in each client's colours on a two-column grid; one tilted old snapshot in the footer.",
+   "layout": "Side margins of 60px. After the hero come a small left-aligned paragraph and a caps label, then a work list that opens with one full-width thumbnail and continues as two columns with staggered vertical offsets. Every item repeats the same caption row. The footer is centred.",
+   "sections": [
+    {
+     "role": "intro",
+     "description": "The serif headline finishes just below the fold at top-left. Beneath it sits a four-line 17px grotesk paragraph in a column only about 190px wide (13% of the viewport), left-aligned at the margin, followed by roughly 120px of empty black and a tiny caps section label. The right three-quarters of the screen stay completely empty."
+    },
+    {
+     "role": "work",
+     "description": "The first project is a single thumbnail running margin to margin; the rest sit in two columns with a 14px gutter, the right column offset vertically so thumbnails never align in rows. Under each thumbnail: project name in 16px medium at left with a line of tiny grey caps disciplines beneath, and a small outlined rounded button right-aligned on the same row. Square image corners, no card containers."
+    },
+    {
+     "role": "footer",
+     "description": "A tilted, slightly warped 1990s snapshot with a year caption overlaps giant block letters of the studio name set in dark grey barely lighter than the background, each letter several hundred pixels tall. Below, a centred row of five small links and a single centred line of the light serif at about 28px with a tiny speaker icon."
+    }
+   ],
+   "steal": [
+    "Render the studio name as separate 3D letters at different depths and tilts, cropped by the viewport edges, instead of a flat wordmark.",
+    "Pair the loud hero object with an ultralight serif statement at bottom-left and a deliberately tiny, narrow paragraph, leaving most of the next screen empty.",
+    "Caption every work thumbnail with the same two-ended row: name and disciplines left, small outlined button right."
+   ]
+  },
+  {
+   "id": "aww-cipher",
+   "name": "Cipher",
+   "url": "https://cipher.tv/",
+   "source": "Awwwards Site of the Day",
+   "kind": "studio-portfolio",
+   "score": 7,
+   "idea": "The showreel as a slowly turning wreath: a dozen film stills overlap in an elliptical ring around a tiny emblem on a black screen, with almost no text.",
+   "mood": [
+    "cinematic",
+    "nocturnal",
+    "minimal",
+    "glossy"
+   ],
+   "archetype": "other: orbiting-image-ring",
+   "hero": "The first capture is the preloader: a black screen textured with a fine grid of grey dots that thins out towards the right, the wordmark top-left and a tiny copyright glyph dead centre. Once loaded, the black screen holds a ring of about fourteen landscape film stills, each roughly 10% of the viewport wide, overlapping one another around an ellipse about 35% of the width; the centre is empty except for a 20px white emblem. The wordmark, about 11% wide, stays top-left. Four 9px uppercase links are split: one at the horizontal centre, three at the far right. A partner mark sits bottom-right. There is no headline.",
+   "type": "Favorit only, and only at about 11px: uppercase nav links with slight tracking. The custom wordmark, with a macron and a schwa among its letters, is the sole large letterform. No headline and no body copy; one type size on the page.",
+   "colour": "#070604 #ffffff #c9a45a #2f55c8 #c96a1e — Near-black ground with white micro-type. All colour comes from the stills: gold, cobalt blue, orange, garden green, plus one black-and-white frame.",
+   "imagery": "Stills from fashion, beauty and fragrance films in 3:2 landscape crops, square-cornered and unframed, layered so each overlaps its neighbour by about a third. No captions or titles on them.",
+   "layout": "A single non-scrolling stage. Navigation is pushed to the corners at tiny size and the ring of stills occupies the middle third; over half the screen is empty black. Scrolling rotates the ring instead of moving the page.",
+   "sections": [],
+   "steal": [
+    "Arrange work thumbnails as an overlapping elliptical ring with an empty centre, and bind scroll to rotation instead of vertical travel.",
+    "Shrink all text to one 11px uppercase size and let a custom wordmark be the only large type.",
+    "Give the preloader its own texture (a dot grid fading across the screen) rather than a spinner or percentage."
+   ],
+   "media": "There is no document: one fixed canvas holds every picture as a texture, a ring of overlapping 16:9 film stills (about 240x135, overlapping their neighbours by 20-40%) round a tiny emblem, covering about 62% by 69% of the viewport, with the tiles themselves on 35-40% of the area and warm black between. No video elements; at least 35 distinct stills cycle through the ring.",
+   "motion": "The dot-grid loader with a spinning chrome letter is still up at 4.5s. After that the wheel turns the ring instead of the page, sliding new stills in along the circular path with no fade or mask; nav letters roll on hover, and the few CSS transitions are transform .45s cubic-bezier(.83,.12,.35,.96) and opacity .2-.3s."
+  },
+  {
+   "id": "aww-lpas",
+   "name": "LPAS",
+   "url": "https://lpas.com/",
+   "source": "Awwwards Site of the Day",
+   "kind": "architecture",
+   "score": 7.3,
+   "idea": "An architecture and interiors practice organised by market sector: each of five sectors gets its own earthy ground colour, like swatches from a material board, and the sectors slide as a card rail over a fixed, dimmed video of the studio; a 45-degree corner cut taken from the logo is the one shape motif.",
+   "mood": [
+    "calm",
+    "warm",
+    "restrained",
+    "editorial",
+    "tactile"
+   ],
+   "archetype": "fullbleed-media-overlay",
+   "hero": "After a charcoal loader of about 4.5s with four stacked process verbs, a full-bleed muted studio video at half brightness fills the screen. A thin wordmark top-left at 50px, a small dark menu pill top-right. The headline, 75px (5.2vw, leading 1.0) in three lines about 800px wide, is docked bottom-left with its last baseline about 65px above the bottom edge, and three 14px labels (discipline, approach, a scroll cue with a 30px circle arrow) sit exactly on the vertical centre line. A 200px sliver of the first sector card already shows at the right edge as the cue to continue. The headline arrives last, about 5s in.",
+   "type": "Aeonik alone, almost entirely at 400 with 600 for small labels, sentence case throughout. A short scale: 75px display (5.2vw, leading 1.0), 56px for the credo and rail titles (3.9vw, leading 1.1), 50px for the closing list, 38 and 28px section titles, 16 and 14px body, 12px captions. Fluid sizes by clamp() on a 10px root.",
+   "colour": "#ffffff #262626 #111111 #625653 #925434 #c9d3df #707569 #e3c1aa — White page, charcoal for the loader and footer, near-black text (though 65% of the characters are set in mid-grey #747474). Five sector grounds of similar value and low chroma (taupe, rust, pale blue-grey, sage, peach), each with a lighter tint for hover; no other accent.",
+   "imagery": "Bright architectural photography with blue skies and dusk light, its brick and timber tones echoing the sector palette, and a 61s documentary-feeling studio video as the hero. Square corners, one 8:5 ratio for projects, no filters; the hero and the closing photo are dimmed to about 50% for white text, and pictures are oversized in their frames so they can drift.",
+   "layout": "50px margins and a 1340px measure on a 20-column main grid with 10px gutters. A fixed hero overtaken by a pinned horizontal rail (about 4320px of scroll), then a statement, a mirrored mosaic, a news list, a full-bleed photo band and a sticky footer uncovered like a curtain. Section gaps of about 100-140px. The ground changes by section: white, each sector colour, white, charcoal.",
+   "sections": [
+    {
+     "role": "showcase",
+     "description": "Five sector cards, each about 770px wide (53.5vw), slide left over the dimmed hero: a photograph on the top 68% and a flat sector-colour panel on the bottom 32%, holding the sector name at 56px bottom-left with a 30px inset, a two-line 16px descriptor right-aligned and a 45px outline circle-plus button top-right. The incoming card's photo grows from about 450 to 615px tall as it centres; neighbours peek about 270px on the left and 400px on the right."
+    },
+    {
+     "role": "intro",
+     "description": "A three-line 56px credo about 647px wide at the top-left; below it a 14px label in a narrow left column and a 16px paragraph about 800px wide starting at x=388, closed by an underlined text link."
+    },
+    {
+     "role": "work",
+     "description": "Six 8:5 images in two mirrored rows: one large (about 678x424, 47% of the width) beside two small ones (334x209), then two small ones bottom-aligned on the left under a placed void, with the large one on the right. The first large image has its top-left corner cut at 45 degrees by 60px and the last its bottom-right, so the cuts bracket the group. Each image carries a 16px name and a 12px place beneath it."
+    },
+    {
+     "role": "footer",
+     "description": "A full-bleed dimmed interior photograph carrying the five sector names stacked at 50px in white scrolls away to uncover a sticky 625px charcoal footer with two office addresses, social links and a back-to-top link."
+    }
+   ],
+   "steal": [
+    "Give each content category its own flat ground drawn from one material family at similar value and low chroma, each with a lighter tint for hover, and keep the rest of the page white plus one charcoal, so the colours read as a system and not as decoration.",
+    "Take one shape from the logo and use it sparingly: a 45-degree corner cut of 20-60px on a single corner of selected images, alternating top-left on the first and bottom-right on the last so the cuts bracket a group.",
+    "Stagger a two-row mosaic big-small-small, then small-small-big, with the small pair bottom-aligned to the tall neighbour so the void above them is placed; keep one ratio and caption every image in 16px. The site's 75px hero headline runs to three lines; under the house rules cut it to two."
+   ],
+   "media": "A 61s muted studio video at 50% brightness covers the whole first screen and stays fixed while a rail of photo-over-colour cards slides over it; projects sit in a mirrored 8:5 mosaic, and a full-bleed dimmed photo band carries the closing list. Thirteen media elements in all, no canvas or WebGL.",
+   "motion": "Under Lenis the sector rail pins for about 4320px and travels about 836px per 900px of wheel while the incoming photo grows and pictures drift inside oversized frames. Project images wipe in with clip-path inset and opacity over 1.2s cubic-bezier(0.14,0.83,0.4,1), hovers take .3s cubic-bezier(0,0,.13,.99), the headline rises through a mask after the 4.5s loader, and there is no reduced-motion rule.",
+   "panel": "2026-10"
+  }
+ ],
+ "scenes": []
+}

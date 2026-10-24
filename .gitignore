@@ -1,13 +1,37 @@
+# Dependencies and build output
+node_modules/
+backend/bin/
+coverage.out
+
+# Local configuration and credentials
 .env
 .env.*
 !.env.example
-backend/bin/
-coverage.out
+*.key
+credentials*.json
+service-account*.json
+.claude/settings.local.json
+
+# Firebase emulator output
+.firebase/
+*-debug.log
 firebase-debug.log
 firebase-debug.*.log
 ui-debug.log
-*-debug.log
-.firebase/
-node_modules/
-credentials*.json
-service-account*.json
+
+# Design tools and generated working files
+.claude/skills/impeccable/scripts/bin/
+.taste-skill/inspect/
+.taste-skill/before/
+.taste-skill/after/
+.impeccable/review/
+.impeccable/build/
+.impeccable/mocks/
+.impeccable/live/
+.impeccable/config.local.json
+
+# Python caches and OS files
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

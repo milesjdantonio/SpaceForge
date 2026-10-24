@@ -1,6 +1,8 @@
-# SpaceForge
+# TerraSim
 
-SpaceForge lets a user draw/highlight an area on a map — an empty city lot, a hillside, any plot of land — and uses an AI model (Gemma, via Google's hosted AI API) to generate a house design for that site. Each generated design is stored along with predicted cost, materials, and cost-over-time projections, so other users can browse past designs, see the numbers behind them, and message the developer directly if they want to buy or build one.
+_Formerly SpaceForge._
+
+TerraSim lets a user draw/highlight an area on a map — an empty city lot, a hillside, any plot of land — and uses an AI model (Gemma, via Google's hosted AI API) to generate a house design for that site. Each generated design is stored along with predicted cost, materials, and cost-over-time projections, so other users can browse past designs, see the numbers behind them, and message the developer directly if they want to buy or build one.
 
 ## Core idea
 
@@ -25,4 +27,48 @@ Early/hackathon stage. Architecture and integrations are still being decided —
 
 ## Getting started
 
-Not yet runnable — no backend/frontend scaffolding exists yet. This section will be filled in once the stack is chosen and the initial scaffold is committed.
+The web interface lives in [frontend/](frontend/). It has no build step; you need Node.js 22 or newer
+to serve it.
+
+```bash
+cd frontend
+npm start            # serves http://localhost:5173
+```
+
+Open http://localhost:5173. Click your location marker to fly home, click anywhere else on the globe
+to go there, or search for a place. Use **Outline land**, choose what to build, describe it in your
+own words, fill in the boxes and send. Until a design service is connected, sending says so and offers
+to place the one sample house on your land.
+
+### Test the AI (Gemma) in the website
+
+The contract between the website and Gemma is in [contracts/](contracts/): the blank
+[baseline.json](contracts/baseline.json), the [field guide](contracts/FIELDS.md), the
+[instructions for Gemma](contracts/GEMMA_PROMPT.md) and the [storage plan](contracts/STORAGE.md).
+
+1. Run your design service with CORS allowing `http://localhost:5173`.
+2. Open `http://localhost:5173/?api=http://localhost:8000` (your server's address). The site remembers
+   it in this browser; `?api=` with nothing after it forgets it. Or set `apiBaseUrl` in
+   `frontend/js/config.js`.
+3. Outline land, fill in the brief and send. The site posts a `terrasim.design-request/2` to
+   `POST /designs` and accepts any of these replies:
+   - `{ "design": {...}, "estimate": {...} }`: drawn straight away;
+   - `{ "designId": "..." }`: it then loads `GET /designs/{id}` and `GET /designs/{id}/estimate`;
+   - `{ "jobId": "..." }`: it polls `GET /designs/jobs/{jobId}` every 2 seconds, showing each
+     `message`, until `{ "status": "done", "designId": "..." }` (or `"failed"` with `"error"`).
+4. The design is checked against the contract before it's drawn. If it breaks a rule, a panel lists
+   exactly which, so the fix can go into Gemma's output.
+
+To check a design file without a server, use **My sites → Open a design file**: it takes a
+`terrasim.design/2` JSON file (or a `{ design, estimate }` reply), checks it and draws it where it
+stands.
+
+### Tools
+
+- `npm install` then `npm run vendor` refreshes the vendored libraries (MapLibre, three.js, Rive, Motion).
+- `npm run rive` rebuilds the Rive animations from `frontend/tools/rive/art/`; open
+  http://localhost:5173/lab/rive.html to see them.
+- `node tools/flow.mjs` (with the server running) drives the whole flow in a headless browser and saves
+  screenshots.
+
+Map tiles and satellite imagery need an internet connection.
