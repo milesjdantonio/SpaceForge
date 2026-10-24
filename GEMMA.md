@@ -1,10 +1,10 @@
 # What the interface needs from the Gemma system
 
-> **Version 2 is in [contracts/](contracts/).** [baseline.json](contracts/baseline.json) is the blank
-> request and render file, [FIELDS.md](contracts/FIELDS.md) explains every field (housing types,
-> whole apartment and dorm buildings, required and advanced questions, furniture), and
-> [STORAGE.md](contracts/STORAGE.md) is the plan for storing designs. The v1 shapes below still
-> describe the sample house and the estimate.
+> **Version 2 is in [contracts/](contracts/) and replaces this file.**
+> [baseline.json](contracts/baseline.json) is the blank request, design (render file) and estimate;
+> [FIELDS.md](contracts/FIELDS.md) explains every field; [GEMMA_PROMPT.md](contracts/GEMMA_PROMPT.md)
+> is the instruction text to give Gemma; [STORAGE.md](contracts/STORAGE.md) is the plan for storing
+> designs. The v1 shapes below describe only the current sample house.
 
 TerraSim's Gemma system designs the houses. The web interface only collects the site and brief,
 sends them, and shows what comes back. This file is the contract between the two.
