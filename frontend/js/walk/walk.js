@@ -11,6 +11,7 @@ import { icon } from '../ui/icons.js';
 import { buildFurnishings } from './furniture.js';
 import { buildSurroundings } from './surroundings.js';
 import { openingSegment, wallLength, wallPointAt, rectPoly, bounds, centroid, pointInPolygon, roomAt, renderable } from '../lib/design.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const EYE = 1.6;
 
@@ -43,10 +44,15 @@ function materials(design) {
   };
 }
 
-// Builds the whole building. Returns the group, the surfaces you can click to move to, and the stairs.
+// Builds the building a floor at a time, as you get near each one. Returns the group, the surfaces
+// you can click to move to, the stairs, and showAround(level), which builds and shows the floors
+// next to `level` and hides the rest, so a big building only draws what can be seen.
 function buildBuilding(design) {
   const M = materials(design);
   const group = new THREE.Group();
+  const levelGroups = design.levels.map((l, li) => { const g = new THREE.Group(); g.userData.level = li; g.visible = false; group.add(g); return g; });
+  const built = new Set();
+  let into = group; // where the helpers below put what they make
   const walkable = new Set();
   const stairs = [];
   const levels = design.levels;
@@ -60,7 +66,7 @@ function buildBuilding(design) {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.y = y;
     mesh.userData = { level, floor: walk };
-    group.add(mesh);
+    into.add(mesh);
     if (walk) walkable.add(mesh);
     return mesh;
   };
@@ -88,7 +94,7 @@ function buildBuilding(design) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(len + extra, y1 - y0, thick), mat);
     m.position.set((ax + bx) / 2, (y0 + y1) / 2, (az + bz) / 2);
     m.rotation.y = -Math.atan2(bz - az, bx - ax);
-    group.add(m);
+    into.add(m);
     return m;
   };
 
@@ -107,11 +113,13 @@ function buildBuilding(design) {
     m.position.set(ax + ux * 0.02 + nx * (leafLen / 2 + t) + ux * thick / 2, (y0 + y1) / 2, az + uz * 0.02 + nz * (leafLen / 2 + t) + uz * thick / 2);
     m.rotation.y = -Math.atan2(nz, nx);
     m.userData.door = true;
-    group.add(m);
+    into.add(m);
     return m;
   };
 
-  levels.forEach((level, li) => {
+  function buildLevel(li) {
+    const level = levels[li];
+    into = levelGroups[li];
     const base = level.elevationM;
     const ceilY = base + (level.ceilingHeightM ?? level.heightM - 0.3);
     const wallTop = li < top ? base + level.heightM : ceilY + 0.05;
@@ -179,7 +187,7 @@ function buildBuilding(design) {
       const bb = bounds(b.polygon);
       under.scale.set(bb.x1 - bb.x0, 1, bb.y1 - bb.y0);
       under.position.set((bb.x0 + bb.x1) / 2, base - 0.09, (bb.y0 + bb.y1) / 2);
-      group.add(under);
+      into.add(under);
       const railMat = b.railing === 'glass' ? M.glass : b.railing === 'solid' ? M.exterior : M.rail;
       for (let i = 0; i < b.polygon.length; i++) {
         const a = b.polygon[i], c = b.polygon[(i + 1) % b.polygon.length];
@@ -198,8 +206,43 @@ function buildBuilding(design) {
 
     // Furniture.
     const furn = buildFurnishings(level, { ceiling: ceilY - base });
-    group.add(furn);
-  });
+    into.add(furn);
+    mergeStatic(levelGroups[li], li);
+    into = group;
+  }
+
+  // Everything on a floor you can't click (walls, glass, frames, ceilings, furniture) is merged into
+  // one mesh per material, and the floors you can walk on into one per finish: hundreds of draw
+  // calls become a few dozen. Elevator floors, balconies, door leaves and rugs stay separate.
+  function mergeStatic(lg, li) {
+    lg.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(lg.matrixWorld).invert();
+    const buckets = new Map();
+    const drop = [];
+    lg.traverse((o) => {
+      if (!o.isMesh || o.userData.elevator || o.userData.balcony || o.userData.door) return;
+      const rug = o.parent?.userData?.furnishing === 'rug';
+      const floor = walkable.has(o);
+      const key = `${o.material.uuid}:${floor ? 'f' : rug ? 'r' : 's'}`;
+      let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      for (const name of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geo.deleteAttribute(name);
+      if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array((geo.attributes.position.count) * 2), 2));
+      geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+      if (!buckets.has(key)) buckets.set(key, { material: o.material, floor, rug, geos: [] });
+      buckets.get(key).geos.push(geo);
+      drop.push(o);
+    });
+    for (const o of drop) { o.parent.remove(o); o.geometry.dispose(); walkable.delete(o); }
+    for (const { material, floor, rug, geos } of buckets.values()) {
+      const merged = mergeGeometries(geos, false);
+      geos.forEach((g) => g.dispose());
+      if (!merged) continue;
+      const m = new THREE.Mesh(merged, material);
+      m.userData = { level: li, floor, rug };
+      lg.add(m);
+      if (floor) walkable.add(m);
+    }
+  }
 
   // Stairs, each built in its own frame (entered from local low y) and turned to its access side.
   for (const s of design.stairs || []) {
@@ -219,7 +262,7 @@ function buildBuilding(design) {
     frame.position.set(place.pos[0], 0, place.pos[1]);
     frame.rotation.y = place.rot;
     group.add(frame);
-    const stair = { id: s.id, level: s.fromLevel, toLevel: s.toLevel, base, rise, rect: rectPoly(s), route: [] };
+    const stair = { id: s.id, level: s.fromLevel, toLevel: s.toLevel, base, rise, rect: rectPoly(s), route: [], frame };
     const step = (x0, x1, z0, z1, h) => {
       const tread = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.05, z1 - z0), M.stair);
       tread.position.set((x0 + x1) / 2, base + h - 0.025, (z0 + z1) / 2);
@@ -268,7 +311,12 @@ function buildBuilding(design) {
     stair.route = local.map(([x, y, z]) => frame.localToWorld(new THREE.Vector3(x, y, z)));
     stairs.push(stair);
   }
-  return { group, walkable, stairs };
+  function showAround(li) {
+    for (let k = li - 1; k <= li + 1; k++) if (levels[k] && !built.has(k)) { built.add(k); buildLevel(k); }
+    levelGroups.forEach((g, k) => { g.visible = Math.abs(k - li) <= 1; });
+    for (const s of stairs) s.frame.visible = Math.abs(s.level - li) <= 1 || Math.abs(s.toLevel - li) <= 1;
+  }
+  return { group, walkable, stairs, showAround };
 }
 
 function levelAtHeight(design, y) {
@@ -336,6 +384,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
       </div>
     </div>
     <div class="walk-lift" hidden role="group" aria-label="Elevator"></div>
+    <div class="walk-lift walk-stairs" hidden role="group" aria-label="Stairs"></div>
     <div class="walk-start">
       <p class="walk-start-title">Look around inside</p>
       <p>Drag to look. Click a spot on the floor to move there. Click the stairs, or a floor seen up the stairwell, to change floors.${(design.elevators || []).length ? ' Step into the elevator to pick a floor.' : ''}</p>
@@ -373,7 +422,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
   ground.position.y = -0.03;
   scene.add(ground);
 
-  const { group, walkable, stairs } = buildBuilding(design);
+  const { group, walkable, stairs, showAround } = buildBuilding(design);
   // Building metres are right-handed (x and y on the ground, height up). Putting y on three.js's Z
   // alone would show the building mirrored, so the world group flips Z back: inside matches the map
   // and the plans. Positions below (`pos`, stair routes, paths) stay in building metres; only the
@@ -415,6 +464,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
   {
     const s = startSpot(design);
     pos.set(s.x, design.levels[s.level].elevationM + EYE, s.z);
+    showAround(s.level);
     yaw = Math.PI - s.yaw; // startSpot faces along building metres; the world flips Z
   }
 
@@ -464,9 +514,10 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
     const hits = ray.intersectObjects(group.children, true);
-    // Rugs lie on the floor: a click on one goes to the floor under it.
-    const onRug = (o) => o.parent?.userData?.furnishing === 'rug';
-    const hit = hits.find((h) => !h.object.material?.transparent && !onRug(h.object));
+    // Rugs lie on the floor: a click on one goes to the floor under it. Hidden floors don't count.
+    const onRug = (o) => o.userData.rug || o.parent?.userData?.furnishing === 'rug';
+    const shown = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; };
+    const hit = hits.find((h) => !h.object.material?.transparent && !onRug(h.object) && shown(h.object));
     if (!hit || !walkable.has(hit.object) || hit.distance > 22) return null;
     return hit;
   };
@@ -515,19 +566,56 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
       target = way[way.length - 1];
     } else {
       // A floor seen up or down the stairwell: go there by the stairs, a flight at a time.
-      let at = levelAtHeight(design, from.y);
-      const toLevel = hit.object.userData.level;
-      while (at !== toLevel) {
-        const up = toLevel > at;
-        const s = nearestStair(up ? at : at - 1, path[path.length - 1]);
-        if (!s) break;
-        path.push(...(up ? s.route : s.route.slice().reverse()));
-        at += up ? 1 : -1;
-      }
+      path.push(...stairPath(from, hit.object.userData.level).slice(1));
     }
     path.push(target);
     glide(path);
   }
+
+  // The way by the stairs from a point to another level, a flight at a time: points to glide through.
+  function stairPath(from, toLevel) {
+    const path = [from.clone()];
+    let at = levelAtHeight(design, from.y);
+    while (at !== toLevel) {
+      const up = toLevel > at;
+      const s = nearestStair(up ? at : at - 1, path[path.length - 1]);
+      if (!s) break;
+      path.push(...(up ? s.route : s.route.slice().reverse()));
+      at += up ? 1 : -1;
+    }
+    return path;
+  }
+
+  // The stairs: standing at the foot or head of a stair (or on it), a panel offers the floors the
+  // stairs reach from here, like the elevator's.
+  const stairsBox = host.querySelector('.walk-stairs');
+  let stairsShown = null;
+  function stairNear(li) {
+    const p = pos;
+    return stairs.find((s) => (s.level === li && s.route[0].distanceTo(p) < 2.4) || (s.toLevel === li && s.route[s.route.length - 1].distanceTo(p) < 2.4)
+      || ((s.level === li || s.toLevel === li) && pointInPolygon(p.x, p.z, s.rect)));
+  }
+  function showStairs(near, li) {
+    if (!near) { if (stairsShown !== null) { stairsShown = null; stairsBox.hidden = true; } return; }
+    // Every floor joined to this one by stairs, highest first.
+    const reach = new Set([li]);
+    for (let at = li; stairs.some((s) => s.level === at); at++) reach.add(at + 1);
+    for (let at = li; stairs.some((s) => s.toLevel === at); at--) reach.add(at - 1);
+    const key = `${li}:${[...reach].join(',')}`;
+    if (stairsShown === key) return;
+    stairsShown = key;
+    if (reach.size < 2) { stairsBox.hidden = true; return; }
+    stairsBox.hidden = false;
+    stairsBox.innerHTML = `<span class="walk-lift-label">Stairs</span>${[...reach].sort((a, b) => b - a).map((l) => `<button type="button" class="btn btn-small" data-stairs="${l}" aria-pressed="${l === li}" title="${l === li ? 'You’re here' : l > li ? `Up to ${design.levels[l].name}` : `Down to ${design.levels[l].name}`}">${shortLevel(design.levels[l], l)}</button>`).join('')}`;
+  }
+  stairsBox.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-stairs]');
+    if (!b) return;
+    const to = Number(b.dataset.stairs);
+    if (to === levelAtHeight(design, pos.y)) return;
+    glide(stairPath(pos, to));
+    stairsShown = null;
+  });
 
   // The elevator: inside a cab, a panel offers the floors it serves.
   const lift = host.querySelector('.walk-lift');
@@ -559,9 +647,13 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
   host.__walk = {
     pose(x, y, z, yawDeg = 0, pitchDeg = 0) { travel = null; pos.set(x, y, z); yaw = (yawDeg * Math.PI) / 180; pitch = (pitchDeg * Math.PI) / 180; },
     surroundings: null,
+    stats: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
+    stairs: () => stairs.map((st) => ({ level: st.level, toLevel: st.toLevel, foot: st.route[0].toArray() })),
+    shownFloors: () => group.children.filter((g) => g.userData.level != null && g.visible).map((g) => g.userData.level),
   };
 
   let raf = 0;
+  let shownLevel = -1;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function tick(now) {
     raf = requestAnimationFrame(tick);
@@ -584,6 +676,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
     camera.position.set(pos.x, pos.y, -pos.z);
     camera.rotation.set(pitch, yaw, 0);
     const li = levelAtHeight(design, pos.y);
+    if (li !== shownLevel) { shownLevel = li; showAround(li); }
     const lvl = design.levels[li];
     const x = pos.x, z = pos.z;
     const r = roomAt(lvl, x, z);
@@ -595,6 +688,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
     if (roomLabel.textContent !== label) roomLabel.textContent = label;
     const cab = !travel && (design.elevators || []).find((e) => e.levels.includes(li) && pointInPolygon(x, z, rectPoly(e)));
     showLift(cab, li);
+    showStairs(!travel && !cab ? stairNear(li) : null, li);
     renderer.render(scene, camera);
   }
   raf = requestAnimationFrame(tick);
@@ -604,6 +698,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
     surroundings?.traverse((o) => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); });
     cancelAnimationFrame(raf);
     removeEventListener('keydown', onKey);
+    group.traverse((o) => o.geometry?.dispose());
     renderer?.dispose();
     host.hidden = true;
     host.replaceChildren();
