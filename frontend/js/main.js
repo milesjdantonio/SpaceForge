@@ -22,7 +22,7 @@ import { renderBriefPanel } from './panels/brief.js';
 import { buildRequest } from './api/request.js';
 import { renderSending } from './panels/send.js';
 import { renderHousePanel, renderDesignProblems } from './panels/house.js';
-import { checkDesign } from './lib/design.js';
+import { checkDesign, pointInPolygon } from './lib/design.js';
 import { landFit } from './lib/fit.js';
 import { explainSaveError } from './lib/errors.js';
 import { createMover } from './map/mover.js';
@@ -198,7 +198,11 @@ map.on('click', (e) => {
     const hit = house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]);
     // A click on a building always opens its details (cost, materials, plans); Move sits beside it.
     if (hit) selectBuilding(hit, { details: true });
-    else {
+    else if (emptyLandAt(e.lngLat)) {
+      // Land with no building on it: back to its brief, to design one.
+      house.deselect();
+      openBrief();
+    } else {
       house.deselect();
       if (panel.dataset.view === 'house') closePanel();
       setMode('explore'); rememberScene();
@@ -209,15 +213,27 @@ map.on('mousemove', (e) => {
   if (outliner.active || mover.dragging) return;
   const hit = ['house', 'explore', 'failed'].includes(app.mode) && map.getZoom() >= 15 &&
     (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]));
-  map.getCanvas().style.cursor = hit ? (mover.active && house.isSelected(hit) ? 'grab' : 'pointer') : app.mode === 'globe' ? 'crosshair' : '';
+  const land = !hit && !mover.active && emptyLandAt(e.lngLat);
+  map.getCanvas().style.cursor = hit || land ? (mover.active && house.isSelected(hit) ? 'grab' : 'pointer') : app.mode === 'globe' ? 'crosshair' : '';
   // Say what a click will open before it's clicked.
-  const show = !!hit && !mover.active && !e.originalEvent?.ctrlKey;
+  const show = (!!hit || !!land) && !mover.active && !e.originalEvent?.ctrlKey;
   hoverTip.hidden = !show;
   if (show) {
-    hoverTip.textContent = panel.dataset.view === 'house' && house.isSelected(hit) ? 'Showing its details' : 'Click for details: cost, plans, materials';
+    hoverTip.textContent = land ? 'Click to design a building on this land'
+      : panel.dataset.view === 'house' && house.isSelected(hit) ? 'Showing its details' : 'Click for details: cost, plans, materials';
     hoverTip.style.transform = `translate(${e.point.x + 16}px, ${e.point.y + 18}px)`;
   }
 });
+// The land being worked on, when the point is on it and it has no building yet (or its building
+// was removed or failed): a click there reopens its brief. null otherwise.
+function emptyLandAt(lngLat) {
+  const site = app.site;
+  if (!site?.ring || outliner.active || !['house', 'explore', 'failed'].includes(app.mode) || map.getZoom() < 15) return null;
+  if (!pointInPolygon(lngLat.lng, lngLat.lat, site.ring)) return null;
+  const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((p, i) => Math.abs(p[0] - b[i][0]) < 1e-7 && Math.abs(p[1] - b[i][1]) < 1e-7);
+  const built = house.entries.some((e) => (site.designId && e.design?.id === site.designId) || same(e.design?.site?.outline, site.ring));
+  return built ? null : site;
+}
 const hoverTip = document.createElement('div');
 hoverTip.className = 'hover-tip';
 hoverTip.hidden = true;

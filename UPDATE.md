@@ -55,6 +55,8 @@ open `frontend/fixtures/mock-house` from My Builds.
   top grip or the roof. It may go past its land while moving (red outline) but Done only keeps spots
   inside; Escape puts it back.
 - **Clicking a building** opens its details straight away (cost, materials, plans).
+- **Clicking land with no building** (not designed yet, removed, or failed) reopens its brief; the
+  hover tip says so first.
 - **Map mouse**: left-drag moves the map; Ctrl + drag turns and tilts (taught on the map); right-drag
   does nothing.
 - **Outside the US**: design it anyway; Gemma assumes typical site conditions and the result is
