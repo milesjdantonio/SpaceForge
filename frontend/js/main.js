@@ -588,7 +588,9 @@ function renderToolbar() {
       ${house.design ? `<button type="button" class="btn btn-quiet" data-act="night" aria-pressed="${app.night}">${icon(app.night ? 'moon' : 'sun')}<span>${app.night ? 'Evening' : 'Day'}</span></button>` : ''}
       <button type="button" class="btn btn-quiet btn-icon" data-act="locate" aria-label="Go to my location" title="Go to my location">${icon('locate')}</button>
     </div>`;
-  toolbar.querySelector('[data-act="outline"]').disabled = drawing;
+  const outlineBtn = toolbar.querySelector('[data-act="outline"]');
+  outlineBtn.disabled = drawing || app.generating;
+  if (app.generating) outlineBtn.title = 'Wait for the design, or cancel it, to outline other land.';
 }
 toolbar.addEventListener('click', (e) => {
   const act = e.target.closest('[data-act]')?.dataset.act;
@@ -780,7 +782,16 @@ function openBrief() {
     onEditOutline: () => { closePanel(); outliner.load(app.site.ring); toast('Drag the corners to adjust the outline.'); setMode('explore'); },
     onChange: (patch) => { Object.assign(app.site, patch); if (patch.form) store.set(scopeKey('lastForm'), patch.form); saveSite(); },
     onSend: () => send(),
+    checkFit: api.connected ? (form) => api.fit(buildRequest({ ...app.site, form })) : null,
   }));
+}
+
+// While a design is generating the land is locked: its corners can't be dragged and no other land
+// can be outlined, so the design always matches the land it was asked for.
+function lockLand(on) {
+  app.generating = on;
+  outliner.setLocked(on);
+  renderToolbar();
 }
 
 async function send() {
@@ -788,6 +799,7 @@ async function send() {
   const generation = new AbortController();
   app.generation = generation;
   const owner = auth.user?.uid ?? null;
+  lockLand(true);
   setMode('sending');
   const request = buildRequest(app.site);
   app.site.lastRequestId = request.id;
@@ -795,13 +807,15 @@ async function send() {
   house.hide();
   house.generating(app.site.ring);
   const form = app.site.form ?? {};
-  const fit = form.housingType ? landFit(form.housingType, form.answers ?? {}, form.advanced ?? {}, measure(app.site.ring)) : null;
+  const checked = app.site.fitCheck?.formKey === JSON.stringify(app.site.form) ? app.site.fitCheck : null;
+  const fit = checked ?? (form.housingType ? landFit(form.housingType, form.answers ?? {}, form.advanced ?? {}, measure(app.site.ring)) : null);
   openPanel((el) => renderSending(el, {
     request,
     fit,
     run: (onProgress) => api.createDesign(request, { onProgress, signal: generation.signal }),
     onDone: async ({ design, estimate }) => {
       if (generation.signal.aborted || (owner && auth.user?.uid !== owner)) return;
+      lockLand(false);
       if (!drawable(design, { fresh: true })) return;
       app.site.status = 'sent';
       app.site.designId = design.id;
@@ -823,6 +837,7 @@ async function send() {
     },
     onFailed: (err) => {
       if (generation.signal.aborted) return;
+      lockLand(false);
       app.site.status = 'not-sent';
       app.site.lastError = err.code ?? 'error';
       saveSite();
@@ -830,6 +845,15 @@ async function send() {
       setMode('failed');
     },
     onRetry: () => send(),
+    onCancel: () => {
+      generation.abort();
+      lockLand(false);
+      house.stopGenerating();
+      app.site.status = 'draft';
+      saveSite();
+      openBrief();
+      toast('Design cancelled. Your brief is kept, so you can change it or send it again.');
+    },
     onEdit: () => openBrief(),
     onPreview: () => previewSample(),
     onOutline: () => { closePanel(); outliner.clear(); app.site = null; setMode('explore'); startOutline(); },
@@ -1276,7 +1300,7 @@ function accountChanged(user) {
     store.set(`sites:${previousUser}`, []);
     store.set(`builder:${previousUser}`, null);
     store.set(`lastForm:${previousUser}`, null);
-    app.generation?.abort();
+    app.generation?.abort(); lockLand(false);
     mover.cancel(); map.dragPan.enable(); map.stop();
     ++app.displayVersion; ++app.sceneVersion;
     $('#walk [data-exit]')?.click();

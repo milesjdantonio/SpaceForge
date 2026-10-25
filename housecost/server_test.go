@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -16,7 +17,7 @@ import (
 // external model and site-data providers use stand-ins; no API key is needed.
 func TestDesignHTTPWorkflow(t *testing.T) {
 	s := &server{jobs: map[string]*job{}, results: map[string]*Output{}, queue: make(chan func(), 1), resDir: t.TempDir()}
-	s.deps = func(log io.Writer, raw []byte) (Deps, error) {
+	s.deps = func(_ context.Context, log io.Writer, raw []byte) (Deps, error) {
 		var req Request
 		if err := json.Unmarshal(raw, &req); err != nil {
 			return Deps{}, err
@@ -113,5 +114,29 @@ func TestDesignHTTPWorkflow(t *testing.T) {
 	}
 	if w := do(http.MethodGet, "/api/designs/jobs/missing", nil); w.Code != 404 {
 		t.Fatalf("unknown job: %d", w.Code)
+	}
+}
+
+// Cancelling a queued design answers straight away, and the job never runs.
+func TestCancelQueuedJob(t *testing.T) {
+	s := &server{jobs: map[string]*job{}, results: map[string]*Output{}, queue: make(chan func(), 4), resDir: t.TempDir()}
+	ran := false
+	s.deps = func(_ context.Context, log io.Writer, raw []byte) (Deps, error) { ran = true; return Deps{}, nil }
+	j := newJob()
+	s.jobs[j.ID] = j
+	h := s.handler("../frontend")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/designs/jobs/"+j.ID+"/cancel", nil))
+	if w.Code != 200 || j.Status != "cancelled" {
+		t.Fatalf("cancel: got %d, status %s: %s", w.Code, j.Status, w.Body)
+	}
+	s.run(j, []byte(`{}`))
+	if ran {
+		t.Fatal("a cancelled job still ran")
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/designs/jobs/nope/cancel", nil))
+	if w.Code != 404 {
+		t.Fatalf("unknown job: got %d", w.Code)
 	}
 }

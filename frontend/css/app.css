@@ -680,3 +680,8 @@ tfoot td { font-weight: 600; }
 .hint-grip svg { width: 18px; height: 18px; }
 .hint-grip svg circle { fill: currentColor; stroke: none; }
 @media (max-width: 760px) { .draw-hint { bottom: 10px; left: 10px; width: calc(100vw - 20px); top: auto; } }
+
+/* Cancel while a design is generating: a second click confirms. */
+.send-cancel { flex: none; }
+.send-cancel.is-confirming { color: var(--negative); border-color: color-mix(in srgb, var(--negative) 60%, transparent); }
+.fit-source { margin-top: 8px; font-size: 12px; color: var(--muted); }

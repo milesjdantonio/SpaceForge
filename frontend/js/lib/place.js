@@ -1,6 +1,6 @@
 // Placing a house on a lot, and reading measurements off an outline.
 
-import { projection, ringCentroidLngLat, area, perimeter, edges, centroid, pointInPolygon, offsetPolygon, signedArea, selfIntersects } from './geo.js';
+import { projection, ringCentroidLngLat, area, perimeter, edges, centroid, pointInPolygon, signedArea, selfIntersects, edgeDistance, bbox } from './geo.js';
 
 // Live measurements for an outline (lng/lat ring).
 export function measure(ring, { setbackM = 3 } = {}) {
@@ -13,8 +13,7 @@ export function measure(ring, { setbackM = 3 } = {}) {
   const list = closedEnough ? edges(local) : [];
   const longest = list.reduce((m, e) => (!m || e.length > m.length ? e : m), null);
   if (closedEnough && signedArea(local) < 0) local = local.slice().reverse();
-  const setback = closedEnough ? offsetPolygon(local, setbackM) : null;
-  const buildable = setback && signedArea(setback) > 0 ? area(setback) : 0;
+  const buildable = closedEnough ? buildableArea(local, setbackM) : 0;
   return {
     areaM2: a,
     perimeterM: per,
@@ -25,6 +24,20 @@ export function measure(ring, { setbackM = 3 } = {}) {
     crossing: closedEnough && ring.length > 3 ? selfIntersects(local) : false,
     centroid: closedEnough ? proj.toGeo(centroid(local)) : ringCentroidLngLat(ring),
   };
+}
+
+// The part of the land at least `setbackM` from every boundary, counted on a grid, so it stays right
+// for spikes, notches and sharp corners (an inset polygon doesn't). Same method as housecost/fitcheck.go.
+export function buildableArea(local, setbackM) {
+  const b = bbox(local);
+  const cell = Math.max(0.25, Math.sqrt(area(local)) / 160);
+  let n = 0;
+  for (let y = b.minY + cell / 2; y < b.maxY; y += cell) {
+    for (let x = b.minX + cell / 2; x < b.maxX; x += cell) {
+      if (pointInPolygon([x, y], local) && edgeDistance([x, y], local) >= setbackM) n++;
+    }
+  }
+  return n * cell * cell;
 }
 
 export function problemsFor(m) {

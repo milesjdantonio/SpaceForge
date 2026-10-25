@@ -59,17 +59,58 @@ export function landFit(type, answers, advanced, m) {
   return { ...base, level: 'ok' };
 }
 
+// The design service's own answer (POST /api/fit, housecost/fitcheck.go), in the same shape as
+// landFit's. It sizes a first version of the building and places it with the code that places the
+// real one, so it knows the building's shape, not just its area.
+export function serviceFit(res, type, m) {
+  if (!res?.level) return null;
+  const fit = {
+    level: res.level,
+    source: 'service',
+    footprintM2: res.footprintM2 ?? null,
+    buildableM2: res.buildableM2 ?? m?.buildableM2 ?? 0,
+    share: res.share ?? null,
+    floors: res.floors,
+    widthM: res.widthM ?? null,
+    depthM: res.depthM ?? null,
+    floorsNeeded: res.floorsNeeded || null,
+    maxAreaM2: res.maxAreaM2 || null,
+    dropped: res.dropped ?? [],
+    single: type === 'house' || type === 'tiny-home',
+  };
+  if (fit.level === 'ok' && m?.areaM2 >= BIG_LAND_M2 && fit.footprintM2 / m.areaM2 < SMALL_SHARE) {
+    return { ...fit, level: 'small', landShare: fit.footprintM2 / m.areaM2 };
+  }
+  return fit;
+}
+
 // The words for a fit result, in the user's units.
 export function fitMessage(fit, fmt) {
   if (!fit) return null;
   // Rounded down below 100, so a building that fits never reads as filling the land.
   const pct = (x) => `${Math.max(1, x < 1 ? Math.min(99, Math.floor(x * 100)) : Math.round(x * 100))}%`;
-  const about = fit.footprintM2 != null ? `About ${fmt.area(fit.footprintM2)} of ground on ${fit.floors} floor${fit.floors === 1 ? '' : 's'}` : '';
+  const floorsWord = `${fit.floors} floor${fit.floors === 1 ? '' : 's'}`;
+  const about = fit.source === 'service' && fit.widthM
+    ? `A ${fmt.len(fit.widthM)} × ${fmt.len(fit.depthM)} building on ${floorsWord}`
+    : fit.footprintM2 != null ? `About ${fmt.area(fit.footprintM2)} of ground on ${floorsWord}` : '';
+  const list = (xs) => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0];
   switch (fit.level) {
     case 'none': return { title: 'No room to build', text: `Keeping ${fmt.len(3)} back from every edge leaves no buildable space. Outline a bigger or wider piece of land.` };
     case 'ai': return { title: 'Gemma sizes it to fit', text: `The building will be sized for the ${fmt.land(fit.buildableM2)} of buildable land.` };
     case 'over': {
       const smaller = fit.single ? 'a smaller size' : 'smaller or fewer homes';
+      if (fit.source === 'service') {
+        const tries = [
+          fit.floorsNeeded && `${fit.floorsNeeded} floors`,
+          fit.maxAreaM2 && `${fit.single ? 'a size' : 'homes'} up to ${fmt.area(fit.maxAreaM2)}`,
+        ].filter(Boolean);
+        return {
+          title: 'Too big for this land',
+          text: `There’s no spot on the land where this building stands ${fmt.len(3)} back from every edge. ${tries.length
+            ? `It would fit with ${tries.join(', or ')}.`
+            : `Try ${smaller}, or outline more land.`} You can still send it; Gemma will try to make it fit.`,
+        };
+      }
       return {
         title: 'Too big for this land',
         text: `${about}, but only ${fmt.land(fit.buildableM2)} is buildable. ${fit.floorsNeeded
@@ -77,7 +118,9 @@ export function fitMessage(fit, fmt) {
           : `Try ${smaller}, or outline more land.`} You can still send it, but the design may not fit inside the land.`,
       };
     }
-    case 'tight': return { title: 'A tight fit', text: `${about}: ${pct(fit.share)} of the buildable land, leaving little room for a yard, paths or parking.` };
+    case 'tight':
+      if (fit.dropped?.length) return { title: 'Fits, with less', text: `${about} fits once the ${list(fit.dropped)} ${fit.dropped.length === 1 && !/s$/.test(fit.dropped[0]) ? 'is' : 'are'} left out. Gemma will leave ${fit.dropped.length === 1 ? 'it' : 'them'} out if needed.` };
+      return { title: 'A tight fit', text: `${about}: ${pct(fit.share)} of the buildable land, leaving little room for a yard, paths or parking.` };
     case 'small': return { title: 'Small for this much land', text: `${about}: ${pct(fit.landShare)} of the land. That’s fine, it will stand in one spot. To design for just that spot, outline a smaller piece.` };
     default: return { title: 'Fits the land', text: `${about}: ${pct(fit.share)} of the ${fmt.land(fit.buildableM2)} buildable.` };
   }

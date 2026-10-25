@@ -9,6 +9,7 @@ export function createOutliner(map, { onChange, onFinish, onCancel } = {}) {
   let cursor = null;
   let dragging = -1;
   let active = false;
+  let locked = false; // while a design is generating for this land, its corners stay put
 
   map.addSource(SRC, { type: 'geojson', data: empty() });
   map.addLayer({ id: 'outline-fill', type: 'fill', source: SRC, filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#ffb15c', 'fill-opacity': 0.16 } });
@@ -58,10 +59,10 @@ export function createOutliner(map, { onChange, onFinish, onCancel } = {}) {
     }
     if (!active) return;
     if (!closed) { cursor = [e.lngLat.lng, e.lngLat.lat]; redraw(); }
-    map.getCanvas().style.cursor = cornerAt(e) >= 0 ? 'grab' : closed ? '' : 'crosshair';
+    map.getCanvas().style.cursor = cornerAt(e) >= 0 && !locked ? 'grab' : closed ? '' : 'crosshair';
   }
   function onDown(e) {
-    if (!active && !closed) return;
+    if (locked || (!active && !closed)) return;
     const hit = cornerAt(e);
     if (hit < 0 || (!closed && !(pts.length >= 3))) return;
     if (!closed && hit === 0) return; // a click on the first corner closes instead
@@ -140,12 +141,19 @@ export function createOutliner(map, { onChange, onFinish, onCancel } = {}) {
     map.setPaintProperty('outline-fill', 'fill-color', color);
     map.setPaintProperty('outline-fill', 'fill-opacity', on ? 0.22 : 0.16);
   }
+  function setLocked(v) {
+    locked = !!v;
+    if (locked && dragging >= 0) { dragging = -1; map.dragPan.enable(); }
+    // Corners hide while locked, so nothing looks draggable.
+    map.setLayoutProperty('outline-corner', 'visibility', locked ? 'none' : 'visible');
+  }
   function setVisible(v) {
     for (const id of ['outline-fill', 'outline-line', 'outline-rubber', 'outline-corner']) map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
   }
 
   return {
-    start, finish, cancel, load, clear, undo, setVisible, setWarning,
+    start, finish, cancel, load, clear, undo, setVisible, setWarning, setLocked,
+    get locked() { return locked; },
     get ring() { return pts.slice(); },
     get closed() { return closed; },
     get active() { return active; },

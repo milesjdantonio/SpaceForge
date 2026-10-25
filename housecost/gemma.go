@@ -485,9 +485,16 @@ type Gemma struct {
 	// "LOW", "MEDIUM", "HIGH"); "" sends nothing and lets the model decide. Gemma 4
 	// reasons by default and can spend its whole output allowance doing so.
 	Thinking string
+	// Ctx stops a call when the design is cancelled; nil means it runs to the end.
+	Ctx      context.Context
 	jsonMode bool
 	n        int
 }
+
+// ErrCancelled means the user stopped the design.
+var ErrCancelled = errors.New("the design was cancelled")
+
+func (g *Gemma) cancelled() bool { return g.Ctx != nil && g.Ctx.Err() != nil }
 
 func NewGemma(key, model string, out io.Writer) *Gemma {
 	return &Gemma{Key: key, Model: model, Timeout: 240 * time.Second, LogDir: "gemma_log", Out: out,
@@ -507,9 +514,15 @@ func (g *Gemma) Ask(msgs []Msg, maxTokens int) (string, error) {
 	var r reply
 	var err error
 	for attempt := 0; attempt < 4; attempt++ {
+		if g.cancelled() {
+			return "", ErrCancelled
+		}
 		r, err = g.streamOnce(msgs, maxTokens)
 		if err == nil {
 			break
+		}
+		if g.cancelled() {
+			return "", ErrCancelled
 		}
 		msg := err.Error()
 		low := strings.ToLower(msg)
@@ -535,7 +548,15 @@ func (g *Gemma) Ask(msgs []Msg, maxTokens int) (string, error) {
 		if attempt < 3 && containsAny(msg, retryable) {
 			wait := time.Duration(15<<attempt) * time.Second
 			fmt.Fprintf(g.Out, "  Gemma API busy/slow (%s). Retrying in %s...\n", truncate(msg, 90), wait)
-			sleep(wait)
+			if g.Ctx != nil {
+				select {
+				case <-g.Ctx.Done():
+					return "", ErrCancelled
+				case <-time.After(wait):
+				}
+			} else {
+				sleep(wait)
+			}
 			continue
 		}
 		return "", err
@@ -589,7 +610,11 @@ func (g *Gemma) streamOnce(msgs []Msg, maxTokens int) (reply, error) {
 	}
 	body, _ := json.Marshal(map[string]any{"contents": contents, "generationConfig": cfg})
 
-	ctx, cancel := context.WithTimeout(context.Background(), g.Timeout)
+	parent := g.Ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, g.Timeout)
 	defer cancel()
 	u := GeminiURL + "/v1beta/models/" + url.PathEscape(g.Model) + ":streamGenerateContent?alt=sse"
 	req, _ := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(body))

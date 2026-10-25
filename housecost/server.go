@@ -6,8 +6,10 @@
 // The website (../frontend) is served at /, and the API at /api, following contracts/STORAGE.md:
 //
 //	GET  /api/health                         { ok, model, key }
+//	POST /api/fit                            a request (description may be empty)  ->  does the building fit the land
 //	POST /api/designs                        a terrasim.design-request/2  ->  202 { jobId }
 //	GET  /api/designs/jobs/{id}?since=N      { status, progress, message, steps, log, logFrom, designId, error }
+//	POST /api/designs/jobs/{id}/cancel       stops a queued or running design  ->  { status: "cancelled" }
 //	GET  /api/designs/{id}                   terrasim.design/2 (with its cost)
 //	GET  /api/designs/{id}/estimate          terrasim.estimate/1
 //	GET  /api/designs/{id}/report            housecost.report/1
@@ -21,6 +23,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -77,7 +80,7 @@ type logLine struct {
 type job struct {
 	mu       sync.Mutex
 	ID       string
-	Status   string // queued | running | done | failed
+	Status   string // queued | running | done | failed | cancelled
 	Message  string
 	Steps    []*jobStep
 	Log      []logLine
@@ -85,10 +88,13 @@ type job struct {
 	Started  time.Time
 	DesignID string
 	Error    string
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 func newJob() *job {
 	j := &job{ID: fmt.Sprintf("job-%d", time.Now().UnixNano()), Status: "queued", Message: "Waiting for the design service."}
+	j.ctx, j.cancel = context.WithCancel(context.Background())
 	for _, d := range stepDefs {
 		j.Steps = append(j.Steps, &jobStep{ID: d.ID, Label: d.Label, Gemma: d.Gemma, Status: "pending"})
 	}
@@ -290,23 +296,26 @@ type server struct {
 	queue    chan func()
 	resDir   string
 	// deps builds the pipeline's connections for one design; tests swap it for stand-ins.
-	deps func(log io.Writer, raw []byte) (Deps, error)
+	deps func(ctx context.Context, log io.Writer, raw []byte) (Deps, error)
 }
 
 func serve(addr, siteDir, model, keyFile string, newGemma func() (*Gemma, error)) error {
 	s := &server{newGemma: newGemma, keyFile: keyFile, model: model, jobs: map[string]*job{}, results: map[string]*Output{},
 		queue: make(chan func(), 64), resDir: "results"}
-	s.deps = func(log io.Writer, raw []byte) (Deps, error) {
+	s.deps = func(ctx context.Context, log io.Writer, raw []byte) (Deps, error) {
 		g, err := s.newGemma()
 		if err != nil {
 			return Deps{}, err
 		}
 		g.Out = log // Gemma's waiting dots, retries and slow-API notes go to the terminal too
+		g.Ctx = ctx
 		ov, err := LoadOverrides("prices.csv")
 		if err != nil {
 			return Deps{}, err
 		}
-		return LiveDeps(g.Ask, log, ov), nil
+		d := LiveDeps(g.Ask, log, ov)
+		d.Ctx = ctx
+		return d, nil
 	}
 	return s.listen(addr, siteDir)
 }
@@ -342,6 +351,7 @@ func (s *server) handler(siteDir string) http.Handler {
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("POST /api/designs", s.create)
 	mux.HandleFunc("GET /api/coverage", s.coverage)
+	mux.HandleFunc("POST /api/fit", s.fit)
 	// One route for jobs/{id}, {id}, {id}/estimate and {id}/report (Go's router can't tell
 	// "jobs/{id}" from "{id}/estimate" apart on its own).
 	mux.HandleFunc("GET /api/designs/{rest...}", func(w http.ResponseWriter, r *http.Request) {
@@ -358,6 +368,7 @@ func (s *server) handler(siteDir string) http.Handler {
 			writeJSON(w, 404, map[string]string{"message": "Not found."})
 		}
 	})
+	mux.HandleFunc("POST /api/designs/jobs/{id}/cancel", s.cancelJob)
 	mux.HandleFunc("GET /api/listings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, []any{}) })
 	mux.HandleFunc("OPTIONS /api/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
 
@@ -424,8 +435,16 @@ func plural(n int) string {
 
 // run does one design: the same pipeline as -request, logging into the job.
 func (s *server) run(j *job, raw []byte) {
+	// A design cancelled while it waited in the queue never starts.
+	if j.ctx.Err() != nil {
+		return
+	}
 	j.set(func(j *job) { j.Status, j.Message, j.Started = "running", "Starting the design.", time.Now() })
 	fail := func(msg string) {
+		if j.ctx.Err() != nil {
+			s.markCancelled(j)
+			return
+		}
 		j.finish(false)
 		j.set(func(j *job) { j.Status, j.Error, j.Partial = "failed", msg, "" })
 		fmt.Printf("[%s] failed: %s\n", j.ID, msg)
@@ -436,12 +455,16 @@ func (s *server) run(j *job, raw []byte) {
 		}
 	}()
 	log := &jobLog{j: j}
-	deps, err := s.deps(log, raw)
+	deps, err := s.deps(j.ctx, log, raw)
 	if err != nil {
 		fail(err.Error())
 		return
 	}
 	res, runErr := RunRequest(raw, deps)
+	if j.ctx.Err() != nil {
+		s.markCancelled(j)
+		return
+	}
 	if res == nil || res.Design == nil {
 		msg := "The design service couldn't design this site."
 		if res != nil && len(res.Report.Problems) > 0 {
@@ -463,6 +486,43 @@ func (s *server) run(j *job, raw []byte) {
 	j.finish(true)
 	j.set(func(j *job) { j.Status, j.DesignID, j.Message, j.Partial = "done", id, "Design ready.", "" })
 	fmt.Printf("[%s] done: %s\n", j.ID, id)
+}
+
+// cancelJob stops a design the user no longer wants. A queued one is skipped; a running one stops
+// at its next step, and any Gemma call in progress is cut off.
+func (s *server) cancelJob(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	j := s.jobs[r.PathValue("id")]
+	s.mu.Unlock()
+	if j == nil {
+		writeJSON(w, 404, map[string]string{"message": "That design job isn't known (the server may have restarted)."})
+		return
+	}
+	j.mu.Lock()
+	st := j.Status
+	j.mu.Unlock()
+	if st == "done" || st == "failed" {
+		writeJSON(w, 409, map[string]string{"status": st, "message": "That design has already finished."})
+		return
+	}
+	j.cancel()
+	s.markCancelled(j)
+	writeJSON(w, 200, map[string]string{"status": "cancelled"})
+}
+
+func (s *server) markCancelled(j *job) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	if j.Status == "cancelled" {
+		return
+	}
+	for _, st := range j.Steps {
+		if st.Status == "running" {
+			st.Status = "failed"
+		}
+	}
+	j.Status, j.Message, j.Partial = "cancelled", "Cancelled.", ""
+	fmt.Printf("[%s] cancelled\n", j.ID)
 }
 
 func (s *server) jobStatus(w http.ResponseWriter, id string, since int) {

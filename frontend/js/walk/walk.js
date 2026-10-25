@@ -415,7 +415,9 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.hypot(dx, dy) > 4) drag.moved = true;
     const k = (camera.fov * Math.PI / 180) / canvas.clientHeight;
-    yaw = drag.yaw - dx * k; // drag right to turn right
+    // Grab the view, as in Street View: drag right and the room follows the pointer (you turn left);
+    // drag down and you look up.
+    yaw = drag.yaw + dx * k;
     pitch = Math.max(-1.35, Math.min(1.35, drag.pitch + dy * k));
   });
   canvas.addEventListener('pointerup', (e) => {

@@ -3,6 +3,7 @@ package main
 // The request → design + estimate pipeline.
 
 import (
+	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
@@ -32,7 +33,12 @@ type Deps struct {
 	Now       func() time.Time
 	Log       io.Writer
 	Overrides map[string]Override
+	// Ctx is cancelled when the user stops the design; nil runs to the end.
+	Ctx context.Context
 }
+
+// stopped is true once the user has cancelled this design.
+func (dp Deps) stopped() bool { return dp.Ctx != nil && dp.Ctx.Err() != nil }
 
 func LiveDeps(ask AskFunc, log io.Writer, ov map[string]Override) Deps {
 	return Deps{
@@ -240,6 +246,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		frame.ToLngLat(Pt{maxE, maxN})[0], frame.ToLngLat(Pt{maxE, maxN})[1]}
 
 	// 3. site data
+	if dp.stopped() {
+		return out, ErrCancelled
+	}
 	fmt.Fprintln(log, "Gathering site data: soil, elevation, climate, flood zone, seismic, wages...")
 	site, err := dp.FetchSite(SiteQuery{Centroid: Pt{cLng, cLat}, Footprint: fpCentre,
 		FootprintFt: [2]float64{f0.l.W / MPerFt, f0.l.D / MPerFt}, SiteBox: box, SetbackM: setback,
@@ -255,6 +264,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	out.Report.Site = &site
 
 	// 4. Gemma: site assessment
+	if dp.stopped() {
+		return out, ErrCancelled
+	}
 	a, err := AskUntilValid(BuildAssessmentPromptFor(site, describe(p0, f0.l)), ParseAssessment,
 		func(x Assessment) []string { return ValidateAssessment(x, site) }, dp.Ask, "site assessment", 8192, 3, log)
 	if err != nil {
@@ -286,6 +298,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	}
 
 	// 5. Gemma: design program and the words the user reads
+	if dp.stopped() {
+		return out, ErrCancelled
+	}
 	sizing := fmt.Sprintf("a first version is %.1f × %.1f m with %d levels; site %.0f m² with a %.0f m setback from every boundary",
 		f0.l.W, f0.l.D, len(f0.l.Levels), siteArea, setback)
 	pr, err := AskUntilValid(BuildProgramPrompt(rAdj, site, a, sizing), ParseProgram,
@@ -350,6 +365,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	}
 
 	// 7. Gemma: materials
+	if dp.stopped() {
+		return out, ErrCancelled
+	}
 	mp, err := AskUntilValid(BuildMaterialsPlanPrompt(p, a, d, site), ParseMaterialPlan,
 		func(x MaterialPlan) []string { return ValidateMaterialPlan(x, a, p, d, site) }, dp.Ask, "materials", 16384, 3, log)
 	if err != nil {
@@ -372,6 +390,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	}
 
 	// 8. quantities, prices, suppliers, estimate
+	if dp.stopped() {
+		return out, ErrCancelled
+	}
 	fmt.Fprintln(log, "Pricing: nearby suppliers, quantities, labor and site work...")
 	var sups []Supplier
 	if dp.Suppliers != nil {

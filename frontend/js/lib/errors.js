@@ -92,7 +92,9 @@ export function suggestFixes(err, { brief = {}, fit = null, type = null } = {}) 
   const out = [];
   if (fit?.level === 'over') {
     if (fit.floorsNeeded) out.push({ label: `Use ${fit.floorsNeeded} floors`, why: 'The building is too big for the land on fewer floors.', patch: { floors: fit.floorsNeeded } });
-    if (brief.areaM2 && fit.share > 1) {
+    if (brief.areaM2 && fit.maxAreaM2 && fit.maxAreaM2 < brief.areaM2) {
+      out.push({ label: `Make it ${Math.floor(fit.maxAreaM2)} m²`, why: 'The largest size the design service could place on this land.', patch: { areaM2: Math.floor(fit.maxAreaM2) } });
+    } else if (brief.areaM2 && fit.share > 1) {
       const area = Math.max(10, Math.floor((brief.areaM2 / fit.share) * 0.9));
       out.push({ label: 'Make it smaller', why: 'A size that fits the buildable land.', patch: { areaM2: area } });
     }

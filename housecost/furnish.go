@@ -316,17 +316,18 @@ func furnish(r *LRoom, id string, clear []Rect) ([]DFurnishing, error) {
 			rot = 90
 		}
 		if pl.at(fitem{typ: "dining-table", w: w, d: d}, cx, cy, rot) {
+			// A chair's front is the way its sitter faces, so each one faces the table.
 			ch := fitem{typ: "chair", w: 0.45, d: 0.45}
 			if rot == 0 {
-				pl.at(ch, cx-0.4, cy-d/2-0.35, 0)
-				pl.at(ch, cx+0.4, cy-d/2-0.35, 0)
-				pl.at(ch, cx-0.4, cy+d/2+0.35, 180)
-				pl.at(ch, cx+0.4, cy+d/2+0.35, 180)
+				pl.at(ch, cx-0.4, cy-d/2-0.35, 180)
+				pl.at(ch, cx+0.4, cy-d/2-0.35, 180)
+				pl.at(ch, cx-0.4, cy+d/2+0.35, 0)
+				pl.at(ch, cx+0.4, cy+d/2+0.35, 0)
 			} else {
-				pl.at(ch, cx-d/2-0.35, cy-0.4, 270)
-				pl.at(ch, cx-d/2-0.35, cy+0.4, 270)
-				pl.at(ch, cx+d/2+0.35, cy-0.4, 90)
-				pl.at(ch, cx+d/2+0.35, cy+0.4, 90)
+				pl.at(ch, cx-d/2-0.35, cy-0.4, 90)
+				pl.at(ch, cx-d/2-0.35, cy+0.4, 90)
+				pl.at(ch, cx+d/2+0.35, cy-0.4, 270)
+				pl.at(ch, cx+d/2+0.35, cy+0.4, 270)
 			}
 			pl.at(fitem{typ: "pendant", w: 0.5, d: 0.5, wide: true}, cx, cy, 0)
 		}

@@ -13,15 +13,16 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const clock = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${Math.round(s)}s`);
 
-export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry, onEdit, onPreview, onOutline, onFix }) {
+export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry, onEdit, onPreview, onOutline, onFix, onCancel }) {
   el.innerHTML = `
     <header class="panel-head">
       <div>
         <h2 class="panel-title" data-title>Generating Build</h2>
         <p class="panel-sub">${typeName(request.housingType)} · ${request.brief.floors} ${request.brief.floors === 1 ? 'floor' : 'floors'}</p>
       </div>
+      <button type="button" class="btn btn-small btn-quiet send-cancel" data-cancel>${icon('close')}<span>Cancel</span></button>
     </header>
-    <p class="note send-wait" data-wait>This may take a while. You can keep looking around the map; the design appears on your land when it’s ready.</p>
+    <p class="note send-wait" data-wait>This may take a while. You can keep looking around the map; the land stays locked until the design is ready or you cancel it.</p>
     <div class="forge" data-rive-slot>
       <div class="forge-fallback" aria-hidden="true"></div>
     </div>
@@ -51,6 +52,25 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
   const fill = el.querySelector('[data-fill]');
   const stepsEl = el.querySelector('[data-steps]');
   let rive = mountRive(slot, { src: 'assets/rive/forge.riv', stateMachine: 'Forge', onLoad: (h) => h.set('state', 1) });
+
+  // Cancel asks once more, since minutes of Gemma's work would be lost; the brief is kept.
+  const cancelBtn = el.querySelector('[data-cancel]');
+  let confirmTimer = 0;
+  cancelBtn.addEventListener('click', () => {
+    if (!cancelBtn.classList.contains('is-confirming')) {
+      cancelBtn.classList.add('is-confirming');
+      cancelBtn.querySelector('span').textContent = 'Stop this design?';
+      clearTimeout(confirmTimer);
+      confirmTimer = setTimeout(() => {
+        cancelBtn.classList.remove('is-confirming');
+        cancelBtn.querySelector('span').textContent = 'Cancel';
+      }, 4000);
+      return;
+    }
+    clearTimeout(confirmTimer);
+    clearInterval(ticker);
+    onCancel?.();
+  });
 
   // ---- terminal ------------------------------------------------------------------------------
   const lines = [];
@@ -124,6 +144,7 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
         setProgress(p, job.status === 'queued' ? job.message : job.message || labelEl.textContent);
       });
       clearInterval(ticker);
+      cancelBtn.remove();
       setProgress(1, 'Design received');
       print(`Design received: ${res.design.overview?.title ?? res.design.id}.`, { kind: 'term-ok' });
       rive?.set('state', 2);
@@ -136,6 +157,7 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
     } catch (err) {
       if (err?.name === 'AbortError') return;
       clearInterval(ticker);
+      cancelBtn.remove();
       // The generation animation gives way to the failure one.
       rive?.destroy();
       slot.classList.add('is-failed');

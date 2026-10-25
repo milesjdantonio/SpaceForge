@@ -56,9 +56,14 @@ export const api = {
   // Sends a request and waits for the finished design. The service may answer with the design
   // itself ({ design, estimate }), with { designId }, or with { jobId } to poll every 2 seconds.
   // Resolves with { design, estimate }. onProgress gets job updates ({ status, progress, message }).
+  // Aborting `signal` also asks the service to stop the job, so Gemma isn't left working on it.
   async createDesign(request, { onProgress, signal } = {}) {
     let res = await call('/designs', { method: 'POST', body: request, signal });
     if (res?.jobId && !res.design && !res.designId) {
+      const jobId = res.jobId;
+      const stop = () => { call(`/designs/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }).catch(() => {}); };
+      if (signal?.aborted) { stop(); throw new DOMException('Stopped', 'AbortError'); }
+      signal?.addEventListener('abort', stop, { once: true });
       onProgress?.({ status: 'queued', message: 'The design service accepted the request.' });
       const started = Date.now();
       let since = 0;
@@ -70,6 +75,7 @@ export const api = {
         if (typeof job.logTotal === 'number') since = job.logTotal;
         onProgress?.(job);
         if (job.status === 'done') { res = job; break; }
+        if (job.status === 'cancelled') throw new DOMException('Stopped', 'AbortError');
         if (job.status === 'failed') {
           const err = new Error(job.error || 'The design service couldn’t finish this design.');
           err.code = 'job-failed';
@@ -81,6 +87,7 @@ export const api = {
           throw err;
         }
       }
+      signal?.removeEventListener('abort', stop);
     }
     // The reply may carry the design whole, nest it under "result", or give only its id.
     const body = res?.result ?? res;
@@ -106,6 +113,13 @@ export const api = {
   async coverage([lng, lat]) {
     if (!config.apiBaseUrl) return null;
     try { return await call(`/coverage?lng=${lng}&lat=${lat}`); } catch { return null; }
+  },
+
+  // Whether the building the brief describes fits the land, checked by the design service with the
+  // code that places the real building. null when there's no service or it can't say.
+  async fit(request, { signal } = {}) {
+    if (!config.apiBaseUrl) return null;
+    try { return await call('/fit', { method: 'POST', body: request, signal }); } catch (e) { if (e.name === 'AbortError') throw e; return null; }
   },
 
   // Keeps a received design in this browser (the newest 12), so it can be reopened.

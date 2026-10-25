@@ -4,7 +4,7 @@
 
 import { fmt } from '../format.js';
 import { problemsFor } from '../lib/place.js';
-import { landFit, fitMessage } from '../lib/fit.js';
+import { landFit, fitMessage, serviceFit } from '../lib/fit.js';
 import { icon } from '../ui/icons.js';
 import { mountRive } from '../rive.js';
 import {
@@ -26,7 +26,7 @@ const num = (s) => {
   return t === '' ? null : Number(t);
 };
 
-export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange, onSend, coverage, terrain }) {
+export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange, onSend, coverage, terrain, checkFit }) {
   const form = structuredClone(EMPTY_FORM);
   if (site.form) {
     form.housingType = site.form.housingType ?? null;
@@ -305,9 +305,34 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     onChange({ form: structuredClone(form), mode: 'dream', builder: null });
   }
 
-  // How the building the brief describes sits on this land, before anything is sent.
+  // How the building the brief describes sits on this land, before anything is sent. A quick
+  // estimate shows straight away; when the design service is connected it then places a first
+  // version of the building with its own code, and that answer replaces the estimate.
+  let fitSeq = 0, fitTimer = 0, checked = null, checkedKey = '';
+  const fitKey = () => JSON.stringify([form.housingType, form.answers, form.advanced, site.ring]);
   function showFit() {
-    const fit = landFit(form.housingType, form.answers, form.advanced, m);
+    const local = landFit(form.housingType, form.answers, form.advanced, m);
+    const key = fitKey();
+    const ask = !!checkFit && !!local && !['none', 'ai'].includes(local.level);
+    const fit = ask && checkedKey === key && checked ? checked : local;
+    paintFit(fit, { checking: ask && checkedKey !== key });
+    if (!ask || checkedKey === key) return;
+    clearTimeout(fitTimer);
+    const seq = ++fitSeq;
+    fitTimer = setTimeout(async () => {
+      let res = null;
+      try { res = await checkFit(structuredClone(form)); } catch { res = null; }
+      if (seq !== fitSeq || !el.isConnected) return;
+      const answer = serviceFit(res, form.housingType, m);
+      // Without an answer the estimate stays, without the "checking" note.
+      checkedKey = key;
+      checked = answer ?? local;
+      paintFit(checked, { checking: false });
+      // Kept with the form it answers, so a later failure's advice can use it.
+      if (answer) onChange({ fitCheck: { ...answer, formKey: JSON.stringify(form) } });
+    }, 450);
+  }
+  function paintFit(fit, { checking = false } = {}) {
     const msg = fitMessage(fit, fmt);
     fitBox.hidden = !msg;
     if (!msg) { fitBox.replaceChildren(); return; }
@@ -315,7 +340,9 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     const bar = fit.share != null
       ? `<div class="fit-bar" role="img" aria-label="Uses ${Math.round(fit.share * 100)}% of the buildable land"><span style="width:${Math.min(100, fit.share * 100).toFixed(1)}%"></span></div>`
       : '';
-    fitBox.innerHTML = `${icon(fit.level === 'ok' || fit.level === 'ai' ? 'check' : 'alert')}<div><strong>${msg.title}</strong><p>${msg.text}</p>${bar}</div>`;
+    const source = checking ? '<p class="fit-source">Estimate. Checking the real placement…</p>'
+      : fit.source === 'service' ? '<p class="fit-source">Checked by placing the building on your land.</p>' : '';
+    fitBox.innerHTML = `${icon(fit.level === 'ok' || fit.level === 'ai' ? 'check' : 'alert')}<div><strong>${msg.title}</strong><p>${msg.text}</p>${bar}${source}</div>`;
   }
 
   // ---- events ----------------------------------------------------------------------------------
