@@ -5,21 +5,33 @@
 > **Sign-in is not available on the current deployed site.** To test sign-in, private saved
 > buildings and account-based generation, follow the [full local setup](#full-local-setup) below.
 
-_Formerly SpaceForge; the checkout, Compose project and storage Go module still use that name._
-
-Outline land on a 3D map, describe what you want to build, and turn the brief into a building on
-that lot. TerraSim combines Gemma through the Gemini API with site data, room layout and cost
-estimation to produce floor plans, a furnished 3D walkthrough, materials and ownership costs.
+TerraSim aims to help address the housing shortage by making it easier to explore what could be
+built on available or underused land—and whether an idea looks feasible before major time and money
+are committed. Outline a lot on a 3D map, describe the housing you want to create, and visualize a
+site-specific building alongside estimated material quantities and costs. TerraSim combines Gemma
+through the Gemini API with site data, room layout and cost estimation to produce floor plans, a
+furnished 3D walkthrough, materials and ownership costs. These estimates support early planning;
+they do not replace professional engineering, code review, contractor quotes or a formal feasibility study.
 
 It supports houses, tiny homes, townhouses, duplexes, mansions, villas, apartments, condos, dorms
 and hotels, plus neighborhoods and trailer parks with roads and lots. The interface supports
 metric and imperial units; estimates are in USD.
 
-[User personas](#user-personas) · [Quick start](#quick-start) · [Architecture](#architecture) ·
+[Who TerraSim is for](#who-terrasim-is-for) · [Quick start](#quick-start) · [Architecture](#architecture) ·
 [Full local setup](#full-local-setup) · [Using the app](#using-the-app) · [Tests](#tests) ·
 [Deployment](#deployment)
 
-## User personas
+## Who TerraSim is for
+
+TerraSim is for people who want to turn land into more housing but need a clearer way to evaluate an
+idea before moving forward. Seeing a proposed home or multi-unit development in 3D helps people
+understand what could fit on a real site. Floor plans, material quantities and cost estimates help
+them compare options and decide whether a concept is worth pursuing. By making early-stage housing
+ideas easier to visualize and price, TerraSim aims to help landowners, prospective buyers and small
+developers identify practical opportunities to add housing. It is a planning aid, not a guarantee
+that a design can be permitted, financed or built at the estimated price.
+
+### Example users
 
 These illustrative personas describe TerraSim's intended users, based on the
 [product goals](docs/product.md#users).
