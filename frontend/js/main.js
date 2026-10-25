@@ -898,6 +898,73 @@ async function send({ keepRetryFlag = false } = {}) {
   }));
 }
 
+// Redesign from a written change (Change this design). The service turns the change into a new brief
+// and designs it on the same land; the new design replaces this one (and its saved copy). A
+// cancelled or failed change puts the old design back as it was.
+function sendEdit(design, estimate, change) {
+  app.generation?.abort();
+  const generation = new AbortController();
+  app.generation = generation;
+  const owner = auth.user?.uid ?? null;
+  const before = { design, estimate, placement: house.placement, savedBuilding: app.savedBuilding, site: app.site };
+  // The brief this design was made from, when this tab still has it; otherwise the service reads
+  // one back from the design.
+  const original = app.site?.designId === design.id && app.site?.form?.housingType ? buildRequest(app.site) : null;
+  const restore = () => {
+    if (generation.signal.aborted && app.generation !== generation) return;
+    lockLand(false);
+    showDesign(before.design, before.estimate, { site: before.site, placement: before.placement, savedBuilding: before.savedBuilding, focus: false });
+  };
+  lockLand(true);
+  setMode('sending');
+  house.hide();
+  house.generating(design.site.outline);
+  const ring = design.site.outline;
+  const display = {
+    housingType: design.housingType,
+    brief: { floors: design.totals.floors, designPrompt: `Change: ${change}` },
+    aiDecides: [],
+    site: { geometry: { coordinates: [[...ring, ring[0]]] }, properties: { areaM2: design.site.areaM2 ?? 0 } },
+  };
+  openPanel((el) => renderSending(el, {
+    request: display,
+    fit: null,
+    run: (onProgress) => api.editDesign({ design, request: original, change }, { onProgress, signal: generation.signal }),
+    onDone: async ({ design: next, estimate: est, request }) => {
+      if (generation.signal.aborted || (owner && auth.user?.uid !== owner)) return;
+      lockLand(false);
+      if (!drawable(next, { fresh: true })) return;
+      house.stopGenerating();
+      // The change replaces the old design, and its saved copy when there is one.
+      if (before.savedBuilding?.uid === owner) app.savedBuilding = { ...before.savedBuilding, designID: next.id };
+      const site = { ...(before.site ?? {}), ring: next.site.outline, designId: next.id, status: 'sent', lastRequestId: request?.id ?? null };
+      app.site = site;
+      api.keepLocal(next, est);
+      showDesign(next, est, { site, savedBuilding: app.savedBuilding });
+      if (owner) {
+        try { await persistBuilding(next, est, site, next.placement); toast('Changed design saved.'); }
+        catch (err) { toast(`The changed design is on the map but wasn’t saved. ${explainSaveError(err).text}`, { kind: 'error' }); }
+      }
+    },
+    onFailed: () => {
+      if (generation.signal.aborted) return;
+      lockLand(false);
+      house.failGenerating();
+      setMode('failed');
+    },
+    onRetry: () => sendEdit(design, estimate, change),
+    onEdit: () => restore(),
+    onPreview: () => restore(),
+    onOutline: () => { closePanel(); outliner.clear(); app.site = null; setMode('explore'); startOutline(); },
+    onCancel: () => {
+      generation.abort();
+      house.stopGenerating();
+      restore();
+      toast('Change cancelled. The design is as it was.');
+    },
+  }));
+}
+
 // Checks a design against the contract before anything is drawn; a broken file opens a panel that
 // says what's wrong instead.
 // `fresh` is set for a design Gemma just sent, which can be generated again.
@@ -1015,6 +1082,7 @@ async function openHouse() {
     preview: !!design.previewOn,
     onWalk: () => openWalk(design),
     onPreview: () => startOrbit(),
+    onChangeDesign: api.connected && !design.sample && !design.previewOn ? (change) => sendEdit(design, estimate, change) : null,
     saved: app.savedBuilding?.uid === auth.user?.uid && app.savedBuilding?.designID === design.id,
     onSave: async () => {
       if (!(await account.require())) return false;

@@ -111,7 +111,7 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
   }
   function renderSteps(steps) {
     stepsEl.hidden = false;
-    stepsEl.innerHTML = steps.map((s) => `
+    stepsEl.innerHTML = steps.filter((s) => s.status !== 'skipped').map((s) => `
       <li class="step step-${s.status}${s.gemma ? ' step-gemma' : ''}">
         <span class="step-dot" aria-hidden="true"></span>
         <span class="step-label">${esc(s.gemma ? s.label.replace(/^Gemma /, '') : s.label)}${s.attempts && s.attempt > 1 ? ` <span class="step-try">try ${s.attempt} of ${s.attempts}</span>` : ''}</span>

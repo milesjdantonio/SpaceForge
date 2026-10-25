@@ -46,6 +46,7 @@ type stepDef struct {
 }
 
 var stepDefs = []stepDef{
+	{"edit", "Reading your change", true, regexp.MustCompile(`^Gemma: your change \(attempt (\d+) of (\d+)\)`)},
 	{"sizing", "Sizing the building to the land", false, regexp.MustCompile(`^Sizing a first version`)},
 	{"site", "Gathering site data", false, regexp.MustCompile(`^Gathering site data`)},
 	{"assessment", "Assessing the site", true, regexp.MustCompile(`^Gemma: site assessment \(attempt (\d+) of (\d+)\)`)},
@@ -59,13 +60,13 @@ var stepDefs = []stepDef{
 var stepExpect = struct {
 	sync.Mutex
 	s map[string]float64
-}{s: map[string]float64{"sizing": 3, "site": 4, "assessment": 8, "program": 18, "drawing": 2, "materials": 32, "pricing": 4}}
+}{s: map[string]float64{"edit": 6, "sizing": 3, "site": 4, "assessment": 8, "program": 18, "drawing": 2, "materials": 32, "pricing": 4}}
 
 type jobStep struct {
 	ID       string  `json:"id"`
 	Label    string  `json:"label"`
 	Gemma    bool    `json:"gemma"`
-	Status   string  `json:"status"` // pending | running | done | failed
+	Status   string  `json:"status"` // pending | running | done | failed | skipped (not part of this job)
 	Attempt  int     `json:"attempt,omitempty"`
 	Attempts int     `json:"attempts,omitempty"`
 	Seconds  float64 `json:"seconds,omitempty"`
@@ -89,15 +90,21 @@ type job struct {
 	DesignID string
 	Error    string
 	Advice   *Advice
+	Request  json.RawMessage // for an edit, the brief the change became (sent with the result)
 	ctx      context.Context
 	cancel   context.CancelFunc
 }
 
-func newJob() *job {
+// newJob starts a design job; an edit job also reads the user's change first.
+func newJob(edit ...bool) *job {
 	j := &job{ID: fmt.Sprintf("job-%d", time.Now().UnixNano()), Status: "queued", Message: "Waiting for the design service."}
 	j.ctx, j.cancel = context.WithCancel(context.Background())
 	for _, d := range stepDefs {
-		j.Steps = append(j.Steps, &jobStep{ID: d.ID, Label: d.Label, Gemma: d.Gemma, Status: "pending"})
+		st := "pending"
+		if d.ID == "edit" && (len(edit) == 0 || !edit[0]) {
+			st = "skipped"
+		}
+		j.Steps = append(j.Steps, &jobStep{ID: d.ID, Label: d.Label, Gemma: d.Gemma, Status: st})
 	}
 	return j
 }
@@ -125,7 +132,7 @@ func (j *job) line(text string) {
 			if p.Status == "running" {
 				p.Status, p.Seconds = "done", sround1(now.Sub(p.started).Seconds())
 				learn(p.ID, p.Seconds/float64(max(1, p.Attempt)))
-			} else if p.Status == "pending" {
+			} else if p.Status == "pending" { // skipped steps stay skipped
 				p.Status = "done"
 			}
 		}
@@ -190,6 +197,7 @@ func (j *job) progress() float64 {
 			total += span
 			el := now.Sub(s.started).Seconds()
 			done += span * minF(0.95, el/span) * (1 - 0.15*expDecay(el, span))
+		case "skipped":
 		default:
 			total += exp
 		}
@@ -249,6 +257,9 @@ func (j *job) view(since int) map[string]any {
 	}
 	if j.Advice != nil {
 		v["advice"] = j.Advice
+	}
+	if len(j.Request) > 0 && j.Status == "done" {
+		v["request"] = j.Request
 	}
 	return v
 }
@@ -376,6 +387,7 @@ func (s *server) handler(siteDir string) http.Handler {
 		}
 	})
 	mux.HandleFunc("POST /api/designs/jobs/{id}/cancel", s.cancelJob)
+	mux.HandleFunc("POST /api/designs/edit", s.editDesign)
 	mux.HandleFunc("GET /api/listings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, []any{}) })
 	mux.HandleFunc("OPTIONS /api/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
 
@@ -431,7 +443,7 @@ func plural(n int) string {
 }
 
 // run does one design: the same pipeline as -request, logging into the job.
-func (s *server) run(j *job, raw []byte) {
+func (s *server) run(j *job, raw []byte, edit ...EditRequest) {
 	// A design cancelled while it waited in the queue never starts.
 	if j.ctx.Err() != nil {
 		return
@@ -456,6 +468,20 @@ func (s *server) run(j *job, raw []byte) {
 	if err != nil {
 		fail(err.Error())
 		return
+	}
+	if len(edit) > 0 {
+		// The change becomes a new brief first; then the design is made from it as usual.
+		r, err := EditRequestFor(edit[0], deps.Ask, func(line string) { fmt.Fprintln(log, line) })
+		if err != nil {
+			fail(err.Error())
+			return
+		}
+		if probs := ValidateRequest(r); len(probs) > 0 {
+			fail("The changed brief can't be designed: " + strings.Join(probs, " "))
+			return
+		}
+		raw, _ = json.Marshal(r)
+		j.set(func(j *job) { j.Request = raw })
 	}
 	res, runErr := RunRequest(raw, deps)
 	if j.ctx.Err() != nil {
@@ -514,6 +540,45 @@ func (s *server) advise(j *job, raw []byte, failure string, deps Deps) {
 		return
 	}
 	j.set(func(j *job) { j.Advice = &a })
+}
+
+// editDesign queues a redesign from a change the user wrote (edit.go).
+func (s *server) editDesign(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 4<<20))
+	var e EditRequest
+	if err != nil || json.Unmarshal(body, &e) != nil {
+		writeJSON(w, 400, map[string]string{"message": "The edit isn't valid JSON."})
+		return
+	}
+	if strings.TrimSpace(e.Change) == "" || len([]rune(e.Change)) > 600 {
+		writeJSON(w, 422, map[string]string{"message": "Write the change in 1 to 600 characters."})
+		return
+	}
+	var orig Request
+	switch {
+	case e.Request != nil && len(*e.Request) > 2:
+		if err := json.Unmarshal(*e.Request, &orig); err != nil {
+			writeJSON(w, 422, map[string]string{"message": "The original request isn't readable."})
+			return
+		}
+	case e.Design != nil && len(e.Design.Site.Outline) >= 3:
+		orig = requestFromDesign(e.Design)
+	default:
+		writeJSON(w, 422, map[string]string{"message": "Send the design to change."})
+		return
+	}
+	raw, _ := json.Marshal(orig)
+	j := newJob(true)
+	s.mu.Lock()
+	s.jobs[j.ID] = j
+	s.mu.Unlock()
+	select {
+	case s.queue <- func() { s.run(j, raw, e) }:
+	default:
+		writeJSON(w, 429, map[string]string{"message": "The design service is busy. Try again in a few minutes."})
+		return
+	}
+	writeJSON(w, 202, map[string]string{"jobId": j.ID})
 }
 
 // cancelJob stops a design the user no longer wants. A queued one is skipped; a running one stops

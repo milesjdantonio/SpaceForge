@@ -49,6 +49,60 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const designKey = () => auth.user ? `designs:${auth.user.uid}` : 'designs';
 const localDesigns = () => store.get(designKey(), []);
 
+// Waits for a design job to finish (polling every second), or takes a design that came back at
+// once. Resolves with { design, estimate, request }.
+async function finishJob(res, { onProgress, signal } = {}) {
+  if (res?.jobId && !res.design && !res.designId) {
+    const jobId = res.jobId;
+    const stop = () => { call(`/designs/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }).catch(() => {}); };
+    if (signal?.aborted) { stop(); throw new DOMException('Stopped', 'AbortError'); }
+    signal?.addEventListener('abort', stop, { once: true });
+    onProgress?.({ status: 'queued', message: 'The design service accepted the request.' });
+    const started = Date.now();
+    let since = 0;
+    for (;;) {
+      await sleep(1000);
+      if (signal?.aborted) throw new DOMException('Stopped', 'AbortError');
+      // `since` asks only for log lines not yet seen (services without a log ignore it).
+      const job = await call(`/designs/jobs/${encodeURIComponent(res.jobId)}?since=${since}`, { signal });
+      if (typeof job.logTotal === 'number') since = job.logTotal;
+      onProgress?.(job);
+      if (job.status === 'done') { res = job; break; }
+      if (job.status === 'cancelled') throw new DOMException('Stopped', 'AbortError');
+      if (job.status === 'failed') {
+        const err = new Error(job.error || 'The design service couldn’t finish this design.');
+        err.code = 'job-failed';
+        // Gemma's recommendation for this failure: { summary, recommendation, change, changeLabel }.
+        err.advice = job.advice ?? null;
+        throw err;
+      }
+      if (Date.now() - started > 15 * 60 * 1000) {
+        const err = new Error('The design is taking longer than 15 minutes. It may still arrive.');
+        err.code = 'timeout';
+        throw err;
+      }
+    }
+    signal?.removeEventListener('abort', stop);
+  }
+  // The reply may carry the design whole, nest it under "result", or give only its id.
+  const body = res?.result ?? res;
+  let design = body?.design ?? (body?.schema === 'terrasim.design/2' ? body : null);
+  let estimate = body?.estimate ?? null;
+  if (!design && body?.designId) {
+    design = await call(`/designs/${encodeURIComponent(body.designId)}`, { signal });
+    // The design carries its cost; a separate estimate is only fetched for services that don't.
+    if (!design?.cost) {
+      try { estimate = await call(`/designs/${encodeURIComponent(body.designId)}/estimate`, { signal }); } catch { estimate = null; }
+    }
+  }
+  if (!design) {
+    const err = new Error('The design service answered, but without a design.');
+    err.code = 'no-design';
+    throw err;
+  }
+  return { design, estimate, request: body?.request ?? null };
+}
+
 export const api = {
   get connected() { return !!config.apiBaseUrl; },
   get baseUrl() { return config.apiBaseUrl; },
@@ -58,57 +112,16 @@ export const api = {
   // Resolves with { design, estimate }. onProgress gets job updates ({ status, progress, message }).
   // Aborting `signal` also asks the service to stop the job, so Gemma isn't left working on it.
   async createDesign(request, { onProgress, signal } = {}) {
-    let res = await call('/designs', { method: 'POST', body: request, signal });
-    if (res?.jobId && !res.design && !res.designId) {
-      const jobId = res.jobId;
-      const stop = () => { call(`/designs/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' }).catch(() => {}); };
-      if (signal?.aborted) { stop(); throw new DOMException('Stopped', 'AbortError'); }
-      signal?.addEventListener('abort', stop, { once: true });
-      onProgress?.({ status: 'queued', message: 'The design service accepted the request.' });
-      const started = Date.now();
-      let since = 0;
-      for (;;) {
-        await sleep(1000);
-        if (signal?.aborted) throw new DOMException('Stopped', 'AbortError');
-        // `since` asks only for log lines not yet seen (services without a log ignore it).
-        const job = await call(`/designs/jobs/${encodeURIComponent(res.jobId)}?since=${since}`, { signal });
-        if (typeof job.logTotal === 'number') since = job.logTotal;
-        onProgress?.(job);
-        if (job.status === 'done') { res = job; break; }
-        if (job.status === 'cancelled') throw new DOMException('Stopped', 'AbortError');
-        if (job.status === 'failed') {
-          const err = new Error(job.error || 'The design service couldn’t finish this design.');
-          err.code = 'job-failed';
-          // Gemma's recommendation for this failure: { summary, recommendation, change, changeLabel }.
-          err.advice = job.advice ?? null;
-          throw err;
-        }
-        if (Date.now() - started > 15 * 60 * 1000) {
-          const err = new Error('The design is taking longer than 15 minutes. It may still arrive.');
-          err.code = 'timeout';
-          throw err;
-        }
-      }
-      signal?.removeEventListener('abort', stop);
-    }
-    // The reply may carry the design whole, nest it under "result", or give only its id.
-    const body = res?.result ?? res;
-    let design = body?.design ?? (body?.schema === 'terrasim.design/2' ? body : null);
-    let estimate = body?.estimate ?? null;
-    if (!design && body?.designId) {
-      design = await call(`/designs/${encodeURIComponent(body.designId)}`, { signal });
-      // The design carries its cost; a separate estimate is only fetched for services that don't.
-      if (!design?.cost) {
-        try { estimate = await call(`/designs/${encodeURIComponent(body.designId)}/estimate`, { signal }); } catch { estimate = null; }
-      }
-    }
-    if (!design) {
-      const err = new Error('The design service answered, but without a design.');
-      err.code = 'no-design';
-      throw err;
-    }
-    return { design, estimate };
+    return finishJob(await call('/designs', { method: 'POST', body: request, signal }), { onProgress, signal });
   },
+
+  // A redesign from a change the user wrote: the service turns the change into a new brief and
+  // designs it on the same land. `request` is the brief the design was made from, when known.
+  // Resolves like createDesign, plus `request`: the brief the change became.
+  async editDesign({ design, request = null, change }, { onProgress, signal } = {}) {
+    return finishJob(await call('/designs/edit', { method: 'POST', body: { design, request, change }, signal }), { onProgress, signal });
+  },
+
 
   // Whether the service has site data for a spot: { covered, message }. null when unknown (no
   // service, or one without this endpoint), so nothing is blocked on a guess.

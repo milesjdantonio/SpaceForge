@@ -717,3 +717,15 @@ tfoot td { font-weight: 600; }
 .estimate-note svg { width: 18px; height: 18px; flex: none; color: var(--warning); margin-top: 2px; }
 .walk-stairs { top: auto; bottom: var(--margin); transform: none; }
 .hint-msg.is-problem { color: var(--negative); }
+
+/* Change this design: a written change, redesigned by Gemma. */
+.change-design { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel-2); }
+.change-design > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; font-weight: 600; list-style: none; }
+.change-design > summary::-webkit-details-marker { display: none; }
+.change-design > summary svg { width: 18px; height: 18px; color: var(--amber); }
+.change-design form { display: grid; gap: 8px; padding: 0 12px 12px; }
+.change-label { font-size: 0.875rem; color: var(--muted); }
+.change-design textarea { width: 100%; min-height: 72px; resize: vertical; padding: 8px 10px; border-radius: var(--radius-small); border: 1px solid var(--border); background: var(--panel); color: var(--ink); font: inherit; }
+.change-design textarea:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.change-error { color: var(--negative); font-size: 0.875rem; }
+.change-design .btn-primary { justify-self: start; }

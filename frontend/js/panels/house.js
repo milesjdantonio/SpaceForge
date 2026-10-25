@@ -24,7 +24,7 @@ const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['
 
 // `name` is the person's own name for the building (onRename changes it); `placement` is where it
 // stands now; `onShare` shares it (a building link, or the land for the sample).
-export function renderHousePanel(el, { design, estimate, preview, onWalk, onPreview, onShare, onSave, saved = false, name = null, onRename = null, placement = design.placement, shared = false }) {
+export function renderHousePanel(el, { design, estimate, preview, onWalk, onPreview, onChangeDesign, onShare, onSave, saved = false, name = null, onRename = null, placement = design.placement, shared = false }) {
   let tab = 'overview';
   let level = 0;
   // The panel element is shared; drop the listeners an earlier house left on it.
@@ -66,6 +66,16 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
       <button type="button" class="btn" data-share>${icon('share')}<span>${design.sample ? 'Share site' : 'Share'}</span></button>
     </div>
     <p class="note">To move or turn it, choose Move beside the building on the map.</p>
+    ${onChangeDesign ? `<details class="change-design">
+      <summary>${icon('edit')}<span>Change this design</span></summary>
+      <form data-change novalidate>
+        <label class="change-label" for="change-text">What should change?</label>
+        <textarea id="change-text" name="change" rows="3" maxlength="600" placeholder="For example: add a fourth bedroom, make it round, brick instead of siding"></textarea>
+        <p class="change-error" role="alert" hidden></p>
+        <p class="note">Gemma rewrites the brief with your change and designs the building again on this land, in about a minute. The new design replaces this one${saved ? ' in My Builds' : ''}.</p>
+        <button type="submit" class="btn btn-primary">${icon('retry')}<span>Redesign</span></button>
+      </form>
+    </details>` : ''}
     <div class="tabs" role="tablist" aria-label="Details">
       ${TABS.map(([id, name]) => `<button type="button" role="tab" id="tab-${id}" aria-controls="tabpanel" aria-selected="${id === tab}" data-tab="${id}">${name}</button>`).join('')}
     </div>
@@ -176,7 +186,24 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
     if (e.target.closest('[data-preview]')) onPreview?.();
     if (e.target.closest('[data-expand]')) expandPlan();
     if (e.target.closest('[data-share]')) onShare?.();
-    if (e.target.closest('[data-rename]')) startRename();  }, { signal });
+    if (e.target.closest('[data-rename]')) startRename();
+  }, { signal });
+  // Change this design: the written change goes to Gemma, which redesigns the building from it.
+  el.addEventListener('submit', (e) => {
+    const form = e.target.closest('[data-change]');
+    if (!form) return;
+    e.preventDefault();
+    const text = form.elements.change.value.trim();
+    const error = form.querySelector('.change-error');
+    if (text.length < 3) {
+      error.hidden = false;
+      error.textContent = 'Write what should change, for example “add a fourth bedroom”.';
+      form.elements.change.focus();
+      return;
+    }
+    error.hidden = true;
+    onChangeDesign?.(text);
+  }, { signal });
   // The plan full screen; picking a floor there shows the same floor here afterwards.
   function expandPlan() {
     openPlanViewer({ design, level, title, onLevel: (i) => { if (i !== level) { level = i; if (tab === 'plans') draw(); } } });

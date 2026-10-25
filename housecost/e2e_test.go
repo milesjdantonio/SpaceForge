@@ -45,6 +45,9 @@ func (f *fakeGemma) ask(msgs []Msg, maxTokens int) (string, error) {
 	prompt := msgs[0].Text
 	last := msgs[len(msgs)-1].Text
 	switch {
+	case strings.Contains(prompt, "The user wants it changed"):
+		f.calls = append(f.calls, "edit")
+		return `{"designPrompt": "A bright family house, now with a fourth bedroom and a round plan.", "bedrooms": 4}`, nil
 	case strings.Contains(prompt, "site-feasibility engineer"):
 		f.calls = append(f.calls, "assessment")
 		slope := echoRe["slope"].FindStringSubmatch(prompt)[1]
