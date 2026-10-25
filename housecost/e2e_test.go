@@ -30,6 +30,9 @@ func fakeSite(q SiteQuery) (Site, error) {
 func TestPipelineEveryHousingType(t *testing.T) {
 	for _, ht := range HousingTypes {
 		t.Run(ht, func(t *testing.T) {
+			if isSiteType(ht) {
+				t.Skip("sites have their own test (sites_test.go)")
+			}
 			r := testRequest(ht)
 			if ht == "house" {
 				r.Advanced.Extras = []string{"porch", "deck"}

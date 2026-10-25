@@ -48,6 +48,9 @@ func FitCheck(r Request) (FitReply, error) {
 	local, _ := localRing(ring)
 	setback := r.Setback()
 	out := FitReply{Floors: *r.Brief.Floors, BuildableM2: math.Round(buildableArea(local, setback))}
+	if isSiteType(ht) {
+		return siteFit(r, out)
+	}
 
 	p := DefaultProgram(r)
 	if f, err := fitLayout(p, local, setback, nil); err == nil {

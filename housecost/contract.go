@@ -111,7 +111,8 @@ type ClientInfo struct {
 }
 
 var (
-	HousingTypes    = []string{"house", "tiny-home", "townhouse", "duplex", "mansion", "villa", "apartment", "condo", "dorm", "hotel"}
+	HousingTypes    = []string{"house", "tiny-home", "townhouse", "duplex", "mansion", "villa", "apartment", "condo", "dorm", "hotel",
+		"neighborhood", "trailer-park", "manufactured"}
 	Styles          = []string{"modern", "farmhouse", "craftsman", "cabin", "mediterranean", "prairie", "contemporary", "brick-traditional"}
 	Qualities       = []string{"essential", "standard", "premium"}
 	Structures      = []string{"wood-frame", "steel-frame", "concrete", "mass-timber", "masonry"}
@@ -120,14 +121,16 @@ var (
 	PriorityValues  = []string{"efficiency", "maintenance", "light", "privacy", "accessible", "quiet"}
 	ExtraValues     = []string{"office", "porch", "deck", "basement", "balconies", "roof-terrace"}
 	SharingValues   = []string{"private", "suite", "hall"}
-	CommonValues    = []string{"lobby", "lounge", "study", "gym", "laundry", "kitchen", "bike-storage", "mail", "restaurant"}
+	CommonValues    = []string{"lobby", "lounge", "study", "gym", "laundry", "kitchen", "bike-storage", "mail", "restaurant",
+		"park", "playground", "pool", "clubhouse"}
 	RoomTypeValues  = []string{"single", "double", "suite"}
 	PaletteUses     = []string{"walls", "roof", "trim", "windows", "doors", "accent", "interior-walls", "floors"}
-	singleHomeTypes = []string{"house", "tiny-home", "townhouse", "duplex", "mansion", "villa"}
+	singleHomeTypes = []string{"house", "tiny-home", "townhouse", "duplex", "mansion", "villa", "manufactured"}
 	multiTypes      = []string{"apartment", "condo", "dorm", "hotel"}
 	// FloorRanges is how many storeys each type may have.
 	FloorRanges = map[string][2]int{"house": {1, 3}, "tiny-home": {1, 2}, "townhouse": {2, 4}, "duplex": {1, 3},
-		"mansion": {1, 4}, "villa": {1, 3}, "apartment": {2, 12}, "condo": {2, 12}, "dorm": {2, 12}, "hotel": {2, 12}}
+		"mansion": {1, 4}, "villa": {1, 3}, "apartment": {2, 12}, "condo": {2, 12}, "dorm": {2, 12}, "hotel": {2, 12},
+		"neighborhood": {1, 3}, "trailer-park": {1, 1}, "manufactured": {1, 1}}
 )
 
 func isMulti(t string) bool { return contains(multiTypes, t) }
@@ -143,6 +146,10 @@ func bedBathRange(t string) (bedLo, bedHi int, bathLo, bathHi float64) {
 		return 3, 12, 2, 14
 	case "villa":
 		return 1, 10, 1, 10
+	case "manufactured", "trailer-park":
+		return 1, 4, 1, 3
+	case "neighborhood":
+		return 1, 6, 1, 5
 	}
 	return 0, 8, 1, 6
 }
@@ -165,6 +172,10 @@ func unitCountRange(t string) (lo, hi int, ok bool) {
 		return 4, 200, true
 	case "hotel":
 		return 8, 400, true
+	case "neighborhood":
+		return 4, 150, true
+	case "trailer-park":
+		return 4, 300, true
 	}
 	return 0, 0, false
 }
@@ -254,6 +265,19 @@ func ValidateRequest(r Request) []string {
 		if !contains(RoomTypeValues, sv(b.RoomType)) {
 			add("brief.roomType must be single, double or suite for a dorm")
 		}
+	} else if ht == "trailer-park" || ht == "manufactured" {
+		if ht == "trailer-park" && (b.UnitCount == nil || *b.UnitCount < 4 || *b.UnitCount > 300) {
+			add("brief.unitCount (home pads) must be 4–300 for a trailer park")
+		}
+		if sv(b.RoomType) != "single" && sv(b.RoomType) != "double" {
+			add("brief.roomType must be single (single-wide homes) or double (double-wide homes) for a %s", ht)
+		}
+		if b.Bedrooms == nil || *b.Bedrooms < 1 || *b.Bedrooms > 4 {
+			add("brief.bedrooms is required (1–4 for %s)", ht)
+		}
+		if b.Bathrooms == nil || *b.Bathrooms < 1 || *b.Bathrooms > 3 || math.Mod(*b.Bathrooms*2, 1) != 0 {
+			add("brief.bathrooms is required (1–3 for %s, in steps of 0.5)", ht)
+		}
 	} else if ht == "hotel" {
 		if b.UnitCount == nil || *b.UnitCount < 8 || *b.UnitCount > 400 {
 			add("brief.unitCount (guest rooms) must be 8–400 for a hotel")
@@ -274,6 +298,10 @@ func ValidateRequest(r Request) []string {
 			add("brief.bathrooms is required (%g–%g for %s, in steps of 0.5)", bathLo, bathHi, ht)
 		}
 		switch ht {
+		case "neighborhood":
+			if b.UnitCount == nil || *b.UnitCount < 4 || *b.UnitCount > 150 {
+				add("brief.unitCount (homes) must be 4–150 for a neighborhood")
+			}
 		case "townhouse":
 			if b.UnitCount == nil || *b.UnitCount < 2 || *b.UnitCount > 12 {
 				add("brief.unitCount must be 2–12 for townhouses")
@@ -653,6 +681,8 @@ type Output struct {
 	Request  json.RawMessage `json:"request"`
 	Design   *Design         `json:"design"`
 	Estimate *Estimate       `json:"estimate"`
+	// SiteDesign is a neighborhood or trailer park (terrasim.design/3, sites.go); Design is then nil.
+	SiteDesign *SiteDesign `json:"siteDesign,omitempty"`
 	Report   Report          `json:"report"`
 }
 
@@ -664,4 +694,17 @@ func title(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// DesignID is the id of what the run made: a building or a site.
+func (o *Output) DesignID() string {
+	switch {
+	case o == nil:
+		return ""
+	case o.SiteDesign != nil:
+		return o.SiteDesign.ID
+	case o.Design != nil:
+		return o.Design.ID
+	}
+	return ""
 }

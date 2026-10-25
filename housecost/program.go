@@ -91,6 +91,14 @@ func DefaultProgram(r Request) Program {
 		p.GarageCars = 1
 	case "duplex":
 		p.UnitCount = 2
+	case "manufactured":
+		p.UnitCount, p.GarageCars = 1, 0
+		p.RoofType, p.RoofPitch = "gable", 0.25
+		p.Cladding = or(sv(a.Cladding), "lap-siding")
+		if b.AreaM2 == nil {
+			// Single- or double-wide decides the size, not Gemma.
+			p.AreaM2, p.AreaFromGemma = manufacturedArea(p.RoomType, p.Bedrooms), false
+		}
 	case "mansion":
 		p.UnitCount = 1
 		p.GarageCars = 3
@@ -335,7 +343,7 @@ func ValidateProgram(pr ProgramReply, r Request, s Site, a Assessment) []string 
 	if pr.Shape != "" && !contains([]string{ShapeRect, ShapeRound, ShapeLand, ShapeL, ShapeU, ShapeCourt}, pr.Shape) {
 		add("footprintShape must be rectangle, l, u, courtyard, round or land.")
 	}
-	if r.Brief.AreaM2 == nil && !roomsNotHomes(ht) {
+	if r.Brief.AreaM2 == nil && !roomsNotHomes(ht) && !isManufactured(ht) {
 		lo, hi := areaRange(ht)
 		if pr.AreaM2 == nil {
 			add("areaM2: the user left the living area to you; give it in m² (%.0f–%.0f for %s).", lo, hi, ht)
@@ -600,7 +608,9 @@ basement. Lean premium. A villa is a relaxed, open home that lives outdoors: ter
 low hip or tile roofs, an open living room onto a terrace (keep "deck" in extras). A hotel is guest
 rooms off corridors (brief.unitCount rooms; brief.roomType single = king rooms, double = two-queen
 rooms, suite = suites) over a ground floor with a lobby and the common spaces you choose; a
-restaurant is the usual one. Hotels are usually flat-roofed.
+restaurant is the usual one. Hotels are usually flat-roofed. A manufactured home is a factory-built
+single-wide (brief.roomType single, about 4.3 m deep) or double-wide (double, about 8 m deep) on a
+pad: one floor, a low gable roof, siding, no garage (garageCars 0).
 
 Decide:
 - style, quality, structure, cladding, roofing (keep the user's non-null choices; choose the rest
@@ -659,6 +669,10 @@ func areaRange(ht string) (float64, float64) {
 		return 120, 1200
 	case "mansion":
 		return 350, 3000
+	case "manufactured":
+		return 40, 200
+	case "neighborhood":
+		return 70, 400
 	default:
 		return 50, 900
 	}

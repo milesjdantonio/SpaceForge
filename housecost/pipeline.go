@@ -255,6 +255,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	if len(took) > 0 {
 		fmt.Fprintf(log, "From the description: %s\n", strings.Join(took, ", "))
 	}
+	if isSiteType(sv(r.HousingType)) {
+		return RunSiteRequest(r, raw, dp, out)
+	}
 	ring, _ := r.SiteRing()
 	setback := r.Setback()
 	var cLng, cLat float64

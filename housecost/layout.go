@@ -143,6 +143,9 @@ func BuildLayout(p Program, variant int) (*Layout, error) {
 		}
 		return l, err
 	}
+	if isManufactured(p.HousingType) && p.RoomType == "single" {
+		return layoutSingleWide(p, variant)
+	}
 	if isWingShape(p.Shape) && wingHomeTypes(p.HousingType) {
 		l, err := layoutWings(p, variant)
 		if err != errWingTooBig {
@@ -195,6 +198,8 @@ func homePresets(p Program) []homePreset {
 		ps = []homePreset{{6.0, 1.6, 5.6}, {5.4, 1.6, 5.0}, {7.0, 1.8, 6.4}}
 	case "villa":
 		ps = []homePreset{{5.6, 1.4, 5.2}, {5.0, 1.4, 4.6}, {6.4, 1.4, 5.8}}
+	case "manufactured":
+		ps = []homePreset{{3.8, 1.0, 3.4}, {3.6, 1.0, 3.2}, {4.0, 1.0, 3.6}} // a double-wide
 	default:
 		ps = []homePreset{{5.0, 1.2, 4.6}, {4.4, 1.2, 4.0}, {6.0, 1.2, 5.4}}
 	}

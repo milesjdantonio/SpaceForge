@@ -40,6 +40,23 @@ func testRequest(ht string) Request {
 		r.Brief.BudgetUSD = ptr(4000000.0)
 	case "villa":
 		r.Brief.Floors, r.Brief.AreaM2, r.Brief.Bedrooms, r.Brief.Bathrooms = ptr(1), ptr(320.0), ptr(4), ptr(4.0)
+	case "manufactured":
+		r.Brief.Floors, r.Brief.RoomType, r.Brief.Bedrooms, r.Brief.Bathrooms = ptr(1), ptr("single"), ptr(2), ptr(1.0)
+	case "neighborhood", "trailer-park":
+		// A 220 × 160 m piece of land.
+		var big [][]*float64
+		for _, p := range []Pt{{-110, -80}, {110, -80}, {110, 80}, {-110, 80}, {-110, -80}} {
+			ll := f.ToLngLat(p)
+			big = append(big, []*float64{ptr(ll[0]), ptr(ll[1])})
+		}
+		r.Site.Geometry.Coordinates = [][][]*float64{big}
+		r.Brief.Floors, r.Brief.UnitCount, r.Brief.Bedrooms, r.Brief.Bathrooms = ptr(1), ptr(16), ptr(3), ptr(2.0)
+		r.Brief.BudgetUSD = ptr(9000000.0)
+		if ht == "neighborhood" {
+			r.Brief.Floors, r.Brief.AreaM2 = ptr(2), ptr(150.0)
+		} else {
+			r.Brief.RoomType, r.Brief.Bedrooms, r.Brief.Bathrooms = ptr("double"), ptr(2), ptr(1.5)
+		}
 	case "hotel":
 		r.Brief.Floors, r.Brief.UnitCount, r.Brief.RoomType = ptr(4), ptr(60), ptr("double")
 		r.Brief.BudgetUSD = ptr(12000000.0)

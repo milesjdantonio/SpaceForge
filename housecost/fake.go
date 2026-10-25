@@ -37,6 +37,9 @@ func (f *fakeGemma) ask(msgs []Msg, maxTokens int) (string, error) {
 	case strings.Contains(prompt, "The user wants it changed"):
 		f.calls = append(f.calls, "edit")
 		return `{"designPrompt": "A bright family house, now with a fourth bedroom and a round plan.", "bedrooms": 4}`, nil
+	case strings.Contains(prompt, "site planner naming"):
+		f.calls = append(f.calls, "site words")
+		return `{"title": "Test Commons", "summary": "A test neighborhood.", "description": ["Streets, homes and a park."]}`, nil
 	case strings.Contains(prompt, "site-feasibility engineer"):
 		f.calls = append(f.calls, "assessment")
 		if f.t == nil {

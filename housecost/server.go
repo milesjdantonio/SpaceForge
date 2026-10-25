@@ -508,7 +508,7 @@ func (s *server) run(j *job, raw []byte, edit ...EditRequest) {
 		s.markCancelled(j)
 		return
 	}
-	if res == nil || res.Design == nil {
+	if res.DesignID() == "" {
 		msg := "The design service couldn't design this site."
 		if res != nil && len(res.Report.Problems) > 0 {
 			msg = strings.Join(res.Report.Problems, " ")
@@ -519,7 +519,7 @@ func (s *server) run(j *job, raw []byte, edit ...EditRequest) {
 		fail(msg)
 		return
 	}
-	id := res.Design.ID
+	id := res.DesignID()
 	s.mu.Lock()
 	s.results[id] = res
 	s.mu.Unlock()
@@ -671,6 +671,10 @@ func (s *server) part(w http.ResponseWriter, id, which string) {
 	}
 	switch which {
 	case "design":
+		if res.SiteDesign != nil {
+			writeJSON(w, 200, res.SiteDesign)
+			return
+		}
 		writeJSON(w, 200, res.Design)
 	case "estimate":
 		if res.Estimate == nil {
