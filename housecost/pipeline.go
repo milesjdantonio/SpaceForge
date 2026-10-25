@@ -59,6 +59,9 @@ func FetchSiteData(q SiteQuery) (Site, error) {
 	lat, lon := q.Footprint[1], q.Footprint[0]
 	ft := q.SetbackM / MPerFt
 	s := Site{Setbacks: Setbacks{ft, ft, ft}, LotFt: q.SiteDimsFt}
+	if !inUSData(q.Centroid[0], q.Centroid[1]) {
+		return fetchWorldSite(q, s)
+	}
 	var mu sync.Mutex
 	warn := func(label string, err error) {
 		mu.Lock()
@@ -315,6 +318,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	site.Terrain.FootprintFt = fmt.Sprintf("%.0f x %.0f", f0.l.W/MPerFt, f0.l.D/MPerFt)
 	site.Terrain.EnvelopeFt = fmt.Sprintf("%.0f m² site with a %.0f m setback (placement checked by code)", siteArea, setback)
 	warnings = append(warnings, site.Warnings...)
+	if site.Estimated {
+		cautions = append(cautions, site.Warnings...) // outside the US: every assumption is a caution
+	}
 	out.Report.Site = &site
 
 	// 4. Gemma: site assessment
@@ -419,6 +425,7 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	d.CreatedAt = now.UTC().Format(time.RFC3339)
 	finishDesign(d, p, l, fin.sp, frame, ring, siteArea)
 	d.Site.Soil = soilSummary(site, a)
+	d.Site.Estimated = site.Estimated
 
 	if probs := CheckDesign(d, ring, setback); len(probs) > 0 {
 		out.Design = d
@@ -594,7 +601,11 @@ func soilSummary(s Site, a Assessment) *SiteSoil {
 	if len(so.Components) > 0 {
 		name = so.Components[0].Component
 	}
-	return &SiteSoil{Source: "USDA Soil Data Access", SoilName: name, USCS: so.GoverningUSCS, BearingPSF: so.GoverningBearing,
+	source := "USDA Soil Data Access"
+	if s.Estimated {
+		source = "ISRIC SoilGrids estimate (outside the US)"
+	}
+	return &SiteSoil{Source: source, SoilName: name, USCS: so.GoverningUSCS, BearingPSF: so.GoverningBearing,
 		ShrinkSwell: so.ShrinkSwell, BedrockIn: so.MinBedrockIn, WaterTableIn: so.MinWaterIn,
 		Foundation: humanize(a.FoundationType), FoundationWhy: a.FoundationReason, Note: so.Note}
 }

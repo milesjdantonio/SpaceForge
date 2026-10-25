@@ -454,10 +454,10 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   // Whether the design service has site data for this land; if not, say so before anything is sent.
   // Outside the site data's coverage it can still be designed, with typical conditions assumed.
   coverage?.then((c) => {
-    if (!c || c.covered !== false || !el.isConnected) return;
+    if (!c || !(c.covered === false || c.estimated) || !el.isConnected) return;
     const box = el.querySelector('[data-coverage]');
     box.classList.add('is-note');
-    box.innerHTML = `${icon('alert')}<div><strong>Outside TerraSim’s detailed site data</strong><p>Soil, flood, earthquake and local wage data cover the US. Here the design assumes typical conditions and is marked as estimated, so it may not be perfect. Slope and climate are still measured.</p></div>`;
+    box.innerHTML = `${icon('alert')}<div><strong>Outside TerraSim’s detailed site data</strong><p>Detailed soil, flood, earthquake and wage data cover the US. Here elevation comes from worldwide maps and soil from SoilGrids; flood, earthquake risk and prices are typical assumptions, all listed with the design. It’s marked as estimated, so it may not be perfect.</p></div>`;
     box.hidden = false;
   });
 }

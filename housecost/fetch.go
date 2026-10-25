@@ -638,6 +638,8 @@ type Site struct {
 	Setbacks Setbacks   `json:"setbacks_ft"`
 	LotFt    [2]float64 `json:"lot_ft"`
 	Warnings []string   `json:"warnings"`
+	// Estimated is set outside the US, where worldwide sources and assumptions stand in (world.go).
+	Estimated bool `json:"estimated,omitempty"`
 }
 
 func GatherSite(cfg Config, log io.Writer) (Site, error) {

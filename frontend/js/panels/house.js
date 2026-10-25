@@ -47,6 +47,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
       </div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
+    ${design.site?.estimated ? `<p class="estimate-note">${icon('alert')}<span><strong>Estimated site data.</strong> This land is outside the US, so elevation and soil come from worldwide maps and flood, earthquake and price figures are typical assumptions. They’re listed under Overview, Cautions.</span></p>` : ''}
     ${design.sample ? `<p class="sample-note">${preview
       ? 'This is TerraSim’s one sample house, placed and turned to fit your outline. A real design will be drawn for your land once the design service is connected.'
       : 'Sample data: this house shows what the design service returns.'}</p>` : ''}

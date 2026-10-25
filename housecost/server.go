@@ -406,16 +406,6 @@ func (s *server) create(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 422, map[string]string{"message": "The design service can't use this request: " + strings.Join(probs, " ")})
 		return
 	}
-	if ring, err := req.SiteRing(); err == nil && len(ring) > 0 {
-		var lng, lat float64
-		for _, p := range ring {
-			lng, lat = lng+p[0], lat+p[1]
-		}
-		if !covered(lng/float64(len(ring)), lat/float64(len(ring))) {
-			writeJSON(w, 422, map[string]string{"message": coverageMessage})
-			return
-		}
-	}
 	j := newJob()
 	s.mu.Lock()
 	s.jobs[j.ID] = j
@@ -649,7 +639,7 @@ var coverageBoxes = []struct {
 	{"Puerto Rico", -67.4, 17.8, -65.2, 18.6},
 }
 
-const coverageMessage = "TerraSim's site data (soil, elevation, flood zones, seismic risk and local wages) only covers the United States, so it can't design for this land yet. Outline land in the US to try it."
+const coverageMessage = "Outside the US, TerraSim estimates the site: elevation from worldwide maps, soil from SoilGrids, and typical flood, earthquake and price assumptions. The design is labelled estimated."
 
 func covered(lng, lat float64) bool {
 	for _, b := range coverageBoxes {
@@ -667,9 +657,10 @@ func (s *server) coverage(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"message": "Give lng and lat."})
 		return
 	}
+	// Every place can be designed for; outside the US the site data is estimated (world.go).
 	if covered(lng, lat) {
 		writeJSON(w, 200, map[string]any{"covered": true})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"covered": false, "message": coverageMessage})
+	writeJSON(w, 200, map[string]any{"covered": true, "estimated": true, "message": coverageMessage})
 }

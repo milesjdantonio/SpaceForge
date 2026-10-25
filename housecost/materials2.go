@@ -39,10 +39,11 @@ func ParseMaterialPlan(text string) (MaterialPlan, error) {
 	if !ok {
 		fe.add("shell: field required (a list)")
 	}
-	for i, x := range shell {
+	for _, x := range shell {
+		// A broken row is dropped rather than failing the reply: if it mattered, the checks
+		// below ask for what's missing.
 		o, ok := x.(map[string]any)
 		if !ok {
-			fe.add("shell[%d]: must be an object", i)
 			continue
 		}
 		var p Pick
@@ -51,12 +52,10 @@ func ParseMaterialPlan(text string) (MaterialPlan, error) {
 		if c, ok := o["count"]; ok && c != nil {
 			if n, ok := asInt(c); ok {
 				p.Count = &n
-			} else {
-				fe.add("shell[%d].count: must be an integer or null", i)
 			}
 		}
 		if p.CatalogID == "" {
-			fe.add("shell[%d].catalog_id: field required", i)
+			continue
 		}
 		mp.Shell = append(mp.Shell, p)
 	}
@@ -64,10 +63,9 @@ func ParseMaterialPlan(text string) (MaterialPlan, error) {
 	if !ok {
 		fe.add("rooms: field required (a list)")
 	}
-	for i, x := range rooms {
+	for _, x := range rooms {
 		o, ok := x.(map[string]any)
 		if !ok {
-			fe.add("rooms[%d]: must be an object", i)
 			continue
 		}
 		var p RoomPick
@@ -77,12 +75,10 @@ func ParseMaterialPlan(text string) (MaterialPlan, error) {
 		if c, ok := o["count"]; ok && c != nil {
 			if n, ok := asInt(c); ok {
 				p.Count = &n
-			} else {
-				fe.add("rooms[%d].count: must be an integer or null", i)
 			}
 		}
 		if p.CatalogID == "" || p.RoomType == "" {
-			fe.add("rooms[%d]: roomType and catalog_id are required", i)
+			continue
 		}
 		mp.Rooms = append(mp.Rooms, p)
 	}

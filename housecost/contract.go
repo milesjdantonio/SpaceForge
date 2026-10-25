@@ -194,8 +194,8 @@ func ValidateRequest(r Request) []string {
 		add("%v", err)
 	} else {
 		for _, p := range ring {
-			if !InUS(p[1], p[0]) {
-				add("site point [%g, %g] is outside the US (points are [longitude, latitude])", p[0], p[1])
+			if math.Abs(p[1]) > 85 || math.Abs(p[0]) > 180 {
+				add("site point [%g, %g] isn't a place on Earth (points are [longitude, latitude])", p[0], p[1])
 				break
 			}
 		}
@@ -340,6 +340,9 @@ type DSite struct {
 	Outline []Pt      `json:"outline"`
 	AreaM2  float64   `json:"areaM2"`
 	Soil    *SiteSoil `json:"soil,omitempty"`
+	// Estimated is true outside the US: worldwide sources and stated assumptions stood in for
+	// the US site data (the cautions list them).
+	Estimated bool `json:"estimated,omitempty"`
 }
 
 // SiteSoil is what the soil survey found under the building, and what the design did about it.

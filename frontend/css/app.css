@@ -711,3 +711,7 @@ tfoot td { font-weight: 600; }
 .orbit-label { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--ink); font-weight: 600; }
 .orbit-label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .orbit-label svg { width: 18px; height: 18px; color: var(--amber); flex: none; }
+
+/* A design made outside the US, from estimated site data. */
+.estimate-note { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--warning) 50%, transparent); background: color-mix(in srgb, var(--warning) 10%, transparent); color: var(--ink); font-size: 0.9375rem; }
+.estimate-note svg { width: 18px; height: 18px; flex: none; color: var(--warning); margin-top: 2px; }

@@ -172,6 +172,7 @@ The roof, garage, porch, parking and materials are in `exterior`.
 |---|---|
 | `site.outline` | The user's outline, copied from the request, `[lng, lat]` points (not closed). |
 | `site.areaM2` | Its area. |
+| `site.estimated` | `true` when the land is outside the US and the site data is estimated (see "Where site data reaches"). Left out otherwise. |
 | `site.soil` | What the soil survey found under the building and the foundation chosen for it: `{ source, name, uscsClass, bearingPsf, shrinkSwell, depthToBedrockIn, depthToWaterTableIn, foundation, foundationReason, note }`. |
 | `placement.origin` | `[lng, lat]` of the building's `[0, 0]` corner on the ground (front left). |
 | `placement.xAxisBearingDeg` | Compass bearing of the building's x axis (0 = north, 90 = east). The y axis is the x axis turned 90° counter-clockwise (seen from above), so the front (y = 0) faces this bearing plus 90°. For x pointing east, y points north and the front faces south. |
@@ -405,7 +406,10 @@ accepts that.)
 
 ## Where site data reaches
 
-The site data (USDA soil, USGS elevation and seismic, FEMA flood zones, BLS wages) covers the United
-States. The design service answers `GET /api/coverage?lng=…&lat=…` with `{ covered, message }`; the
-website asks as soon as land is outlined and blocks sending, with that message, when it isn't covered.
-`POST /designs` refuses such land with a 422 and the same message.
+The detailed site data (USDA soil, USGS elevation and seismic, FEMA flood zones, BLS wages) covers
+the United States. Anywhere else the design is still made, from worldwide sources (Terrarium elevation
+tiles, ISRIC SoilGrids soil, Open-Meteo climate) and stated assumptions (no flood zone, moderate
+earthquake risk, US average prices in USD), and `design.site.estimated` is `true`; every assumption
+is in `overview.cautions`. `GET /api/coverage?lng=…&lat=…` answers `{ covered: true }` in the US and
+`{ covered: true, estimated: true, message }` elsewhere; the website shows that message in the brief
+and labels the finished design "Estimated site data".
