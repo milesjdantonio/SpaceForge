@@ -15,12 +15,14 @@ cd frontend && npm start                                    # website on :5173
 ```
 
 The Gemini key goes in `GEMINI_API_KEY` in `.env` or in `APIKey.txt` (both git-ignored). The site
-finds the design service on :8000 by itself. Without the storage API and emulator the site still
+uses the account API for generation. Configure GENERATION_URL and the same random
+GENERATION_SERVICE_TOKEN in both Go processes (see BACKEND.md). Without the storage API and emulator the site still
 works, but Sign in can't be reached (it says so and offers to carry on without an account).
 
-- `housecost/` (Gemma design service, :8000): job queue, step tracking, log streaming, coverage,
-  results in `housecost/results/`. No accounts.
-- `backend/` (Noah, :8080): Firebase sign-in and private building storage in Postgres. Routes in
+- `housecost/` (private design worker, :8000): service-token protected computation,
+  step streaming and coverage. No local queue or result files in server mode.
+- `backend/` (:8080): Firebase sign-in, private projects/buildings, durable concurrent
+  SQL jobs with lease recovery, and atomic generated-result persistence. Routes in
   [docs/api.md](docs/api.md); the saved document in [contracts/STORAGE.md](contracts/STORAGE.md).
 
 ## Decisions
@@ -45,6 +47,13 @@ works, but Sign in can't be reached (it says so and offers to carry on without a
 - **Backend can change** when a feature needs it.
 
 ## Done
+
+**Backend architecture:** Account-authorized generation, server-owned atomic saving,
+durable SQL jobs with fenced recovery and configurable workers, shared project/land
+groups (including migration of existing buildings), project controls in My Builds,
+and frontend coordination split into controllers. Query-string provider overrides
+are removed. Offline SQL tests cover ownership, restart recovery, duplicate claims,
+and stale completions.
 
 **This branch, merged into main:**
 - Size check in the brief (`lib/fit.js`): fits / tight / too big (with a floors suggestion) / small.

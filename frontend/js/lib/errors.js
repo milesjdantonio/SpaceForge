@@ -13,11 +13,21 @@ export function explainDesignError(err, { request = null, fit = null } = {}) {
   const keep = 'Your land and brief are saved in My Builds.';
   const fixes = suggestFixes(err, { brief, fit, type: request?.housingType });
 
-  if (err?.code === 'not-connected') {
+  if (err?.reason === 'design-does-not-fit') {
+    return {
+      title: 'The building does not fit this land',
+      text: msg,
+      next: 'Reduce the building size or number of homes, or outline a larger lot. Setbacks need clear space around the footprint.',
+      actions: ['edit', 'outline', 'preview'],
+      fixes,
+    };
+  }
+
+  if (err?.code === 'not-connected' || err?.code === 'not_connected') {
     return {
       title: 'The design service isn’t connected',
       text: `Nothing was sent. ${keep}`,
-      next: 'Start the design service (cd housecost, then go run . -serve) and try again. Meanwhile you can place the sample house on your land.',
+      next: 'Generation is unavailable right now. Try again later, or place the sample house on your land.',
       actions: ['preview', 'retry', 'edit'],
       fixes,
     };

@@ -14,6 +14,11 @@ func TestConfigurationSecurity(t *testing.T) {
 		valid  bool
 	}{
 		{"local emulator", nil, true},
+		{"generation requires service token", map[string]string{"GENERATION_URL": "http://127.0.0.1:8000"}, false},
+		{"private generation", map[string]string{"GENERATION_URL": "http://127.0.0.1:8000", "GENERATION_SERVICE_TOKEN": "test-service-token-at-least-32-characters"}, true},
+		{"remote cleartext generation rejected", map[string]string{"GENERATION_URL": "http://worker.example", "GENERATION_SERVICE_TOKEN": "test-service-token-at-least-32-characters"}, false},
+		{"generation URL cannot carry credentials", map[string]string{"GENERATION_URL": "https://user:password@worker.example", "GENERATION_SERVICE_TOKEN": "test-service-token-at-least-32-characters"}, false},
+		{"generation workers bounded", map[string]string{"GENERATION_WORKERS": "0"}, false},
 		{"production rejects emulator", map[string]string{"APP_ENV": "production"}, false},
 		{"unset environment fails closed", map[string]string{"APP_ENV": ""}, false},
 		{"unknown environment", map[string]string{"APP_ENV": "staging"}, false},

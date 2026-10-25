@@ -1,26 +1,10 @@
-// Web server mode: the TerraSim website and its design API in one process.
-//
-//	go run . -serve              website and API on http://localhost:8000
-//	go run . -serve -addr :9000  another port
-//
-// The website (../frontend) is served at /, and the API at /api, following contracts/STORAGE.md:
-//
-//	GET  /api/health                         { ok, model, key }
-//	POST /api/designs                        a terrasim.design-request/2  ->  202 { jobId }
-//	GET  /api/designs/jobs/{id}?since=N      { status, progress, message, steps, log, logFrom, designId, error }
-//	GET  /api/designs/{id}                   terrasim.design/2 (with its cost)
-//	GET  /api/designs/{id}/estimate          terrasim.estimate/1
-//	GET  /api/designs/{id}/report            housecost.report/1
-//
-// Each request runs the same pipeline as -request (site data, three Gemma calls, layout, pricing).
-// Progress follows the pipeline's own steps; each step's expected length starts from a typical run
-// and is replaced by the measured length as designs complete, so the bar gets more accurate.
-// Jobs run one at a time: the free Gemini tier and the free data sources are rate-limited.
-// Finished results are kept in memory and written to results/<design id>.json.
+// Private generation worker. Account authorization, jobs and persistence live in backend/.
 package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -259,7 +243,6 @@ type jobLog struct {
 }
 
 func (w *jobLog) Write(p []byte) (int, error) {
-	os.Stdout.Write(p)
 	w.buf.Write(p)
 	for {
 		line, err := w.buf.ReadString('\n')
@@ -278,254 +261,198 @@ func (w *jobLog) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// ---- the server ---------------------------------------------------------------------------------
+// ---- the private worker service ---------------------------------------------------------------
 
 type server struct {
-	newGemma func() (*Gemma, error)
-	keyFile  string
-	model    string
-	mu       sync.Mutex
-	jobs     map[string]*job
-	results  map[string]*Output
-	queue    chan func()
-	resDir   string
-	// deps builds the pipeline's connections for one design; tests swap it for stand-ins.
-	deps func(log io.Writer, raw []byte) (Deps, error)
+	keyFile, model, token string
+	deps                  func(context.Context, io.Writer, []byte) (Deps, error)
 }
 
 func serve(addr, siteDir, model, keyFile string, newGemma func() (*Gemma, error)) error {
-	s := &server{newGemma: newGemma, keyFile: keyFile, model: model, jobs: map[string]*job{}, results: map[string]*Output{},
-		queue: make(chan func(), 64), resDir: "results"}
-	s.deps = func(log io.Writer, raw []byte) (Deps, error) {
-		g, err := s.newGemma()
+	token := os.Getenv("GENERATION_SERVICE_TOKEN")
+	if len(token) < 32 {
+		return fmt.Errorf("GENERATION_SERVICE_TOKEN must contain at least 32 characters")
+	}
+	s := &server{keyFile: keyFile, model: model, token: token}
+	s.deps = func(ctx context.Context, log io.Writer, raw []byte) (Deps, error) {
+		g, err := newGemma()
 		if err != nil {
 			return Deps{}, err
 		}
-		g.Out = log // Gemma's waiting dots, retries and slow-API notes go to the terminal too
+		g.Out, g.LogDir, g.Context = log, "", ctx
 		ov, err := LoadOverrides("prices.csv")
 		if err != nil {
 			return Deps{}, err
 		}
 		return LiveDeps(g.Ask, log, ov), nil
 	}
-	return s.listen(addr, siteDir)
+	fmt.Printf("Private design worker listening on %s\n", addr)
+	srv := &http.Server{Addr: addr, Handler: s.handler(siteDir), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 20 * time.Minute, IdleTimeout: 60 * time.Second}
+	return srv.ListenAndServe()
 }
 
-// listen serves the website and the API.
-func (s *server) listen(addr, siteDir string) error {
-	go func() {
-		for run := range s.queue {
-			run()
-		}
-	}()
-
-	abs, _ := filepath.Abs(siteDir)
-	if fileExists(filepath.Join(siteDir, "index.html")) {
-		fmt.Printf("Website: %s\n", abs)
-	} else {
-		fmt.Printf("No website found at %s (use -site); serving the API only.\n", abs)
-	}
-	if _, _, err := loadKey(s.keyFile); err != nil {
-		fmt.Printf("\nWARNING: %v\nDesigns will fail until a key is in place.\n\n", err)
-	}
-	host := addr
-	if strings.HasPrefix(host, ":") {
-		host = "localhost" + host
-	}
-	fmt.Printf("TerraSim is running: open http://%s\n", host)
-	return http.ListenAndServe(addr, s.handler(siteDir))
-}
-
-// handler is shared by the running server and HTTP integration tests.
 func (s *server) handler(siteDir string) http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", s.health)
-	mux.HandleFunc("POST /api/designs", s.create)
-	mux.HandleFunc("GET /api/coverage", s.coverage)
-	// One route for jobs/{id}, {id}, {id}/estimate and {id}/report (Go's router can't tell
-	// "jobs/{id}" from "{id}/estimate" apart on its own).
-	mux.HandleFunc("GET /api/designs/{rest...}", func(w http.ResponseWriter, r *http.Request) {
-		parts := strings.Split(strings.Trim(r.PathValue("rest"), "/"), "/")
-		switch {
-		case len(parts) == 2 && parts[0] == "jobs":
-			since, _ := strconv.Atoi(r.URL.Query().Get("since"))
-			s.jobStatus(w, parts[1], since)
-		case len(parts) == 1:
-			s.part(w, parts[0], "design")
-		case len(parts) == 2 && (parts[1] == "estimate" || parts[1] == "report"):
-			s.part(w, parts[0], parts[1])
-		default:
-			writeJSON(w, 404, map[string]string{"message": "Not found."})
+	private := http.NewServeMux()
+	private.HandleFunc("POST /internal/generate", s.generate)
+	private.HandleFunc("GET /api/coverage", s.coverage)
+	private.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, map[string]bool{"ok": true}) })
+	guard := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		values := r.Header.Values("Authorization")
+		if len(s.token) < 32 || len(values) != 1 || subtle.ConstantTimeCompare([]byte(values[0]), []byte("Bearer "+s.token)) != 1 {
+			writeJSON(w, 401, map[string]string{"message": "Service authorization required."})
+			return
 		}
+		private.ServeHTTP(w, r)
 	})
-	mux.HandleFunc("GET /api/listings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, []any{}) })
-	mux.HandleFunc("OPTIONS /api/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
-
+	mux := http.NewServeMux()
+	mux.Handle("/internal/", guard)
+	mux.Handle("/api/", guard)
 	if fileExists(filepath.Join(siteDir, "index.html")) {
 		mux.Handle("/", noCache(http.FileServer(http.Dir(siteDir))))
 	}
-	return cors(mux)
+	return mux
 }
 
-func (s *server) health(w http.ResponseWriter, r *http.Request) {
-	_, _, err := loadKey(s.keyFile)
-	writeJSON(w, 200, map[string]any{"ok": true, "service": "housecost", "model": s.model, "key": err == nil})
-}
-
-func (s *server) create(w http.ResponseWriter, r *http.Request) {
-	raw, err := io.ReadAll(io.LimitReader(r.Body, 2<<20))
-	if err != nil || !json.Valid(raw) {
-		writeJSON(w, 400, map[string]string{"message": "The request isn't valid JSON."})
+// Progress is streamed to the authenticated API, which persists safe step snapshots.
+// No local queue, result files or shared provider-reply logs are used by this path.
+func (s *server) generate(w http.ResponseWriter, r *http.Request) {
+	raw, err := io.ReadAll(io.LimitReader(r.Body, (1<<20)+1))
+	if err != nil || len(raw) > 1<<20 {
+		writeJSON(w, 413, map[string]string{"message": "Request exceeds 1 MiB."})
 		return
 	}
-	// Check the request before queueing, so a bad one is answered straight away.
-	var req Request
-	if err := json.Unmarshal(raw, &req); err != nil {
-		writeJSON(w, 400, map[string]string{"message": "The request doesn't match terrasim.design-request/2: " + err.Error()})
+	var request Request
+	if json.Unmarshal(raw, &request) != nil {
+		writeJSON(w, 400, map[string]string{"message": "Invalid design request."})
 		return
 	}
-	if probs := ValidateRequest(req); len(probs) > 0 {
-		writeJSON(w, 422, map[string]string{"message": "The design service can't use this request: " + strings.Join(probs, " ")})
+	if problems := ValidateRequest(request); len(problems) > 0 {
+		writeJSON(w, 422, map[string]string{"message": strings.Join(problems, " ")})
 		return
 	}
-	if ring, err := req.SiteRing(); err == nil && len(ring) > 0 {
+	if ring, err := request.SiteRing(); err == nil && len(ring) > 0 {
 		var lng, lat float64
 		for _, p := range ring {
-			lng, lat = lng+p[0], lat+p[1]
+			lng += p[0]
+			lat += p[1]
 		}
 		if !covered(lng/float64(len(ring)), lat/float64(len(ring))) {
 			writeJSON(w, 422, map[string]string{"message": coverageMessage})
 			return
 		}
 	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
+	defer cancel()
+	fmt.Printf("Design generation started (model=%s, type=%s).\n", s.model, sv(request.HousingType))
 	j := newJob()
-	s.mu.Lock()
-	s.jobs[j.ID] = j
-	ahead := len(s.queue)
-	s.mu.Unlock()
-	if ahead > 0 {
-		j.set(func(j *job) { j.Message = fmt.Sprintf("Queued behind %d other design%s.", ahead, plural(ahead)) })
-	}
-	select {
-	case s.queue <- func() { s.run(j, raw) }:
-	default:
-		writeJSON(w, 429, map[string]string{"message": "The design service is busy. Try again in a few minutes."})
-		return
-	}
-	writeJSON(w, 202, map[string]string{"jobId": j.ID})
-}
-
-func plural(n int) string {
-	if n == 1 {
-		return ""
-	}
-	return "s"
-}
-
-// run does one design: the same pipeline as -request, logging into the job.
-func (s *server) run(j *job, raw []byte) {
-	j.set(func(j *job) { j.Status, j.Message, j.Started = "running", "Starting the design.", time.Now() })
-	fail := func(msg string) {
-		j.finish(false)
-		j.set(func(j *job) { j.Status, j.Error, j.Partial = "failed", msg, "" })
-		fmt.Printf("[%s] failed: %s\n", j.ID, msg)
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			fail(fmt.Sprintf("The design service hit an internal error (%v).", r))
-		}
-	}()
-	log := &jobLog{j: j}
-	deps, err := s.deps(log, raw)
+	j.set(func(j *job) { j.Status = "running"; j.Message = "Starting the design."; j.Started = time.Now() })
+	deps, err := s.deps(ctx, &jobLog{j: j}, raw)
 	if err != nil {
-		fail(err.Error())
+		writeJSON(w, 503, map[string]string{"message": "Generation providers are unavailable."})
 		return
 	}
-	res, runErr := RunRequest(raw, deps)
-	if res == nil || res.Design == nil {
-		msg := "The design service couldn't design this site."
-		if res != nil && len(res.Report.Problems) > 0 {
-			msg = strings.Join(res.Report.Problems, " ")
-		} else if runErr != nil {
-			msg = runErr.Error()
-		}
-		fail(msg)
-		return
+	type finished struct {
+		result *Output
+		err    error
 	}
-	id := res.Design.ID
-	s.mu.Lock()
-	s.results[id] = res
-	s.mu.Unlock()
-	if err := os.MkdirAll(s.resDir, 0o755); err == nil {
-		b, _ := json.MarshalIndent(res, "", "  ")
-		_ = os.WriteFile(filepath.Join(s.resDir, id+".json"), b, 0o644)
-	}
-	j.finish(true)
-	j.set(func(j *job) { j.Status, j.DesignID, j.Message, j.Partial = "done", id, "Design ready.", "" })
-	fmt.Printf("[%s] done: %s\n", j.ID, id)
-}
-
-func (s *server) jobStatus(w http.ResponseWriter, id string, since int) {
-	s.mu.Lock()
-	j := s.jobs[id]
-	s.mu.Unlock()
-	if j == nil {
-		writeJSON(w, 404, map[string]string{"message": "That design job isn't known (the server may have restarted)."})
-		return
-	}
-	writeJSON(w, 200, j.view(since))
-}
-
-// part serves one part of a finished result, from memory or from results/<id>.json.
-func (s *server) part(w http.ResponseWriter, id, which string) {
-	s.mu.Lock()
-	res := s.results[id]
-	s.mu.Unlock()
-	if res == nil && !strings.ContainsAny(id, `/\.`) {
-		if b, err := os.ReadFile(filepath.Join(s.resDir, id+".json")); err == nil {
-			var o Output
-			if json.Unmarshal(b, &o) == nil {
-				res = &o
-				s.mu.Lock()
-				s.results[id] = res
-				s.mu.Unlock()
+	done := make(chan finished, 1)
+	go func() {
+		defer func() {
+			if recover() != nil {
+				done <- finished{err: fmt.Errorf("pipeline failed")}
 			}
+		}()
+		out, err := RunRequest(raw, deps)
+		done <- finished{out, err}
+	}()
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	encoder := json.NewEncoder(w)
+	send := func(value any) bool {
+		if encoder.Encode(value) != nil {
+			return false
 		}
+		return http.NewResponseController(w).Flush() == nil
 	}
-	if res == nil {
-		writeJSON(w, 404, map[string]string{"message": "No design with that id."})
+	progress := func() bool {
+		snapshot := j.view(0)
+		// Only step metadata crosses the process boundary. Raw provider logs may contain private input.
+		delete(snapshot, "log")
+		delete(snapshot, "logFrom")
+		delete(snapshot, "logTotal")
+		delete(snapshot, "logPartial")
+		return send(map[string]any{"progress": snapshot})
+	}
+	if !progress() {
 		return
 	}
-	switch which {
-	case "design":
-		writeJSON(w, 200, res.Design)
-	case "estimate":
-		if res.Estimate == nil {
-			writeJSON(w, 404, map[string]string{"message": "No estimate for this design."})
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+			if !progress() {
+				return
+			}
+		case result := <-done:
+			if result.err != nil || result.result == nil || result.result.Design == nil {
+				code, message := generationFailure(result.result, result.err)
+				j.finish(false)
+				j.set(func(j *job) { j.Status = "failed"; j.Message = message })
+				fmt.Printf("Design generation failed (code=%s).\n", code)
+				if !progress() {
+					return
+				}
+				send(map[string]string{"error": message, "code": code})
+				return
+			}
+			j.finish(true)
+			j.set(func(j *job) { j.Status = "done" })
+			if !progress() {
+				return
+			}
+			send(map[string]any{"result": map[string]any{"design": result.result.Design, "estimate": result.result.Estimate}})
+			fmt.Println("Design generation completed.")
 			return
 		}
-		writeJSON(w, 200, res.Estimate)
-	default:
-		writeJSON(w, 200, res.Report)
 	}
 }
 
-func writeJSON(w http.ResponseWriter, code int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+// Classify failures without exposing credentials, private prompts or provider replies.
+func generationFailure(out *Output, err error) (string, string) {
+	if out != nil && out.Report.Verdict == "not_feasible" {
+		fit := out.Report.Assessment == nil
+		for _, problem := range out.Report.Problems {
+			if strings.Contains(problem, "doesn't fit on the site") {
+				fit = true
+			}
+		}
+		if fit {
+			return "design-does-not-fit", "The requested building does not fit inside the land with the required setbacks. Reduce its size or number of homes, or outline a larger lot."
+		}
+		return "site-not-feasible", "The site assessment could not support this design. Adjust the brief or choose different land."
+	}
+	if err != nil {
+		message := err.Error()
+		if strings.Contains(message, "HTTP 401") || strings.Contains(message, "HTTP 403") {
+			return "model-access-denied", "The design provider rejected access. Check the server's Google API key and model permissions."
+		}
+		if strings.Contains(message, "HTTP 404") {
+			return "model-not-found", "The configured design model is unavailable. Check the server's model setting and account access."
+		}
+		if strings.Contains(message, "HTTP 429") {
+			return "provider-busy", "The design provider is rate limited. Wait a few minutes and try again."
+		}
+	}
+	return "generation-failed", "Generation could not finish. Adjust the brief or try again."
 }
 
-// cors lets a website served elsewhere (npm start on :5173) call the API.
-func cors(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Headers", "content-type")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		}
-		h.ServeHTTP(w, r)
-	})
+func writeJSON(w http.ResponseWriter, code int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(value)
 }
 
 // noCache keeps the browser from holding on to old copies of the website's files during work.

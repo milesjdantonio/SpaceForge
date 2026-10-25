@@ -110,7 +110,7 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
     await wait(300);
     print(`Brief: ${typeName(request.housingType).toLowerCase()}, ${request.aiDecides.length ? `${request.aiDecides.length} choices left to the design system` : 'every choice made by you'}.`, { kind: 'term-local' });
     print(`Description: “${request.brief.designPrompt}”`, { kind: 'term-local' });
-    print(config.apiBaseUrl ? `Sending to ${config.apiBaseUrl}…` : 'Sending to the design service…', { kind: 'term-local' });
+    print('Starting a design in your account…', { kind: 'term-local' });
     setProgress(0.01, 'Sending the request…');
     try {
       const res = await run((job) => {

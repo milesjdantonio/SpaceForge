@@ -5,7 +5,7 @@ import { measure } from '../lib/place.js';
 import { icon } from '../ui/icons.js';
 import { typeName } from '../lib/housing.js';
 
-export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore, onRetry }) {
+export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], projects = [], projectID = '', onProjectChange, onCreateProject, onMoveBuilding, loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore, onRetry }) {
   const statusText = { draft: 'Draft', 'not-sent': 'Not sent yet', sent: 'Sent' };
   el.innerHTML = `
     <header class="panel-head">
@@ -15,6 +15,7 @@ export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, 
     <section class="saved-buildings" aria-labelledby="saved-buildings-title">
       <h3 class="group-title" id="saved-buildings-title">Saved buildings</h3>
       <p class="note">${account ? 'Private to your account.' : 'Sign in to save buildings and open them on your next visit.'}</p>
+      ${account ? '<label>Project <select class="select" data-project-filter><option value="">All projects</option></select></label><button type="button" class="btn btn-small" data-new-project>New project</button>' : ''}
       ${!account ? '<button type="button" class="btn btn-primary" data-library-signin>Sign in</button>' : ''}
       <p class="account-error" data-library-error role="alert" hidden></p>
       ${error && onRetry ? `<div class="fail-actions"><button type="button" class="btn btn-small" data-library-retry>${icon('retry')}<span>Try again</span></button></div><p class="note">Site drafts below are kept in this browser and still work.</p>` : ''}
@@ -33,6 +34,13 @@ export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, 
   el.querySelector('[data-library-signin]')?.addEventListener('click', onSignIn);
   el.querySelector('[data-library-more]')?.addEventListener('click', onMore);
   el.querySelector('[data-library-retry]')?.addEventListener('click', onRetry);
+  const filter = el.querySelector('[data-project-filter]');
+  for (const project of projects) {
+    const option = document.createElement('option'); option.value = project.id; option.textContent = project.name;
+    filter?.append(option);
+  }
+  if (filter) { filter.value = projectID; filter.onchange = () => onProjectChange?.(filter.value); }
+  el.querySelector('[data-new-project]')?.addEventListener('click', onCreateProject);
   if (error) { const note = el.querySelector('[data-library-error]'); note.textContent = error; note.hidden = false; }
   for (const building of buildings) {
     const li = document.createElement('li');
@@ -49,6 +57,24 @@ export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, 
       try { await onDeleteBuilding(building); li.remove(); }
       catch (err) { const note = el.querySelector('[data-library-error]'); note.textContent = err.message || 'Couldn’t delete the building.'; note.hidden = false; remove.disabled = false; }
     };
+    if (projects.length && onMoveBuilding) {
+      const select = document.createElement('select'); select.className = 'select project-assignment';
+      select.setAttribute('aria-label', `Project for ${building.name}`);
+      for (const project of projects) {
+        const option = document.createElement('option'); option.value = project.id; option.textContent = project.name;
+        select.append(option);
+      }
+      select.value = building.project_id;
+      select.onchange = async () => {
+        select.disabled = true;
+        try { await onMoveBuilding(building, select.value); }
+        catch (err) {
+          select.value = building.project_id;
+          const note = el.querySelector('[data-library-error]'); note.textContent = err.message; note.hidden = false;
+        } finally { select.disabled = false; }
+      };
+      li.insertBefore(select, remove);
+    }
     el.querySelector('[data-buildings]').append(li);
   }
   const ul = el.querySelector('[data-drafts]');

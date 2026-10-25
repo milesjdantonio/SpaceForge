@@ -27,6 +27,7 @@ body:not(.in-space) .stars { opacity: 0; }
 .saved-buildings .sites { margin: 0; }
 .saved-buildings .site-name { overflow-wrap: anywhere; }
 .saved-buildings .empty { margin: 0; }
+.project-assignment { max-width: 38%; min-width: 0; }
 .bar-help { display: grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: var(--panel); box-shadow: var(--shadow); color: var(--muted); cursor: pointer; }
 .bar-help:hover { color: var(--ink); background: var(--panel-2); }
 .bar-help:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }

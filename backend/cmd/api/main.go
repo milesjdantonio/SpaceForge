@@ -15,6 +15,7 @@ import (
 	"spaceforge/backend/internal/building"
 	"spaceforge/backend/internal/config"
 	"spaceforge/backend/internal/database"
+	"spaceforge/backend/internal/generation"
 	"spaceforge/backend/internal/server"
 	"spaceforge/backend/internal/user"
 )
@@ -42,7 +43,7 @@ func run(log *slog.Logger) error {
 	}
 	defer pool.Close()
 	var schemaReady bool
-	if err := pool.QueryRow(startup, "SELECT to_regclass('public.users') IS NOT NULL AND to_regclass('public.buildings') IS NOT NULL").Scan(&schemaReady); err != nil || !schemaReady {
+	if err := pool.QueryRow(startup, "SELECT to_regclass('public.users') IS NOT NULL AND to_regclass('public.buildings') IS NOT NULL AND to_regclass('public.projects') IS NOT NULL AND to_regclass('public.design_tasks') IS NOT NULL").Scan(&schemaReady); err != nil || !schemaReady {
 		return errors.New("database schema is not ready; run cmd/migrate first")
 	}
 	verifier, err := auth.NewFirebase(startup, cfg.ProjectID)
@@ -52,9 +53,13 @@ func run(log *slog.Logger) error {
 	if cfg.EmulatorHost != "" {
 		log.Warn("local Firebase Auth emulator enabled; development use only")
 	}
+	workerCtx, stopWorkers := context.WithCancel(ctx)
+	service := &generation.Service{Pool: pool, URL: cfg.GenerationURL, Token: cfg.GenerationToken, Workers: cfg.GenerationWorkers}
+	waitWorkers := service.Start(workerCtx)
+	defer func() { stopWorkers(); waitWorkers() }()
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           server.New(log, pool, verifier, &user.Store{Pool: pool}, &building.Store{Pool: pool}, cfg.Origins),
+		Handler:           server.New(log, pool, verifier, &user.Store{Pool: pool}, &building.Store{Pool: pool}, cfg.Origins, service),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second,
 		MaxHeaderBytes: 32 * 1024,

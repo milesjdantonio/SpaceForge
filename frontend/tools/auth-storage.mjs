@@ -1,4 +1,5 @@
-// Uses the real local Auth emulator + Go API/SQL, with a fixture design-service reply.
+// Uses the real local Auth emulator + Go API/SQL, with an imported fixture design.
+// Durable generation is covered by tools/architecture-flow.mjs through backend tests.
 // TEST_STORAGE_URL may point to an isolated API/database; no AI provider is called.
 import assert from 'node:assert/strict';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -41,22 +42,6 @@ try {
     await page.route('https://tiles.openfreemap.org/**', (route) => route.fulfill({ json: { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#1b2639' } }] } }));
     await page.route('https://server.arcgisonline.com/**', (route) => route.fulfill({ status: 404, body: '' }));
     await page.route('https://nominatim.openstreetmap.org/**', (route) => route.fulfill({ json: {} }));
-    await page.route('http://design.test/**', async (route) => {
-      assert.equal(route.request().headers().authorization, undefined, 'Firebase tokens must not go to the design service');
-      const request = route.request().method() === 'POST' ? route.request().postDataJSON() : null;
-      if (request) {
-        assert.equal(request.schema, 'terrasim.design-request/2');
-        generated.requestId = request.id;
-      }
-      const path = new URL(route.request().url()).pathname;
-      const body = request ? { jobId: 'browser-job' }
-        : path.includes('/jobs/') ? { status: 'done', designId: generated.id, logTotal: 1,
-          log: [{ t: 1, text: 'Drawing the design' }], progress: 1, message: 'Design ready.' }
-        : path === `/designs/${generated.id}` ? generated : [];
-      await route.fulfill({ status: route.request().method() === 'OPTIONS' ? 204 : request ? 202 : 200,
-        headers: { 'Access-Control-Allow-Origin': base, 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' },
-        ...(route.request().method() === 'OPTIONS' ? { body: '' } : { json: body }) });
-    });
     const waitApp = async () => page.waitForFunction(() => window.__terrasim?.house, { timeout: 30000 });
     const signIn = async (email, create = false) => {
       await page.click('#account-button');
@@ -70,28 +55,21 @@ try {
     const signOut = async () => { await page.click('#account-button'); await page.click('[data-signout]'); await page.waitForFunction(() => document.querySelector('#account-button').textContent === 'Sign in'); };
     const stamp = Date.now();
     const alice = `browser-alice-${stamp}@example.test`, bob = `browser-bob-${stamp}@example.test`;
-    await page.goto(base + '/?api=http://design.test');
+    await page.goto(base + '/');
     await waitApp();
     await signIn(alice, true);
     console.log('PASS: browser registration, Firebase token verification, and profile creation');
 
-    await page.evaluate(async ({ ring, totals }) => {
-      const { auth } = await import('/js/auth.js');
-      const { store } = await import('/js/store.js');
-      store.set(`sites:${auth.user.uid}`, [{ id: 'browser-lot', ring, mode: 'dream', status: 'draft', createdAt: new Date().toISOString(), form: {
-        housingType: 'house', answers: { designPrompt: 'A bright modern house with quiet rooms and a generous kitchen.', floors: totals.floors, areaM2: totals.finishedAreaM2, bedrooms: totals.bedrooms, bathrooms: totals.bathrooms, unitCount: 1, budgetUSD: 650000 }, advanced: {},
-      } }]);
-    }, { ring: sample.site.outline, totals: sample.totals });
     await page.click('[data-open=sites]');
-    await page.click('[data-drafts] .site-open');
-    await page.waitForSelector('[data-send]');
+    await page.locator('[data-file]').setInputFiles({ name: 'storage-fixture.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ design: generated, estimate: null })) });
+    await page.waitForSelector('[data-save]');
     const savedResponse = page.waitForResponse((res) => res.url() === storage + '/api/buildings' && res.request().method() === 'POST' && res.status() === 201, { timeout: 30000 });
-    await page.click('[data-send]');
+    await page.click('[data-save]');
     const record = await (await savedResponse).json();
     assert.equal(record.data.design.id, generated.id);
     assert.equal(record.data.estimate, null);
     assert.deepEqual(record.data.design.cost, generated.cost);
-    assert.equal(record.data.site.id, 'browser-lot');
+    assert.deepEqual(record.data.site.ring, generated.site.outline);
     await page.waitForSelector('[data-save]', { timeout: 20000 });
     assert.equal(await page.locator('[data-save]').textContent(), 'Save changes');
     const replaced = page.waitForResponse((res) => res.url() === storage + '/api/buildings/' + record.id && res.request().method() === 'PUT');
@@ -101,7 +79,7 @@ try {
     await page.click('[data-tab=cost]');
     await page.waitForSelector('.tabpanel .range');
     assert.match(await page.locator('.tabpanel').textContent(), /Test supplier/);
-    console.log('PASS: Gemma job polling, inline cost renders, SQL auto-save and repeat save updates by SQL ID');
+    console.log('PASS: fixture import, inline cost renders, SQL save and repeat updates by SQL ID');
 
     // Use real pointer drags. Hold the first save response while the house moves
     // again, so the latest placement must queue behind it and use the same SQL ID.
@@ -130,10 +108,12 @@ try {
         assert.equal(await page.evaluate(() => window.__terrasim.house.selected), true);
         assert.deepEqual(await page.evaluate(() => window.__terrasim.house.placement), placement, 'selection must not move the house');
       }
+      await page.click('.mover-offer');
       await page.mouse.move(...points.from);
       await page.mouse.down();
       await page.mouse.move(...points.to, { steps: 6 });
       await page.mouse.up();
+      await page.click('[data-m=done]');
       assert.deepEqual(await page.evaluate(() => window.__terrasim.map.getCenter().toArray()), camera, 'building drags must not pan the map');
       return page.evaluate(() => structuredClone(window.__terrasim.house.placement));
     };

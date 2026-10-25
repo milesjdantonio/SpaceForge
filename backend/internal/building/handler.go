@@ -123,6 +123,38 @@ func (h Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h Handler) AssignProject(w http.ResponseWriter, r *http.Request) {
+	owner, id, ok := ownerAndID(w, r)
+	if !ok {
+		return
+	}
+	media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || media != "application/json" {
+		httpx.Error(w, r, 415, "unsupported_media_type", "Use Content-Type: application/json.")
+		return
+	}
+	var input struct {
+		ProjectID string `json:"project_id"`
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if dec.Decode(&input) != nil || dec.Decode(new(any)) != io.EOF {
+		httpx.Error(w, r, 400, "invalid_project", "Provide a project_id UUID.")
+		return
+	}
+	projectID, err := uuid.Parse(input.ProjectID)
+	if err != nil {
+		httpx.Error(w, r, 400, "invalid_project", "Provide a project_id UUID.")
+		return
+	}
+	record, err := h.Store.AssignProject(r.Context(), owner, id, projectID.String())
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	httpx.JSON(w, 200, record)
+}
+
 func currentOwner(w http.ResponseWriter, r *http.Request) (string, bool) {
 	u, ok := auth.CurrentUser(r.Context())
 	if !ok || u.ID == "" {
@@ -155,7 +187,7 @@ func decodeInput(w http.ResponseWriter, r *http.Request) (Input, bool) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&input); err != nil {
-		httpx.Error(w, r, http.StatusBadRequest, "invalid_building", "Provide a JSON object containing name and data only.")
+		httpx.Error(w, r, http.StatusBadRequest, "invalid_building", "Provide a JSON object containing name, data and optionally project_id.")
 		return input, false
 	}
 	var extra any
@@ -164,6 +196,14 @@ func decodeInput(w http.ResponseWriter, r *http.Request) (Input, bool) {
 		return input, false
 	}
 	input.Name = strings.TrimSpace(input.Name)
+	if input.ProjectID != nil {
+		id, err := uuid.Parse(*input.ProjectID)
+		if err != nil {
+			httpx.Error(w, r, 400, "invalid_project", "Project ID must be a UUID.")
+			return input, false
+		}
+		*input.ProjectID = id.String()
+	}
 	input.Data = bytes.TrimSpace(input.Data)
 	if utf8.RuneCountInString(input.Name) < 1 || utf8.RuneCountInString(input.Name) > 120 || strings.ContainsRune(input.Name, '\x00') || len(input.Data) == 0 || input.Data[0] != '{' || !utf8.Valid(input.Data) {
 		httpx.Error(w, r, http.StatusBadRequest, "invalid_building", "Name must be 1-120 characters and data must be a JSON object.")

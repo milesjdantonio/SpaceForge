@@ -477,6 +477,7 @@ type EmptyReplyError struct {
 func (e EmptyReplyError) Error() string { return "empty (" + e.Detail + ")" }
 
 type Gemma struct {
+	Context    context.Context
 	Key, Model string
 	Timeout    time.Duration
 	LogDir     string
@@ -535,7 +536,15 @@ func (g *Gemma) Ask(msgs []Msg, maxTokens int) (string, error) {
 		if attempt < 3 && containsAny(msg, retryable) {
 			wait := time.Duration(15<<attempt) * time.Second
 			fmt.Fprintf(g.Out, "  Gemma API busy/slow (%s). Retrying in %s...\n", truncate(msg, 90), wait)
-			sleep(wait)
+			if g.Context != nil {
+				select {
+				case <-g.Context.Done():
+					return "", g.Context.Err()
+				case <-time.After(wait):
+				}
+			} else {
+				sleep(wait)
+			}
 			continue
 		}
 		return "", err
@@ -544,12 +553,17 @@ func (g *Gemma) Ask(msgs []Msg, maxTokens int) (string, error) {
 		return "", err
 	}
 	g.n++
-	_ = os.MkdirAll(g.LogDir, 0o755)
 	logFile := filepath.Join(g.LogDir, fmt.Sprintf("reply_%d.txt", g.n))
-	_ = os.WriteFile(logFile, []byte(fmt.Sprintf("finish_reason: %s\nmax_output_tokens: %d\nreasoning_tokens: %d\n\n"+
-		"=== answer ===\n%s\n\n=== hidden reasoning ===\n%s\n", r.finish, maxTokens, r.thoughtTokens, r.text, r.thoughts)), 0o644)
+	if g.LogDir != "" {
+		_ = os.MkdirAll(g.LogDir, 0o755)
+		_ = os.WriteFile(logFile, []byte(fmt.Sprintf("finish_reason: %s\nmax_output_tokens: %d\nreasoning_tokens: %d\n\n"+
+			"=== answer ===\n%s\n\n=== hidden reasoning ===\n%s\n", r.finish, maxTokens, r.thoughtTokens, r.text, r.thoughts)), 0o644)
+	}
 	hitLimit := strings.Contains(r.finish, "MAX_TOKENS")
 	if strings.TrimSpace(r.text) == "" {
+		if g.LogDir == "" {
+			return "", EmptyReplyError{fmt.Sprintf("finish_reason=%s after %d reasoning tokens", r.finish, r.thoughtTokens), hitLimit}
+		}
 		return "", EmptyReplyError{fmt.Sprintf("finish_reason=%s after %d reasoning tokens; saved to %s",
 			r.finish, r.thoughtTokens, logFile), hitLimit}
 	}
@@ -589,7 +603,11 @@ func (g *Gemma) streamOnce(msgs []Msg, maxTokens int) (reply, error) {
 	}
 	body, _ := json.Marshal(map[string]any{"contents": contents, "generationConfig": cfg})
 
-	ctx, cancel := context.WithTimeout(context.Background(), g.Timeout)
+	parent := g.Context
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, g.Timeout)
 	defer cancel()
 	u := GeminiURL + "/v1beta/models/" + url.PathEscape(g.Model) + ":streamGenerateContent?alt=sse"
 	req, _ := http.NewRequestWithContext(ctx, "POST", u, bytes.NewReader(body))

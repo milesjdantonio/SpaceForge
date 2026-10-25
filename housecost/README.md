@@ -54,7 +54,7 @@ Without `-request`, the older interactive wizard (`-inputs inputs.json`) still w
    permits, builds the cost range and the 30-year table.
 
 Every Gemma answer that fails a check goes back to Gemma with a numbered list of problems
-(up to 3 tries). Raw replies are saved in `gemma_log/`.
+(up to 3 tries). CLI raw replies are saved in `gemma_log/`; server mode disables reply files.
 
 ## Prices
 
@@ -90,3 +90,13 @@ ready_mix_3000,172,Roanoke Ready Mix
 - `exterior.garage` holds one garage; townhomes/duplexes with several list the first, with the total cars.
 - Elevation is sampled over a north-aligned box around the footprint.
 - Prices are national baselines scaled by local wages, not live quotes.
+
+## Private worker mode
+
+`go run . -serve -addr 127.0.0.1:8000` runs a private computation service. Set the same
+random GENERATION_SERVICE_TOKEN (at least 32 characters) in this process and the
+account API. POST /internal/generate requires that service token and streams NDJSON
+progress/result frames. The authenticated account API owns jobs, recovery and SQL
+persistence; this service has no local HTTP job queue or result files. The retired
+/api/designs endpoints are unavailable. CLI request/file-output mode is unchanged.
+See [BACKEND.md](../BACKEND.md) for the complete setup.

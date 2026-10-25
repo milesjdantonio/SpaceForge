@@ -9,12 +9,14 @@ import (
 
 	"spaceforge/backend/internal/auth"
 	"spaceforge/backend/internal/building"
+	"spaceforge/backend/internal/generation"
 	"spaceforge/backend/internal/httpx"
+	"spaceforge/backend/internal/project"
 )
 
 type Pinger interface{ Ping(context.Context) error }
 
-func New(log *slog.Logger, db Pinger, verifier auth.Verifier, users auth.UserStore, buildings building.Repository, origins []string) http.Handler {
+func New(log *slog.Logger, db Pinger, verifier auth.Verifier, users auth.UserStore, buildings building.Repository, origins []string, services ...*generation.Service) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -39,7 +41,13 @@ func New(log *slog.Logger, db Pinger, verifier auth.Verifier, users auth.UserSto
 	mux.Handle("GET /api/buildings", requireUser(http.HandlerFunc(buildingHandler.List)))
 	mux.Handle("GET /api/buildings/{id}", requireUser(http.HandlerFunc(buildingHandler.Get)))
 	mux.Handle("PUT /api/buildings/{id}", requireUser(http.HandlerFunc(buildingHandler.Update)))
+	mux.Handle("PUT /api/buildings/{id}/project", requireUser(http.HandlerFunc(buildingHandler.AssignProject)))
 	mux.Handle("DELETE /api/buildings/{id}", requireUser(http.HandlerFunc(buildingHandler.Delete)))
+	if len(services) > 0 && services[0] != nil {
+		service := services[0]
+		service.Register(mux, requireUser)
+		project.Handler{Pool: service.Pool}.Register(mux, requireUser)
+	}
 	// Centralize JSON 404/405 responses while allowing ServeMux to resolve routes.
 	routes := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, pattern := mux.Handler(r)
