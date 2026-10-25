@@ -278,3 +278,8 @@ In [`website/js/config.js`](website/js/config.js), set `storageBaseUrl` to the H
 Gemini key, service token and Google service-account credentials out of frontend configuration.
 See [the local guide's Firebase configuration](docs/running-locally.md#sign-in) for the backend
 requirements and [resources](docs/resources.md) for map/data provider considerations.
+
+## License
+
+TerraSim is licensed under the [MIT License](LICENSE). Third-party dependencies retain their
+respective licenses.
