@@ -52,7 +52,7 @@ export function createMover(map, { house, outliner, landOf, canOffer, onDone, on
   const bar = make('div', 'mover-bar', `
     <p class="mover-status" data-status aria-live="polite"></p>
     <div class="mover-controls">
-      <label class="mover-angle"><span>Front faces</span><input class="input num" data-angle type="number" min="0" max="359" step="1" inputmode="numeric" aria-label="Front faces, degrees from north"><span aria-hidden="true">°</span></label>
+      <label class="mover-angle"><span>Front Faces</span><input class="input num" data-angle type="number" min="0" max="359" step="1" inputmode="numeric" aria-label="Front faces, degrees from north"><span aria-hidden="true">°</span></label>
       <button type="button" class="btn btn-small btn-quiet" data-m="cancel">Cancel</button>
       <button type="button" class="btn btn-small btn-primary" data-m="done">Done</button>
     </div>`, document.body);

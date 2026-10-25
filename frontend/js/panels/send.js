@@ -145,10 +145,10 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
       });
       clearInterval(ticker);
       cancelBtn.remove();
-      setProgress(1, 'Design received');
+      setProgress(1, 'Design Received');
       print(`Design received: ${res.design.overview?.title ?? res.design.id}.`, { kind: 'term-ok' });
       rive?.set('state', 2);
-      el.querySelector('[data-title]').textContent = 'Build ready';
+      el.querySelector('[data-title]').textContent = 'Build Ready';
       el.querySelector('[data-wait]').hidden = true;
       el.querySelector('.progress').classList.add('is-done');
       result.innerHTML = '<p class="ok-msg">Checking the design and raising it on your land…</p>';
@@ -163,17 +163,17 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
       slot.classList.add('is-failed');
       rive = mountRive(slot, { src: 'assets/rive/failed.riv', stateMachine: 'Failed' });
       el.querySelector('.progress').classList.add('is-failed');
-      el.querySelector('[data-title]').textContent = 'Build not generated';
+      el.querySelector('[data-title]').textContent = 'Build Not Generated';
       el.querySelector('[data-wait]').hidden = true;
       const why = explainDesignError(err, { request, fit });
       labelEl.textContent = why.title;
       print(why.text, { kind: 'term-fail' });
       onFailed(err);
       const ACTIONS = {
-        retry: ['btn', 'retry', 'Try again'],
-        edit: ['btn btn-quiet', null, 'Edit the brief'],
-        preview: config.showSample ? ['btn', 'house', 'Preview the sample house'] : null,
-        outline: ['btn', 'outline', 'Outline other land'],
+        retry: ['btn', 'retry', 'Try Again'],
+        edit: ['btn btn-quiet', null, 'Edit the Brief'],
+        preview: config.showSample ? ['btn', 'house', 'Preview the Sample House'] : null,
+        outline: ['btn', 'outline', 'Outline Other Land'],
       };
       const actions = why.actions.map((a) => [a, ACTIONS[a]]).filter(([, def]) => def);
       // The first action is the main one, unless a suggested fix leads.
@@ -194,7 +194,7 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
             <summary>Details for support</summary>
             <p class="note">${esc(err.message || 'No message.')}${err.status ? ` (status ${err.status})` : ''}</p>
             <pre class="code">${esc(JSON.stringify(request, null, 2))}</pre>
-            <button type="button" class="btn btn-small" data-a="copy">${icon('copy')}<span>Copy the request</span></button>
+            <button type="button" class="btn btn-small" data-a="copy">${icon('copy')}<span>Copy the Request</span></button>
           </details>
         </div>`;
       // What to do comes before the log, where it's seen first; Gemma's recommendation, when there
@@ -206,15 +206,15 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
         card.className = 'advice-card';
         card.setAttribute('role', 'alert');
         card.innerHTML = `
-          <p class="advice-kicker">${icon('spark')}<span>Gemma’s recommendation</span></p>
+          <p class="advice-kicker">${icon('spark')}<span>Gemma’s Recommendation</span></p>
           ${advice.summary ? `<p class="advice-summary">${esc(advice.summary)}</p>` : ''}
           <p class="advice-text">${esc(advice.recommendation)}</p>
           ${changeList(advice.change)}
           <div class="advice-actions">
             ${advice.change && Object.keys(advice.change).length
-              ? `<button type="button" class="btn btn-primary" data-advice="apply">${icon('check')}<span>${esc(advice.changeLabel || 'Apply this change')}</span></button>
-                 <button type="button" class="btn btn-quiet" data-advice="retry">Try again as it is</button>`
-              : '<button type="button" class="btn btn-primary" data-advice="retry">Try again</button>'}
+              ? `<button type="button" class="btn btn-primary" data-advice="apply">${icon('check')}<span>${esc(advice.changeLabel || 'Apply This Change')}</span></button>
+                 <button type="button" class="btn btn-quiet" data-advice="retry">Try Again as It Is</button>`
+              : '<button type="button" class="btn btn-primary" data-advice="retry">Try Again</button>'}
           </div>`;
         el.querySelector('.panel-head').after(card);
         card.addEventListener('click', (e) => {
@@ -249,7 +249,7 @@ const CHANGE_NAMES = {
 };
 function changeList(change) {
   const rows = Object.entries(change || {}).map(([k, v]) => {
-    const val = k === 'noBudgetLimit' ? 'No limit' : k === 'areaByAI' ? 'Gemma chooses'
+    const val = k === 'noBudgetLimit' ? 'No Limit' : k === 'areaByAI' ? 'Gemma Chooses'
       : k === 'budgetUSD' ? `$${Number(v).toLocaleString('en-US')}` : String(v);
     return `<div><dt>${esc(CHANGE_NAMES[k] ?? k)}</dt><dd>${esc(val)}</dd></div>`;
   });

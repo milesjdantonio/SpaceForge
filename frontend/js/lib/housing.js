@@ -4,7 +4,7 @@
 
 export const HOUSING_TYPES = [
   { id: 'house', name: 'House', blurb: 'One home on its own lot' },
-  { id: 'tiny-home', name: 'Tiny home', blurb: 'A small home, often with a loft' },
+  { id: 'tiny-home', name: 'Tiny Home', blurb: 'A small home, often with a loft' },
   { id: 'townhouse', name: 'Townhouses', blurb: 'A row of homes side by side' },
   { id: 'duplex', name: 'Duplex', blurb: 'Two homes in one building' },
   { id: 'mansion', name: 'Mansion', blurb: 'A large, formal home' },
@@ -14,7 +14,7 @@ export const HOUSING_TYPES = [
   { id: 'dorm', name: 'Dorm', blurb: 'Student rooms and shared spaces' },
   { id: 'hotel', name: 'Hotel', blurb: 'Guest rooms over a lobby and restaurant' },
   { id: 'neighborhood', name: 'Neighborhood', blurb: 'Homes on lots along new streets' },
-  { id: 'trailer-park', name: 'Trailer park', blurb: 'Manufactured homes on pads' },
+  { id: 'trailer-park', name: 'Trailer Park', blurb: 'Manufactured homes on pads' },
 ];
 
 // Sites: many homes, with streets, lots and shared spaces (a terrasim.design/3 file).
@@ -48,8 +48,8 @@ export const BRIEF_RULES = {
   'trailer-park': { floors: { fixed: 1 }, unitCount: [4, 300], roomType: { options: ['single', 'double'] }, bedrooms: [1, 4], bathrooms: [1, 3] },
 };
 
-export const ROOM_TYPES = [['single', 'Single rooms'], ['double', 'Double rooms'], ['suite', 'Suites']];
-const HOTEL_ROOM_TYPES = [['single', 'King rooms'], ['double', 'Two-queen rooms'], ['suite', 'Suites']];
+export const ROOM_TYPES = [['single', 'Single Rooms'], ['double', 'Double Rooms'], ['suite', 'Suites']];
+const HOTEL_ROOM_TYPES = [['single', 'King Rooms'], ['double', 'Two-Queen Rooms'], ['suite', 'Suites']];
 const HOME_WIDTHS = [['single', 'Single-wide'], ['double', 'Double-wide']];
 export const roomTypeOptions = (type) => (type === 'hotel' ? HOTEL_ROOM_TYPES : type === 'trailer-park' ? HOME_WIDTHS : ROOM_TYPES);
 
@@ -59,13 +59,13 @@ export function fieldLabel(field, type) {
   const avg = type === 'apartment' || type === 'condo';
   switch (field) {
     case 'floors': return 'Floors';
-    case 'areaM2': return avg ? 'Average home size' : per ? 'Size of each home' : 'Living space';
-    case 'unitCount': return type === 'townhouse' ? 'Townhomes in the row' : type === 'hotel' ? 'Guest rooms' : type === 'neighborhood' ? 'Homes' : type === 'trailer-park' ? 'Home pads' : 'Homes in the building';
-    case 'bedrooms': return avg ? 'Bedrooms in a typical home' : per ? 'Bedrooms per home' : 'Bedrooms';
-    case 'bathrooms': return avg ? 'Bathrooms in a typical home' : per ? 'Bathrooms per home' : 'Bathrooms';
-    case 'residents': return 'Beds in the building';
-    case 'roomType': return type === 'trailer-park' ? 'Home width' : 'Room type';
-    case 'budgetUSD': return isSingleHome(type) ? 'Budget for the build' : isSiteType(type) ? 'Budget for the whole site' : 'Budget for the whole building';
+    case 'areaM2': return avg ? 'Average Home Size' : per ? 'Size of Each Home' : 'Living Space';
+    case 'unitCount': return type === 'townhouse' ? 'Townhomes in the Row' : type === 'hotel' ? 'Guest Rooms' : type === 'neighborhood' ? 'Homes' : type === 'trailer-park' ? 'Home Pads' : 'Homes in the Building';
+    case 'bedrooms': return avg ? 'Bedrooms in a Typical Home' : per ? 'Bedrooms per Home' : 'Bedrooms';
+    case 'bathrooms': return avg ? 'Bathrooms in a Typical Home' : per ? 'Bathrooms per Home' : 'Bathrooms';
+    case 'residents': return 'Beds in the Building';
+    case 'roomType': return type === 'trailer-park' ? 'Home Width' : 'Room Type';
+    case 'budgetUSD': return isSingleHome(type) ? 'Budget for the Build' : isSiteType(type) ? 'Budget for the Whole Site' : 'Budget for the Whole Building';
     default: return field;
   }
 }
@@ -174,14 +174,14 @@ export const STYLE_IDEAS = [
   ['Brick', 'traditional brick with a symmetrical front'],
 ];
 export const QUALITY = [['essential', 'Essential'], ['standard', 'Standard'], ['premium', 'Premium']];
-export const STRUCTURE = [['wood-frame', 'Wood frame'], ['steel-frame', 'Steel frame'], ['concrete', 'Concrete'], ['mass-timber', 'Mass timber'], ['masonry', 'Masonry']];
-export const CLADDING = [['board-batten', 'Board and batten'], ['lap-siding', 'Lap siding'], ['brick', 'Brick'], ['stucco', 'Stucco'], ['stone', 'Stone'], ['fiber-cement', 'Fiber cement'], ['metal-panel', 'Metal panel'], ['timber', 'Timber']];
-export const ROOFING = [['asphalt-shingle', 'Asphalt shingle'], ['metal', 'Standing-seam metal'], ['tile', 'Tile'], ['slate', 'Slate'], ['membrane', 'Flat membrane']];
-export const PRIORITIES = [['efficiency', 'Energy efficiency'], ['maintenance', 'Low maintenance'], ['light', 'Daylight'], ['privacy', 'Privacy'], ['accessible', 'Step-free living'], ['quiet', 'Quiet']];
-export const EXTRAS = [['office', 'Home office'], ['porch', 'Porch'], ['deck', 'Deck or terrace'], ['basement', 'Basement'], ['balconies', 'Balconies'], ['roof-terrace', 'Roof terrace']];
-export const BATHROOM_SHARING = [['private', 'Private'], ['suite', 'Shared in a suite'], ['hall', 'Shared per floor']];
-export const COMMON_SPACES = [['lobby', 'Lobby'], ['lounge', 'Lounge'], ['study', 'Study rooms'], ['gym', 'Gym'], ['laundry', 'Laundry'], ['kitchen', 'Shared kitchen'], ['bike-storage', 'Bike storage'], ['mail', 'Mail room']];
-const HOTEL_SPACES = [['restaurant', 'Restaurant'], ['lounge', 'Lounge or bar'], ['gym', 'Gym'], ['laundry', 'Housekeeping'], ['study', 'Meeting room'], ['bike-storage', 'Bike storage']];
+export const STRUCTURE = [['wood-frame', 'Wood Frame'], ['steel-frame', 'Steel Frame'], ['concrete', 'Concrete'], ['mass-timber', 'Mass Timber'], ['masonry', 'Masonry']];
+export const CLADDING = [['board-batten', 'Board and Batten'], ['lap-siding', 'Lap Siding'], ['brick', 'Brick'], ['stucco', 'Stucco'], ['stone', 'Stone'], ['fiber-cement', 'Fiber Cement'], ['metal-panel', 'Metal Panel'], ['timber', 'Timber']];
+export const ROOFING = [['asphalt-shingle', 'Asphalt Shingle'], ['metal', 'Standing-Seam Metal'], ['tile', 'Tile'], ['slate', 'Slate'], ['membrane', 'Flat Membrane']];
+export const PRIORITIES = [['efficiency', 'Energy Efficiency'], ['maintenance', 'Low Maintenance'], ['light', 'Daylight'], ['privacy', 'Privacy'], ['accessible', 'Step-Free Living'], ['quiet', 'Quiet']];
+export const EXTRAS = [['office', 'Home Office'], ['porch', 'Porch'], ['deck', 'Deck or Terrace'], ['basement', 'Basement'], ['balconies', 'Balconies'], ['roof-terrace', 'Roof Terrace']];
+export const BATHROOM_SHARING = [['private', 'Private'], ['suite', 'Shared in a Suite'], ['hall', 'Shared per Floor']];
+export const COMMON_SPACES = [['lobby', 'Lobby'], ['lounge', 'Lounge'], ['study', 'Study Rooms'], ['gym', 'Gym'], ['laundry', 'Laundry'], ['kitchen', 'Shared Kitchen'], ['bike-storage', 'Bike Storage'], ['mail', 'Mail Room']];
+const HOTEL_SPACES = [['restaurant', 'Restaurant'], ['lounge', 'Lounge or Bar'], ['gym', 'Gym'], ['laundry', 'Housekeeping'], ['study', 'Meeting Room'], ['bike-storage', 'Bike Storage']];
 const SITE_SPACES = [['park', 'Park'], ['playground', 'Playground'], ['pool', 'Pool'], ['clubhouse', 'Clubhouse']];
 export const commonSpaceOptions = (type) => (type === 'hotel' ? HOTEL_SPACES : isSiteType(type)
   ? [...SITE_SPACES, ...(type === 'trailer-park' ? [['laundry', 'Laundry']] : [])] : COMMON_SPACES);

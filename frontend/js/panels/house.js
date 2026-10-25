@@ -23,7 +23,7 @@ export function holdsLine(design) {
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['materials', 'Materials'], ['time', 'Over time']];
+const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['materials', 'Materials'], ['time', 'Over Time']];
 
 // `name` is the person's own name for the building (onRename changes it); `placement` is where it
 // stands now; `onShare` shares it (a building link, or the land for the sample).
@@ -43,7 +43,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
   const cost = estimate?.buildCost ?? null;
   const faces = fmt.bearing((placement.xAxisBearingDeg + 90) % 360);
   let title = name || design.overview.title;
-  const sub = design.sample ? (preview ? 'Sample house placed on your land' : 'Sample listing')
+  const sub = design.sample ? (preview ? 'Sample house placed on your land' : 'Sample Listing')
     : shared ? `${typeName(design.housingType)} shared with you` : `${typeName(design.housingType)} designed for this land`;
 
   el.innerHTML = `
@@ -60,22 +60,22 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
       ? 'This is TerraSim’s one sample house, placed and turned to fit your outline. A real design will be drawn for your land once the design service is connected.'
       : 'Sample data: this house shows what the design service returns.'}</p>` : ''}
     <dl class="facts num">
-      <div><dt>Build estimate</dt><dd>${cost ? `${fmt.money(cost.low, { short: true })}–${fmt.money(cost.high, { short: true })}` : 'Not included'}</dd></div>
-      <div><dt>Finished space</dt><dd>${fmt.area(design.totals.finishedAreaM2)}</dd></div>
+      <div><dt>Build Estimate</dt><dd>${cost ? `${fmt.money(cost.low, { short: true })}–${fmt.money(cost.high, { short: true })}` : 'Not Included'}</dd></div>
+      <div><dt>Finished Space</dt><dd>${fmt.area(design.totals.finishedAreaM2)}</dd></div>
       <div><dt>Holds</dt><dd>${esc(holdsLine(design))}</dd></div>
-      ${site ? `<div><dt>Land</dt><dd>${fmt.land ? fmt.land(design.totals.landAreaM2 ?? design.site.areaM2) : fmt.area(design.site.areaM2)}</dd></div>` : `<div><dt>Front faces</dt><dd>${faces}</dd></div>`}
+      ${site ? `<div><dt>Land</dt><dd>${fmt.land ? fmt.land(design.totals.landAreaM2 ?? design.site.areaM2) : fmt.area(design.site.areaM2)}</dd></div>` : `<div><dt>Front Faces</dt><dd>${faces}</dd></div>`}
     </dl>
     <div class="panel-actions">
-      <button type="button" class="btn btn-primary" data-walk>${icon('walk')}<span>Walk through</span></button>
+      <button type="button" class="btn btn-primary" data-walk>${icon('walk')}<span>Walk Through</span></button>
       ${onPreview ? `<button type="button" class="btn btn-primary" data-preview>${icon('orbit')}<span>Preview</span></button>` : ''}
     </div>
     <div class="panel-actions panel-actions-quiet">
-      ${onSave ? `<button type="button" class="btn" data-save>${saved ? 'Save changes' : 'Save building'}</button>` : ''}
-      <button type="button" class="btn" data-share>${icon('share')}<span>${design.sample ? 'Share site' : 'Share'}</span></button>
+      ${onSave ? `<button type="button" class="btn" data-save>${saved ? 'Save Changes' : 'Save Building'}</button>` : ''}
+      <button type="button" class="btn" data-share>${icon('share')}<span>${design.sample ? 'Share Site' : 'Share'}</span></button>
     </div>
     ${site ? '' : '<p class="note">To move or turn it, choose Move beside the building on the map.</p>'}
     ${onChangeDesign ? `<details class="change-design">
-      <summary>${icon('edit')}<span>Change this design</span></summary>
+      <summary>${icon('edit')}<span>Change This Design</span></summary>
       <form data-change novalidate>
         <label class="change-label" for="change-text">What should change?</label>
         <textarea id="change-text" name="change" rows="3" maxlength="600" placeholder="For example: add a fourth bedroom, make it round, brick instead of siding"></textarea>
@@ -100,11 +100,11 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
         ${design.overview.description.map((p) => `<p>${esc(p)}</p>`).join('')}
         ${design.overview.features?.length ? `<h3 class="group-title">Features</h3><ul class="ticks">${design.overview.features.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
         ${soilBlock(design.site?.soil)}
-        <h3 class="group-title">How it answers the land</h3>
+        <h3 class="group-title">How It Answers the Land</h3>
         <ul class="ticks">${design.overview.siteResponse.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
         <h3 class="group-title">Materials</h3>
         <ul class="swatches">${palette.map((p) => `<li><span class="swatch" style="background:${esc(p.hex)}"></span><span>${esc(p.name)}</span><span class="swatch-use">${esc(p.use)}</span></li>`).join('')}</ul>
-        <h3 class="group-title">Check before building</h3>
+        <h3 class="group-title">Check Before Building</h3>
         <ul class="ticks ticks-warn">${design.overview.cautions.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>`;
     }
     if (tab === 'plans') {
@@ -162,12 +162,12 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
       body.innerHTML = `
         <dl class="facts num">
           <div><dt>${estimate.overTime.years}-year cost to own</dt><dd>${fmt.money(own, { short: true })}</dd></div>
-          <div><dt>Per month, on average</dt><dd>${fmt.money(own / (estimate.overTime.years * 12))}</dd></div>
+          <div><dt>Per Month, on Average</dt><dd>${fmt.money(own / (estimate.overTime.years * 12))}</dd></div>
           <div><dt>House value in year ${last.year}</dt><dd>${fmt.money(last.value, { short: true })}</dd></div>
         </dl>
         <div class="chart-box">${renderOverTime(estimate.overTime)}</div>
         <p class="note">Yearly maintenance, energy and replacements. Amber years carry a big replacement.</p>
-        <h3 class="group-title">Big expenses ahead</h3>
+        <h3 class="group-title">Big Expenses Ahead</h3>
         <table class="lines num"><tbody>${estimate.overTime.events.map((e) => `<tr><td>Year ${esc(e.year)}</td><td>${esc(e.name)}</td><td class="r">${fmt.money(e.amount)}</td></tr>`).join('')}</tbody></table>
         <p class="note">Assumes ${(estimate.overTime.assumptions.inflation * 100).toFixed(1)}% inflation and ${(estimate.overTime.assumptions.appreciation * 100).toFixed(1)}% yearly appreciation. Excludes land, taxes and insurance.</p>`;
     }
@@ -181,7 +181,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
       save.disabled = true; save.textContent = 'Saving…';
       try {
         const result = await onSave();
-        save.textContent = result ? 'Save changes' : before;
+        save.textContent = result ? 'Save Changes' : before;
         if (result) toast('Building saved to your account.');
       } catch (err) {
         save.textContent = before;
@@ -311,8 +311,8 @@ export function renderDesignProblems(el, { design, result, onClose, actions = []
   el.innerHTML = `
     <header class="panel-head">
       <div>
-        <h2 class="panel-title">This design can’t be drawn</h2>
-        <p class="panel-sub">${esc(design?.overview?.title ?? design?.id ?? 'Design file')}</p>
+        <h2 class="panel-title">This Design Can’t Be Drawn</h2>
+        <p class="panel-sub">${esc(design?.overview?.title ?? design?.id ?? 'Design File')}</p>
       </div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
@@ -334,11 +334,11 @@ function soilBlock(soil) {
     ['Bearing', soil.bearingPsf ? `${fmt.int(soil.bearingPsf)} psf` : null],
     ['Shrink-swell', soil.shrinkSwell],
     ['Bedrock', soil.depthToBedrockIn ? `${soil.depthToBedrockIn} in down` : null],
-    ['Water table', soil.depthToWaterTableIn ? `${soil.depthToWaterTableIn} in down` : null],
+    ['Water Table', soil.depthToWaterTableIn ? `${soil.depthToWaterTableIn} in down` : null],
     ['Foundation', soil.foundation],
   ].filter(([, v]) => v);
   if (!rows.length) return '';
-  return `<h3 class="group-title">The ground</h3>
+  return `<h3 class="group-title">The Ground</h3>
     <dl class="facts">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
     ${soil.foundationReason ? `<p class="note">${esc(soil.foundationReason)}${soil.source ? ` Soil data: ${esc(soil.source)}.` : ''}</p>` : ''}`;
 }
@@ -346,12 +346,12 @@ function soilBlock(soil) {
 // Where the money goes, and how it sits against the budget (cost.breakdown).
 function breakdownBlock(b) {
   if (!b) return '';
-  const rows = [['Materials', b.materials], ['Installed work', b.installedWork], ['Labor', b.labor], ['Site work', b.siteWork],
-    ['Overhead and profit', b.overheadAndProfit], ['Permits and design', b.permitsAndDesign]].filter(([, v]) => v);
+  const rows = [['Materials', b.materials], ['Installed Work', b.installedWork], ['Labor', b.labor], ['Site Work', b.siteWork],
+    ['Overhead and Profit', b.overheadAndProfit], ['Permits and Design', b.permitsAndDesign]].filter(([, v]) => v);
   const budget = b.budgetUSD
     ? (b.overBudgetBy ? `<p class="problem">${fmt.money(b.overBudgetBy)} over the ${fmt.money(b.budgetUSD)} budget.</p>` : `<p class="note">Within the ${fmt.money(b.budgetUSD)} budget.</p>`)
     : '';
-  return `<h3 class="group-title">Where the money goes</h3>${budget}
+  return `<h3 class="group-title">Where the Money Goes</h3>${budget}
     <table class="lines num"><tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td class="r">${fmt.money(v)}</td></tr>`).join('')}</tbody>
     <tfoot><tr><td>Total</td><td class="r">${fmt.money(b.total)}</td></tr></tfoot></table>
     ${b.wageFactor ? `<p class="note">Labor is priced at ${Math.round(b.wageFactor * 100)}% of the national average, from local construction wages.</p>` : ''}`;
@@ -360,6 +360,6 @@ function breakdownBlock(b) {
 // Building suppliers near the land (cost.suppliers).
 function suppliersBlock(list) {
   if (!list?.length) return '';
-  return `<h3 class="group-title">Suppliers nearby</h3>
+  return `<h3 class="group-title">Suppliers Nearby</h3>
     <table class="lines num"><tbody>${list.map((s) => `<tr><td>${esc(s.Name)}<span class="unit"> · ${esc(String(s.Type || '').replace(/_/g, ' '))}</span></td><td class="r">${s.Miles != null ? `${Number(s.Miles).toFixed(1)} mi` : ''}</td></tr>`).join('')}</tbody></table>`;
 }

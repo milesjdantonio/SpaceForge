@@ -3,26 +3,26 @@ import { auth } from '../auth.js';
 export function mountAccount(button, dialog) {
   let pending = null, mode = 'signin', busy = false;
   function paintButton() {
-    button.textContent = auth.user ? 'Account' : 'Sign in';
-    button.title = auth.user ? `Signed in as ${auth.user.email}` : 'Sign in to save buildings';
+    button.textContent = auth.user ? 'Account' : 'Sign In';
+    button.title = auth.user ? `Signed in as ${auth.user.email}` : 'Sign in to Save Buildings';
   }
   function finish(value = null) { pending?.(value); pending = null; }
   dialog.addEventListener('close', () => { dialog.replaceChildren(); finish(); });
   dialog.addEventListener('cancel', (event) => { if (busy) event.preventDefault(); });
   function render() {
     if (auth.user) {
-      dialog.innerHTML = `<div class="dialog-body"><h2 class="dialog-title" id="account-title">Your account</h2><p data-email></p><p class="note">Your saved buildings are private to this account.</p><button class="btn" type="button" data-signout>Sign out</button><button class="btn btn-quiet" type="button" data-cancel>Close</button></div>`;
+      dialog.innerHTML = `<div class="dialog-body"><h2 class="dialog-title" id="account-title">Your Account</h2><p data-email></p><p class="note">Your saved buildings are private to this account.</p><button class="btn" type="button" data-signout>Sign Out</button><button class="btn btn-quiet" type="button" data-cancel>Close</button></div>`;
       dialog.querySelector('[data-email]').textContent = auth.user.email;
       dialog.querySelector('[data-signout]').onclick = () => { auth.signOut(); dialog.close(); };
     } else {
       const signup = mode === 'signup';
       dialog.innerHTML = `<form class="dialog-body" data-auth-form>
-        <h2 class="dialog-title" id="account-title">${signup ? 'Create an account' : 'Sign in'}</h2>
+        <h2 class="dialog-title" id="account-title">${signup ? 'Create an Account' : 'Sign In'}</h2>
         <p class="note">Save your buildings and open them again on your next visit.</p>
         <div class="field"><label for="account-email">Email</label><input class="input" id="account-email" name="email" type="email" autocomplete="email" required autofocus></div>
         <div class="field"><label for="account-password">Password</label><input class="input" id="account-password" name="password" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="${signup ? 6 : 1}" required></div>
         <p class="account-error" data-auth-error role="alert" hidden></p>
-        <button class="btn btn-primary" type="submit">${signup ? 'Create account' : 'Sign in'}</button>
+        <button class="btn btn-primary" type="submit">${signup ? 'Create Account' : 'Sign In'}</button>
         <button class="text-link" type="button" data-toggle>${signup ? 'Already have an account? Sign in' : 'New here? Create an account'}</button>
         <button class="btn btn-quiet" type="button" data-cancel>Cancel</button>
       </form>`;
@@ -51,7 +51,7 @@ export function mountAccount(button, dialog) {
             go.type = 'button';
             go.className = 'btn';
             go.dataset.continue = '';
-            go.textContent = 'Continue without signing in';
+            go.textContent = 'Continue Without Signing In';
             go.onclick = () => dialog.close();
             error.after(go);
           }

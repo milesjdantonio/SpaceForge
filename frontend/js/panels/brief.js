@@ -40,7 +40,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   el.innerHTML = `
     <header class="panel-head">
       <div>
-        <h2 class="panel-title">Your land</h2>
+        <h2 class="panel-title">Your Land</h2>
         <p class="panel-sub">${site.preview ? 'Previewed with the sample house' : 'Outlined on the map'}</p>
       </div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
@@ -50,13 +50,13 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       <div><dt>Area</dt><dd>${fmt.land(m.areaM2)}</dd></div>
       <div><dt>Buildable</dt><dd>${m.buildableM2 ? fmt.land(m.buildableM2) : '–'}</dd></div>
       <div><dt>Around</dt><dd>${fmt.len(m.perimeterM)}</dd></div>
-      <div><dt>Longest side</dt><dd>${fmt.len(m.longestEdgeM)}, ${fmt.bearing(m.longestEdgeBearing)}</dd></div>
+      <div><dt>Longest Side</dt><dd>${fmt.len(m.longestEdgeM)}, ${fmt.bearing(m.longestEdgeBearing)}</dd></div>
     </dl>
     <p class="note">Buildable area keeps ${fmt.len(3)} back from every boundary. Local setbacks may differ.</p>
     <div class="lie" data-lie aria-live="polite"><p class="note">Measuring the slope…</p></div>
     ${siteProblems.length ? `<p class="problem">${siteProblems[0]}</p>` : ''}
     <div class="coverage-alert" data-coverage role="alert" hidden></div>
-    <button type="button" class="text-link edit-outline" data-edit>Adjust the outline</button>
+    <button type="button" class="text-link edit-outline" data-edit>Adjust the Outline</button>
 
     <form class="brief" novalidate>
       <section class="qgroup" aria-labelledby="g-type">
@@ -79,7 +79,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       </section>
 
       <section class="qgroup" aria-labelledby="g-prompt">
-        <h3 class="group-title" id="g-prompt">Describe the design</h3>
+        <h3 class="group-title" id="g-prompt">Describe the Design</h3>
         <div class="qbox qbox-wide qbox-prompt" data-field="designPrompt">
           <label class="qlabel" for="q-designPrompt">The building and its style, in your words</label>
           <textarea id="q-designPrompt" name="designPrompt" class="input qcontrol prompt-input" rows="4" maxlength="${PROMPT_MAX}" placeholder="A bright modern farmhouse that opens to the view, with a big kitchen at its heart and a quiet office away from the bedrooms." aria-describedby="hint-designPrompt err-designPrompt">${esc(form.answers.designPrompt)}</textarea>
@@ -106,7 +106,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
 
       <div class="send-row">
         <p class="send-summary" data-summary aria-live="polite"></p>
-        <button type="submit" class="btn btn-primary btn-wide" data-send>Send to the design service</button>
+        <button type="submit" class="btn btn-primary btn-wide" data-send>Send to the Design Service</button>
       </div>
     </form>`;
 
@@ -132,7 +132,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   function renderBasics() {
     const type = form.housingType;
     if (!type) {
-      basics.innerHTML = `<h3 class="group-title" id="g-basics">The basics</h3><p class="note">Choose a type above and its questions appear here.</p>`;
+      basics.innerHTML = `<h3 class="group-title" id="g-basics">The Basics</h3><p class="note">Choose a type above and its questions appear here.</p>`;
       return;
     }
     const fields = requiredFields(type);
@@ -158,7 +158,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       return `<div class="qbox qbox-wide" data-field="budgetUSD">
         <label class="qlabel" for="q-budgetUSD">${label}</label>
         <div class="qinput"><span class="qaffix">$</span><input id="q-budgetUSD" name="budgetUSD" class="qcontrol num" inputmode="numeric" autocomplete="off" placeholder="Amount in US dollars" value="${a.budgetUSD ? a.budgetUSD.toLocaleString('en-US') : ''}" ${a.noBudgetLimit ? 'disabled' : ''} aria-describedby="err-budgetUSD"></div>
-        <label class="check check-small"><input type="checkbox" name="noBudgetLimit" ${a.noBudgetLimit ? 'checked' : ''}><span>No limit</span></label>
+        <label class="check check-small"><input type="checkbox" name="noBudgetLimit" ${a.noBudgetLimit ? 'checked' : ''}><span>No Limit</span></label>
         ${err}</div>`;
     }
     const isArea = f === 'areaM2';
@@ -170,11 +170,11 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       <label class="qlabel" for="q-${f}">${label}</label>
       <div class="qinput">
         <button type="button" class="qstep" data-step="-1" data-for="${f}" aria-label="Less" ${byAI ? 'disabled' : ''}>${icon('minus')}</button>
-        <input id="q-${f}" name="${f}" class="qcontrol num" inputmode="decimal" autocomplete="off" placeholder="${byAI ? 'Gemma decides' : '–'}" value="${byAI ? '' : shown}" ${byAI ? 'disabled' : ''} aria-describedby="hint-${f} err-${f}">
+        <input id="q-${f}" name="${f}" class="qcontrol num" inputmode="decimal" autocomplete="off" placeholder="${byAI ? 'Gemma Decides' : '–'}" value="${byAI ? '' : shown}" ${byAI ? 'disabled' : ''} aria-describedby="hint-${f} err-${f}">
         ${isArea ? `<span class="qaffix">${fmt.unitArea()}</span>` : ''}
         <button type="button" class="qstep" data-step="1" data-for="${f}" aria-label="More" ${byAI ? 'disabled' : ''}>${icon('plus')}</button>
       </div>
-      ${isArea ? `<label class="check check-small"><input type="checkbox" name="areaByAI" ${byAI ? 'checked' : ''}><span>Let Gemma choose the size</span></label>` : ''}
+      ${isArea ? `<label class="check check-small"><input type="checkbox" name="areaByAI" ${byAI ? 'checked' : ''}><span>Let Gemma Choose the Size</span></label>` : ''}
       <p class="qhint" id="hint-${f}">${byAI ? 'Gemma sizes it from the bedrooms, budget and land. ' : hint ? `${hint} ` : ''}<span class="num">${range}</span></p>
       ${err}</div>`;
   }
@@ -188,13 +188,13 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     const seg = (name, opts, value, label) => `<div class="qbox qbox-wide" data-field="${name}">
       <span class="qlabel" id="l-${name}">${label}</span>
       <div class="seg" role="radiogroup" aria-labelledby="l-${name}">
-        <label><input type="radio" name="${name}" value="" ${value == null ? 'checked' : ''}><span>Decide for me</span></label>
+        <label><input type="radio" name="${name}" value="" ${value == null ? 'checked' : ''}><span>Decide for Me</span></label>
         ${opts.map(([v, t]) => `<label><input type="radio" name="${name}" value="${v}" ${String(value) === String(v) ? 'checked' : ''}><span>${t}</span></label>`).join('')}
       </div><p class="qerror" id="err-${name}" role="alert"></p></div>`;
     const select = (name, opts, value, label) => `<div class="qbox" data-field="${name}">
       <label class="qlabel" for="a-${name}">${label}</label>
       <select class="select qcontrol" id="a-${name}" name="${name}">
-        <option value="">Decide for me</option>
+        <option value="">Decide for Me</option>
         ${opts.map(([v, t]) => `<option value="${v}" ${value === v ? 'selected' : ''}>${t}</option>`).join('')}
       </select></div>`;
     const chips = (name, opts, values, label) => `<fieldset class="qbox qbox-wide chips" data-field="${name}">
@@ -204,23 +204,23 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
 
     const parts = [];
     if (show.has('quality')) parts.push(seg('quality', QUALITY, adv.quality, 'Finishes'));
-    if (show.has('garage')) parts.push(seg('garage', [[0, 'None'], [1, '1 car'], [2, '2 cars'], [3, '3 cars'], ...(type === 'mansion' ? [[4, '4 cars']] : [])], adv.garage, type === 'townhouse' || type === 'duplex' ? 'Garage for each home' : 'Garage'));
+    if (show.has('garage')) parts.push(seg('garage', [[0, 'None'], [1, '1 car'], [2, '2 cars'], [3, '3 cars'], ...(type === 'mansion' ? [[4, '4 cars']] : [])], adv.garage, type === 'townhouse' || type === 'duplex' ? 'Garage for Each Home' : 'Garage'));
     if (show.has('parkingSpaces')) {
       parts.push(`<div class="qbox" data-field="parkingSpaces">
-        <label class="qlabel" for="a-parkingSpaces">Parking spaces</label>
-        <div class="qinput"><input id="a-parkingSpaces" name="parkingSpaces" class="qcontrol num" inputmode="numeric" placeholder="Decide for me" value="${adv.parkingSpaces ?? ''}"></div>
+        <label class="qlabel" for="a-parkingSpaces">Parking Spaces</label>
+        <div class="qinput"><input id="a-parkingSpaces" name="parkingSpaces" class="qcontrol num" inputmode="numeric" placeholder="Decide for Me" value="${adv.parkingSpaces ?? ''}"></div>
         <p class="qhint">For the whole site.</p><p class="qerror" id="err-parkingSpaces" role="alert"></p></div>`);
     }
     parts.push(`<div class="qgrid qgrid-3">
       ${select('structure', STRUCTURE, adv.structure, 'Structure')}
-      ${select('cladding', CLADDING, adv.cladding, 'Outside walls')}
+      ${select('cladding', CLADDING, adv.cladding, 'Outside Walls')}
       ${select('roofing', ROOFING, adv.roofing, 'Roof')}
     </div>`);
-    parts.push(chips('priorities', PRIORITIES, adv.priorities, 'What matters most'));
+    parts.push(chips('priorities', PRIORITIES, adv.priorities, 'What Matters Most'));
     parts.push(chips('extras', EXTRAS, adv.extras, 'Extras'));
     if (show.has('unitMix')) {
       parts.push(`<fieldset class="qbox qbox-wide" data-field="unitMix">
-        <legend class="qlabel">Mix of homes</legend>
+        <legend class="qlabel">Mix of Homes</legend>
         <div class="qgrid qgrid-4">
           ${UNIT_MIX.map(([k, t]) => `<label class="mini"><span>${t}</span><input class="qcontrol num" name="mix-${k}" inputmode="numeric" placeholder="–" value="${adv.unitMix?.[k] ?? ''}"></label>`).join('')}
         </div>
@@ -228,7 +228,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
         <p class="qerror" id="err-unitMix" role="alert"></p></fieldset>`);
     }
     if (show.has('bathroomSharing')) parts.push(seg('bathroomSharing', BATHROOM_SHARING, adv.bathroomSharing, 'Bathrooms'));
-    if (show.has('commonSpaces')) parts.push(chips('commonSpaces', commonSpaceOptions(type), adv.commonSpaces, type === 'hotel' ? 'Guest spaces' : 'Shared spaces'));
+    if (show.has('commonSpaces')) parts.push(chips('commonSpaces', commonSpaceOptions(type), adv.commonSpaces, type === 'hotel' ? 'Guest Spaces' : 'Shared Spaces'));
     advBody.innerHTML = parts.join('');
   }
 
@@ -442,12 +442,12 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     if (!t) { lie.innerHTML = '<p class="note">The slope couldn’t be measured here, so the design service will measure it.</p>'; return; }
     const flat = t.steepness.name === 'flat';
     lie.innerHTML = `
-      <h3 class="group-title">The lie of the land</h3>
+      <h3 class="group-title">The Lie of the Land</h3>
       <dl class="facts num">
         <div><dt>Slope</dt><dd>${Math.round(t.slopeMeanPct)}% · ${esc(t.steepness.name)}</dd></div>
-        <div><dt>Rise and fall</dt><dd>${fmt.len(t.reliefM, { precise: t.reliefM < 10 })}</dd></div>
-        <div><dt>Falls toward</dt><dd>${flat ? 'Level' : esc(t.downhillName)}</dd></div>
-        <div><dt>Ground height</dt><dd>${fmt.len(t.lowM)}–${fmt.len(t.highM)}</dd></div>
+        <div><dt>Rise and Fall</dt><dd>${fmt.len(t.reliefM, { precise: t.reliefM < 10 })}</dd></div>
+        <div><dt>Falls Toward</dt><dd>${flat ? 'Level' : esc(t.downhillName)}</dd></div>
+        <div><dt>Ground Height</dt><dd>${fmt.len(t.lowM)}–${fmt.len(t.highM)}</dd></div>
       </dl>
       <p class="note">${esc(t.steepness.note)} The lines on the map join points of equal height, every ${fmt.len(t.interval)}.</p>`;
   }).catch(() => { lie.replaceChildren(); });

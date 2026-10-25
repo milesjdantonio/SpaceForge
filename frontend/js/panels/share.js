@@ -26,8 +26,8 @@ export function renderShare(el, { current, links, onCopy, onOpen, onDownload, on
         </div>
         ${current.url.length > LONG_LINK ? `<p class="note share-long">This building is large, so its link is long (${Math.round(current.url.length / 1000)} KB). Some apps cut long links; the file always works.</p>` : ''}
         <div class="fail-actions">
-          ${current.sample ? '' : `<button type="button" class="btn" data-download-current>${icon('house')}<span>Download as a file</span></button>`}
-          <button type="button" class="btn btn-quiet" data-open-current>Open the link</button>
+          ${current.sample ? '' : `<button type="button" class="btn" data-download-current>${icon('house')}<span>Download as a File</span></button>`}
+          <button type="button" class="btn btn-quiet" data-open-current>Open the Link</button>
         </div>
       </section>` : `
       <section class="share-now">
@@ -35,7 +35,7 @@ export function renderShare(el, { current, links, onCopy, onOpen, onDownload, on
         <button type="button" class="btn" data-pick>Open My Builds</button>
       </section>`}
     <section aria-labelledby="share-links-title">
-      <h3 class="group-title" id="share-links-title">Your share links</h3>
+      <h3 class="group-title" id="share-links-title">Your Share Links</h3>
       ${links.length ? '<ul class="sites" data-links></ul>' : '<p class="empty">Links you make appear here, so you can copy them again.</p>'}
     </section>`;
 

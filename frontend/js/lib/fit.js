@@ -107,8 +107,8 @@ export function fitMessage(fit, fmt) {
     : fit.footprintM2 != null ? `About ${fmt.area(fit.footprintM2)} of ground on ${floorsWord}` : '';
   const list = (xs) => xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs[0];
   switch (fit.level) {
-    case 'none': return { title: 'No room to build', text: `Keeping ${fmt.len(3)} back from every edge leaves no buildable space. Outline a bigger or wider piece of land.` };
-    case 'ai': return { title: 'Gemma sizes it to fit', text: `The building will be sized for the ${fmt.land(fit.buildableM2)} of buildable land.` };
+    case 'none': return { title: 'No Room to Build', text: `Keeping ${fmt.len(3)} back from every edge leaves no buildable space. Outline a bigger or wider piece of land.` };
+    case 'ai': return { title: 'Gemma Sizes It to Fit', text: `The building will be sized for the ${fmt.land(fit.buildableM2)} of buildable land.` };
     case 'over': {
       const smaller = fit.single ? 'a smaller size' : 'smaller or fewer homes';
       if (fit.source === 'service') {
@@ -117,14 +117,14 @@ export function fitMessage(fit, fmt) {
           fit.maxAreaM2 && `${fit.single ? 'a size' : 'homes'} up to ${fmt.area(fit.maxAreaM2)}`,
         ].filter(Boolean);
         return {
-          title: 'Too big for this land',
+          title: 'Too Big for This Land',
           text: `There’s no spot on the land where this building stands ${fmt.len(3)} back from every edge. ${tries.length
             ? `It would fit with ${tries.join(', or ')}.`
             : `Try ${smaller}, or outline more land.`} You can still send it; Gemma will try to make it fit.`,
         };
       }
       return {
-        title: 'Too big for this land',
+        title: 'Too Big for This Land',
         text: `${about}, but only ${fmt.land(fit.buildableM2)} is buildable. ${fit.floorsNeeded
           ? `Try ${fit.floorsNeeded} floors, ${smaller}, or more land.`
           : `Try ${smaller}, or outline more land.`} You can still send it, but the design may not fit inside the land.`,
@@ -133,7 +133,7 @@ export function fitMessage(fit, fmt) {
     case 'tight':
       if (fit.dropped?.length) return { title: 'Fits, with less', text: `${about} fits once the ${list(fit.dropped)} ${fit.dropped.length === 1 && !/s$/.test(fit.dropped[0]) ? 'is' : 'are'} left out. Gemma will leave ${fit.dropped.length === 1 ? 'it' : 'them'} out if needed.` };
       return { title: 'A tight fit', text: `${about}: ${pct(fit.share)} of the buildable land, leaving little room for a yard, paths or parking.` };
-    case 'small': return { title: 'Small for this much land', text: `${about}: ${pct(fit.landShare)} of the land. That’s fine, it will stand in one spot. To design for just that spot, outline a smaller piece.` };
-    default: return { title: 'Fits the land', text: `${about}: ${pct(fit.share)} of the ${fmt.land(fit.buildableM2)} buildable.` };
+    case 'small': return { title: 'Small for This Much Land', text: `${about}: ${pct(fit.landShare)} of the land. That’s fine, it will stand in one spot. To design for just that spot, outline a smaller piece.` };
+    default: return { title: 'Fits the Land', text: `${about}: ${pct(fit.share)} of the ${fmt.land(fit.buildableM2)} buildable.` };
   }
 }

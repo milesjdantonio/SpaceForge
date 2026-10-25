@@ -98,6 +98,8 @@ open `frontend/fixtures/mock-house` from My Builds.
   the top floor across the far end of the yard; a home that can have wings becomes a U for it. Left
   out, with a caution, for one-floor homes and plans without two wings.
 - Fixed: the expanded plan was cut off (a CSS rule left it taller than its box).
+- Wording: buttons, tabs, headings, field labels, option and type names are in title case ("Save
+  Building", "Walk Through"); sentences, hints and messages stay in sentence case.
 - Neighborhoods and trailer parks (`housecost/sites.go`, `frontend/js/lib/site.js`, format
   `terrasim.design/3` in FIELDS.md "Sites"): streets, lots both sides, a park, playground, pool or
   clubhouse near the entrance; one or two home variants designed by the normal pipeline and copied
@@ -166,7 +168,6 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 **Interface**
 - Check the open front doors, curved walls, Preview and sloped foundations in a real browser
   (checked headless only).
-- Spell and text check across the site. (Sign-in was tested end to end by a teammate.)
 
 **Gemma and backend (`housecost/`)**
 - Run a full design with real Gemma end to end.

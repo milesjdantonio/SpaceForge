@@ -487,7 +487,7 @@ async function runSearch(q, { typing }) {
     if (!typing) results.querySelector('[data-i]')?.focus();
   } catch (err) {
     if (err.name !== 'AbortError') {
-      results.innerHTML = `<li class="search-note">Search isn’t reachable right now. You can still click anywhere on the globe to fly there.</li><li role="option" tabindex="-1" data-retry class="search-retry">${icon('retry')}<span>Try the search again</span></li>`;
+      results.innerHTML = `<li class="search-note">Search isn’t reachable right now. You can still click anywhere on the globe to fly there.</li><li role="option" tabindex="-1" data-retry class="search-retry">${icon('retry')}<span>Try the Search Again</span></li>`;
     }
   }
 }
@@ -577,7 +577,7 @@ function shareLink({ preview = false } = {}) {
 async function openShared(hash) {
   const data = decodeShare(hash.slice(3));
   if (!data?.r || data.r.length < 3) {
-    toast('That link is incomplete, so there’s no land to show. Ask for the link again, or outline land yourself.', { kind: 'error', action: { label: 'Outline land', run: () => { leaveGlobe(); startOutline(); } } });
+    toast('That link is incomplete, so there’s no land to show. Ask for the link again, or outline land yourself.', { kind: 'error', action: { label: 'Outline Land', run: () => { leaveGlobe(); startOutline(); } } });
     return false;
   }
   stopSpin();
@@ -599,7 +599,7 @@ function renderToolbar() {
   if (!show) return;
   const drawing = outliner.active;
   toolbar.innerHTML = `
-    <button type="button" class="btn btn-primary" data-act="outline">${icon('outline')}<span>${app.site ? 'Outline new land' : 'Outline land'}</span></button>
+    <button type="button" class="btn btn-primary" data-act="outline">${icon('outline')}<span>${app.site ? 'Outline New Land' : 'Outline Land'}</span></button>
     <div class="tool-group" role="group" aria-label="Map">
       <button type="button" class="btn btn-quiet" data-act="basemap" aria-pressed="${app.basemap === 'satellite'}">${icon(app.basemap === 'satellite' ? 'satellite' : 'map')}<span>${app.basemap === 'satellite' ? 'Satellite' : 'Map'}</span></button>
       <button type="button" class="btn btn-quiet" data-act="tilt" aria-pressed="${app.tilted}">${icon('tilt')}<span>${app.tilted ? '3D' : '2D'}</span></button>
@@ -994,9 +994,9 @@ function drawable(design, { fresh = false } = {}) {
   if (fresh) house.failGenerating();
   setMode(house.design ? 'house' : 'explore');
   const actions = fresh
-    ? [{ label: 'Generate again', primary: true, run: () => send() }, { label: 'Edit the brief', run: () => openBrief() }]
-    : [{ label: 'Choose another file', primary: true, run: () => openSites().then(() => panel.querySelector('[data-file]')?.click()) }];
-  if (config.showSample && app.site) actions.push({ label: 'Preview the sample house', run: () => previewSample() });
+    ? [{ label: 'Generate Again', primary: true, run: () => send() }, { label: 'Edit the Brief', run: () => openBrief() }]
+    : [{ label: 'Choose Another File', primary: true, run: () => openSites().then(() => panel.querySelector('[data-file]')?.click()) }];
+  if (config.showSample && app.site) actions.push({ label: 'Preview the Sample House', run: () => previewSample() });
   openPanel((el) => renderDesignProblems(el, { design, result, onClose: closePanel, actions }));
   return false;
 }
@@ -1031,7 +1031,7 @@ function showDesign(design, estimate, { site = null, placement = design.placemen
 // Opens a design file from disk: a Gemma reply ({ design, estimate }) or a bare design.
 async function openDesignFile(file) {
   let data;
-  const another = { label: 'Choose another file', run: () => openSites().then(() => panel.querySelector('[data-file]')?.click()) };
+  const another = { label: 'Choose Another File', run: () => openSites().then(() => panel.querySelector('[data-file]')?.click()) };
   try { data = JSON.parse(await file.text()); }
   catch { toast(`“${file.name}” isn’t a JSON file, so it can’t be opened. Choose a design file saved from TerraSim or Gemma.`, { kind: 'error', action: another }); return; }
   const design = data?.design ?? data;
@@ -1049,7 +1049,7 @@ async function previewSample() {
   let design;
   try { design = await api.design('sample-0001'); }
   catch {
-    toast('The sample house couldn’t load. Check your connection and try again.', { kind: 'error', action: { label: 'Try again', run: () => previewSample() } });
+    toast('The sample house couldn’t load. Check your connection and try again.', { kind: 'error', action: { label: 'Try Again', run: () => previewSample() } });
     return;
   }
   app.currentDesignID = design.id;
@@ -1129,7 +1129,7 @@ function buildingName(design) {
 }
 
 // Share: a real building goes into the link whole (design, where it stands, its land); the sample
-// preview shares its land and brief. The link is made, kept in "Your share links", and shown in
+// preview shares its land and brief. The link is made, kept in "Your Share Links", and shown in
 // the Share panel to copy, open or download.
 async function shareBuilding(design) {
   const name = buildingName(design) ?? design.overview.title;
@@ -1140,7 +1140,7 @@ async function shareBuilding(design) {
       const doc = shareDocument({ design, placement: house.design === design ? house.placement : design.placement, ring: landOf(design) ?? design.site.outline, name, estimate: app.estimates.get(design.id) ?? null });
       url = `${shareBase()}#b=${await packShare(doc)}`;
     } catch {
-      toast('This browser can’t pack the building into a link. Download it as a file to share instead.', { kind: 'error', action: { label: 'Download file', run: () => downloadBuilding(design) } });
+      toast('This browser can’t pack the building into a link. Download it as a file to share instead.', { kind: 'error', action: { label: 'Download File', run: () => downloadBuilding(design) } });
       return;
     }
   }
@@ -1185,7 +1185,7 @@ async function openSharedBuilding(hash) {
   let doc;
   try { doc = await unpackShare(hash.slice(3)); }
   catch {
-    toast('That building link is incomplete or damaged, often because an app cut it short. Ask for the link again, or for the building as a file.', { kind: 'error', action: { label: 'Outline land', run: () => { leaveGlobe(); startOutline(); } } });
+    toast('That building link is incomplete or damaged, often because an app cut it short. Ask for the link again, or for the building as a file.', { kind: 'error', action: { label: 'Outline Land', run: () => { leaveGlobe(); startOutline(); } } });
     return;
   }
   if (!drawable(doc.design)) return;
@@ -1455,7 +1455,7 @@ async function restoreScene(uid) {
     }
     if (skipped) toast(`${skipped} saved building${skipped === 1 ? '' : 's'} couldn’t be drawn. The rest are on the map.`, { kind: 'error', action: { label: 'Open My Builds', run: () => openSites() } });
   } catch (error) {
-    if (current()) toast('Your saved buildings couldn’t be loaded right now.', { kind: 'error', action: { label: 'Try again', run: () => restoreScene(uid) } });
+    if (current()) toast('Your saved buildings couldn’t be loaded right now.', { kind: 'error', action: { label: 'Try Again', run: () => restoreScene(uid) } });
   }
 }
 

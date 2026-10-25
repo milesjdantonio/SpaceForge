@@ -6,27 +6,27 @@ import { icon } from '../ui/icons.js';
 import { typeName } from '../lib/housing.js';
 
 export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore, onRetry }) {
-  const statusText = { draft: 'Draft', 'not-sent': 'Not sent yet', sent: 'Sent' };
+  const statusText = { draft: 'Draft', 'not-sent': 'Not Sent Yet', sent: 'Sent' };
   el.innerHTML = `
     <header class="panel-head">
       <div><h2 class="panel-title">My Builds</h2><p class="panel-sub">Your buildings and site drafts</p></div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
     <section class="saved-buildings" aria-labelledby="saved-buildings-title">
-      <h3 class="group-title" id="saved-buildings-title">Saved buildings</h3>
+      <h3 class="group-title" id="saved-buildings-title">Saved Buildings</h3>
       <p class="note">${account ? 'Private to your account.' : 'Sign in to save buildings and open them on your next visit.'}</p>
-      ${!account ? '<button type="button" class="btn btn-primary" data-library-signin>Sign in</button>' : ''}
+      ${!account ? '<button type="button" class="btn btn-primary" data-library-signin>Sign In</button>' : ''}
       <p class="account-error" data-library-error role="alert" hidden></p>
-      ${error && onRetry ? `<div class="fail-actions"><button type="button" class="btn btn-small" data-library-retry>${icon('retry')}<span>Try again</span></button></div><p class="note">Site drafts below are kept in this browser and still work.</p>` : ''}
+      ${error && onRetry ? `<div class="fail-actions"><button type="button" class="btn btn-small" data-library-retry>${icon('retry')}<span>Try Again</span></button></div><p class="note">Site drafts below are kept in this browser and still work.</p>` : ''}
       ${loading ? '<p role="status">Loading saved buildings…</p>' : ''}
       ${account && !loading && !error && !buildings.length ? '<p class="empty">No saved buildings yet. Open a design and choose Save building.</p>' : ''}
       <ul class="sites" data-buildings></ul>
-      ${nextOffset != null ? '<button type="button" class="btn btn-small" data-library-more>Load more</button>' : ''}
+      ${nextOffset != null ? '<button type="button" class="btn btn-small" data-library-more>Load More</button>' : ''}
     </section>
-    <h3 class="group-title">Site drafts in this browser</h3>
+    <h3 class="group-title">Site Drafts in This Browser</h3>
     ${sites.length ? '<ul class="sites" data-drafts></ul>' : '<p class="empty">Outline some land to start a site draft.</p>'}
     <div class="file-open">
-      <label class="btn btn-small">${icon('house')}<span>Open a design file</span><input type="file" accept="application/json,.json" class="sr-only" data-file></label>
+      <label class="btn btn-small">${icon('house')}<span>Open a Design File</span><input type="file" accept="application/json,.json" class="sr-only" data-file></label>
       <p class="note">For checking Gemma’s output: a terrasim.design/2 JSON file, or a reply with design and estimate. It’s checked against the contract, then drawn where it stands.</p>
     </div>`;
   el.querySelector('[data-file]').addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) onOpenFile?.(f); });

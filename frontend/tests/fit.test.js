@@ -55,7 +55,7 @@ test('the design service’s placement answer replaces the estimate', () => {
   assert.match(fitMessage(ok, fmt).text, /A 12 m × 10 m building on 2 floors: 16% of the 816 m²/);
   const over = serviceFit({ level: 'over', floors: 1, buildableM2: 660, floorsNeeded: 3, maxAreaM2: 348 }, 'house', land(1000, 660));
   const msg = fitMessage(over, fmt);
-  assert.equal(msg.title, 'Too big for this land');
+  assert.equal(msg.title, 'Too Big for This Land');
   assert.match(msg.text, /3 floors, or a size up to 348 m²/);
   const lean = serviceFit({ level: 'tight', floors: 1, widthM: 15, depthM: 11, buildableM2: 300, dropped: ['porch'] }, 'house', land(500, 300));
   assert.match(fitMessage(lean, fmt).text, /once the porch is left out/);

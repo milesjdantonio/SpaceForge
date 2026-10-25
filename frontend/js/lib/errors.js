@@ -15,7 +15,7 @@ export function explainDesignError(err, { request = null, fit = null } = {}) {
 
   if (err?.code === 'not-connected') {
     return {
-      title: 'The design service isn’t connected',
+      title: 'The Design Service Isn’t Connected',
       text: `Nothing was sent. ${keep}`,
       next: 'Start the design service (cd housecost, then go run . -serve) and try again. Meanwhile you can place the sample house on your land.',
       actions: ['preview', 'retry', 'edit'],
@@ -24,7 +24,7 @@ export function explainDesignError(err, { request = null, fit = null } = {}) {
   }
   if (err?.code === 'network') {
     return {
-      title: 'Couldn’t reach the design service',
+      title: 'Couldn’t Reach the Design Service',
       text: `The request didn’t get through. ${keep}`,
       next: 'Check your internet connection and that the design service is running, then try again.',
       actions: ['retry', 'preview', 'edit'],
@@ -33,7 +33,7 @@ export function explainDesignError(err, { request = null, fit = null } = {}) {
   }
   if (err?.code === 'rate-limited' || err?.status === 429 || err?.status === 503 || has(msg, /busy|quota|rate limit|overloaded/i)) {
     return {
-      title: 'The design service is busy',
+      title: 'The Design Service Is Busy',
       text: 'Gemma has too many requests right now.',
       next: 'Wait a minute and try again. Your brief is kept, so nothing needs re-entering.',
       actions: ['retry', 'preview'],
@@ -42,7 +42,7 @@ export function explainDesignError(err, { request = null, fit = null } = {}) {
   }
   if (err?.status === 422 || has(msg, /coverage|outside the (us|united states)|no site data/i)) {
     return {
-      title: 'No site data for this land',
+      title: 'No Site Data for This Land',
       text: msg || 'The design service has no site data here.',
       next: 'Try again: outside the US, TerraSim now estimates the site and labels the result. Or outline land somewhere else.',
       actions: ['retry', 'outline', 'preview'],
@@ -60,7 +60,7 @@ export function explainDesignError(err, { request = null, fit = null } = {}) {
   }
   if (err?.code === 'no-design' || err?.code === 'invalid-design') {
     return {
-      title: 'The design came back incomplete',
+      title: 'The Design Came Back Incomplete',
       text: msg || 'Gemma answered, but the design couldn’t be drawn.',
       next: 'This is usually a one-off. Try again; if it repeats, a shorter, plainer description helps.',
       actions: ['retry', 'edit'],
@@ -77,7 +77,7 @@ export function explainDesignError(err, { request = null, fit = null } = {}) {
     };
   }
   return {
-    title: 'The design didn’t come back',
+    title: 'The Design Didn’t Come Back',
     text: msg || 'The design service couldn’t finish this design.',
     next: fixes.length ? 'Try one of the suggestions below, or try again as it is.' : 'Try again; most failures don’t repeat. If it does, simplify the brief.',
     actions: ['retry', 'edit', 'preview'],
@@ -96,28 +96,28 @@ export function suggestFixes(err, { brief = {}, fit = null, type = null } = {}) 
       out.push({ label: `Make it ${Math.floor(fit.maxAreaM2)} m²`, why: 'The largest size the design service could place on this land.', patch: { areaM2: Math.floor(fit.maxAreaM2) } });
     } else if (brief.areaM2 && fit.share > 1) {
       const area = Math.max(10, Math.floor((brief.areaM2 / fit.share) * 0.9));
-      out.push({ label: 'Make it smaller', why: 'A size that fits the buildable land.', patch: { areaM2: area } });
+      out.push({ label: 'Make It Smaller', why: 'A size that fits the buildable land.', patch: { areaM2: area } });
     }
-    if (type !== 'dorm') out.push({ label: 'Let Gemma choose the size', why: 'Gemma sizes it to fit the land.', patch: { areaByAI: true } });
+    if (type !== 'dorm') out.push({ label: 'Let Gemma Choose the Size', why: 'Gemma sizes it to fit the land.', patch: { areaByAI: true } });
   }
   if (has(msg, /budget|cost|afford|too (low|small)/i) && brief.budgetUSD) {
     out.push({ label: 'Raise the budget 25%', why: 'The design may not be buildable for this budget.', patch: { budgetUSD: Math.round((brief.budgetUSD * 1.25) / 1000) * 1000 } });
-    out.push({ label: 'No budget limit', why: 'Let the design set its own cost.', patch: { noBudgetLimit: true } });
+    out.push({ label: 'No Budget Limit', why: 'Let the design set its own cost.', patch: { noBudgetLimit: true } });
   }
   if (has(msg, /json|parse|invalid|program|style|could not use|unusable/i) && (brief.designPrompt?.length ?? 0) > 220) {
-    out.push({ label: 'Shorten the description', why: 'A shorter, plainer description is easier for Gemma to follow.', patch: { designPrompt: brief.designPrompt.slice(0, 200).replace(/\s+\S*$/, '') + '.' } });
+    out.push({ label: 'Shorten the Description', why: 'A shorter, plainer description is easier for Gemma to follow.', patch: { designPrompt: brief.designPrompt.slice(0, 200).replace(/\s+\S*$/, '') + '.' } });
   }
   return out.slice(0, 3);
 }
 
 // Saving to the account.
 export function explainSaveError(err) {
-  if (err?.code === 'sign-in-required') return { text: 'Sign in to save buildings to your account.', action: 'Sign in' };
-  if (err?.status === 401) return { text: 'Your sign-in expired, so the building wasn’t saved.', action: 'Sign in again' };
+  if (err?.code === 'sign-in-required') return { text: 'Sign in to save buildings to your account.', action: 'Sign In' };
+  if (err?.status === 401) return { text: 'Your sign-in expired, so the building wasn’t saved.', action: 'Sign in Again' };
   if (err?.status === 413) return { text: 'This building is too large to save (over 1 MB).', action: null };
-  if (err?.code === 'account-changed' || err?.code === 'view-changed') return { text: 'The account or building changed while saving.', action: 'Try again' };
+  if (err?.code === 'account-changed' || err?.code === 'view-changed') return { text: 'The account or building changed while saving.', action: 'Try Again' };
   if (err instanceof TypeError || /unavailable|fetch|network/i.test(err?.message ?? '')) {
-    return { text: 'Saved buildings can’t be reached right now. It stays on the map in this tab.', action: 'Try again' };
+    return { text: 'Saved buildings can’t be reached right now. It stays on the map in this tab.', action: 'Try Again' };
   }
-  return { text: err?.message || 'The building wasn’t saved.', action: 'Try again' };
+  return { text: err?.message || 'The building wasn’t saved.', action: 'Try Again' };
 }

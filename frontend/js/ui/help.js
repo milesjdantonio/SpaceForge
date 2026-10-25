@@ -1,4 +1,4 @@
-// "How to": the question-mark button in the top bar opens a short guide, one step at a time, each
+// "How To": the question-mark button in the top bar opens a short guide, one step at a time, each
 // with a looping Rive scene of the step being done and a line of text under it.
 
 import { icon } from './icons.js';
@@ -10,13 +10,13 @@ const touch = () => matchMedia('(pointer: coarse)').matches;
 function steps() {
   const tap = touch() ? 'Tap' : 'Click';
   return [
-    { title: 'Find your land', text: `Search for a place, or ${tap.toLowerCase()} anywhere on the globe to fly there.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Find' } },
-    { title: 'Outline it', text: `${tap} each corner of the land, then ${tap.toLowerCase()} the first corner again to close it.`, rive: { src: 'assets/rive/outline.riv', fit: 'cover' } },
-    { title: 'Describe the building', text: 'Pick a type and describe it. The bar shows whether it suits the land before you send it.', rive: { src: 'assets/rive/guide.riv', artboard: 'Describe' } },
-    { title: 'Send it', text: 'The design service draws a building for your land. This may take a while.', rive: { src: 'assets/rive/forge.riv', stateMachine: 'Forge', inputs: { state: 1 } } },
-    { title: 'Move or turn it', text: `${tap} the building, choose Move, then drag the top grip to move it or the ring grip to turn it.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Move' } },
-    { title: 'Look inside', text: `${tap} it again for plans and costs, then Walk through to explore the rooms.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Inside' } },
-    { title: 'Save and share', text: 'Sign in to keep it in My Builds. Then choose Share to send it to a builder or landowner; your links stay under Share.', rive: { src: 'assets/rive/guide.riv', artboard: 'Save' } },
+    { title: 'Find Your Land', text: `Search for a place, or ${tap.toLowerCase()} anywhere on the globe to fly there.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Find' } },
+    { title: 'Outline It', text: `${tap} each corner of the land, then ${tap.toLowerCase()} the first corner again to close it.`, rive: { src: 'assets/rive/outline.riv', fit: 'cover' } },
+    { title: 'Describe the Building', text: 'Pick a type and describe it. The bar shows whether it suits the land before you send it.', rive: { src: 'assets/rive/guide.riv', artboard: 'Describe' } },
+    { title: 'Send It', text: 'The design service draws a building for your land. This may take a while.', rive: { src: 'assets/rive/forge.riv', stateMachine: 'Forge', inputs: { state: 1 } } },
+    { title: 'Move or Turn It', text: `${tap} the building, choose Move, then drag the top grip to move it or the ring grip to turn it.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Move' } },
+    { title: 'Look Inside', text: `${tap} it again for plans and costs, then Walk through to explore the rooms.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Inside' } },
+    { title: 'Save and Share', text: 'Sign in to keep it in My Builds. Then choose Share to send it to a builder or landowner; your links stay under Share.', rive: { src: 'assets/rive/guide.riv', artboard: 'Save' } },
   ];
 }
 
@@ -26,8 +26,8 @@ function mapControls() {
 }
 
 export function mountHelp(button, dialog) {
-  button.innerHTML = `${icon('help')}<span class="sr-only">How to use TerraSim</span>`;
-  button.title = 'How to use TerraSim';
+  button.innerHTML = `${icon('help')}<span class="sr-only">How to Use TerraSim</span>`;
+  button.title = 'How to Use TerraSim';
   let at = 0, scene = null, list = [];
 
   function show(i) {
@@ -53,7 +53,7 @@ export function mountHelp(button, dialog) {
     dialog.innerHTML = `
       <div class="dialog-body help-body">
         <header class="help-head">
-          <h2 class="dialog-title" id="help-title">How to use TerraSim</h2>
+          <h2 class="dialog-title" id="help-title">How to Use TerraSim</h2>
           <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
         </header>
         <div class="help-stage" data-stage role="img"></div>

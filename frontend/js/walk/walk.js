@@ -423,7 +423,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
     <div class="walk-top">
       <div><h2 class="walk-title">${title}</h2><p class="walk-room" aria-live="polite"></p></div>
       <div class="walk-tools">
-        <button type="button" class="btn" data-exit>${icon('close')}<span>Back to the map</span></button>
+        <button type="button" class="btn" data-exit>${icon('close')}<span>Back to the Map</span></button>
       </div>
     </div>
     <div class="walk-lift" hidden role="group" aria-label="Elevator"></div>
@@ -442,7 +442,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
   } catch {
     host.querySelector('.walk-start').innerHTML = `<p class="walk-start-title">The walkthrough can’t start here</p>
       <p>It needs WebGL (3D graphics), which this browser has turned off. Turn on hardware acceleration in the browser’s settings and reload, or look at the floor plans instead.</p>
-      <button type="button" class="btn btn-primary" data-plans>See the floor plans</button>`;
+      <button type="button" class="btn btn-primary" data-plans>See the Floor Plans</button>`;
     // Nothing else was set up, so closing only hides the walkthrough.
     const leave = () => { host.hidden = true; host.replaceChildren(); };
     host.querySelector('[data-plans]').addEventListener('click', () => { leave(); document.querySelector('#panel [data-tab="plans"]')?.click(); });

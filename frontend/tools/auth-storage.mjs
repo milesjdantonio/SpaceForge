@@ -67,7 +67,7 @@ try {
       await page.waitForFunction(() => !document.querySelector('#dialog').open, { timeout: 15000 });
       assert.equal(await page.locator('#account-button').textContent(), 'Account');
     };
-    const signOut = async () => { await page.click('#account-button'); await page.click('[data-signout]'); await page.waitForFunction(() => document.querySelector('#account-button').textContent === 'Sign in'); };
+    const signOut = async () => { await page.click('#account-button'); await page.click('[data-signout]'); await page.waitForFunction(() => document.querySelector('#account-button').textContent === 'Sign In'); };
     const stamp = Date.now();
     const alice = `browser-alice-${stamp}@example.test`, bob = `browser-bob-${stamp}@example.test`;
     await page.goto(base + '/?api=http://design.test');
