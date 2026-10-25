@@ -134,7 +134,7 @@ func run() error {
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("Using the API key from %s: %s\n", src, maskKey(key))
+		fmt.Printf("Using the API key from %s\n", src)
 		g := NewGemma(key, *model, os.Stdout)
 		if t := strings.ToUpper(strings.TrimSpace(*thinking)); t == "DEFAULT" || t == "" {
 			g.Thinking = ""

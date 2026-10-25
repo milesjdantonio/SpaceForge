@@ -10,9 +10,11 @@ import { api } from './api/client.js';
 import { config } from './config.js';
 import { auth } from './auth.js';
 import { buildings } from './api/buildings.js';
-import { savedDocument, readSavedBuilding } from './lib/saved-building.js';
-import { createBuildingSaver } from './lib/building-saver.js';
-import { loadSavedScene, sceneCamera } from './lib/saved-scene.js';
+import { readSavedBuilding } from './lib/saved-building.js';
+import { createBuildingStorage } from './controllers/building-storage.js';
+import { createSceneController } from './controllers/scene.js';
+import { createAccountSession } from './controllers/account-session.js';
+import { mountBuildingInteraction } from './controllers/building-interaction.js';
 import { mountAccount } from './ui/account.js';
 import { mountHelp } from './ui/help.js';
 import { enablePress } from './ui/press.js';
@@ -26,10 +28,11 @@ import { checkDesign, pointInPolygon } from './lib/design.js';
 import { isSite, homePlacement, variantOf } from './lib/site.js';
 import { landFit } from './lib/fit.js';
 import { explainSaveError } from './lib/errors.js';
-import { createMover } from './map/mover.js';
 import { createTopo } from './map/topo.js';
 import { shareDocument, packShare, unpackShare } from './lib/share.js';
-import { renderSites } from './panels/lists.js';
+import { projects } from './api/projects.js';
+import { createLibraryController } from './controllers/library.js';
+import { createGenerationObserver } from './controllers/generation.js';
 import { renderShare } from './panels/share.js';
 import { mountRive } from './rive.js';
 import { createStarfield } from './map/stars.js';
@@ -59,8 +62,6 @@ const app = {
   generation: null,
   currentDesignID: null,
   libraryVersion: 0,
-  saving: null,
-  savers: new Map(), // One ordered writer per SQL building, independent of selection.
   records: new Map(), // SQL UUID -> validated document for the signed-in account
   removedRecords: new Set(),
   sceneReady: false,
@@ -184,157 +185,7 @@ function goHome() {
   else map.flyTo({ center: app.you, zoom: 17.5, pitch: app.tilted ? 58 : 0, duration: 2500 });
 }
 
-map.on('click', (e) => {
-  if (e.originalEvent?.target?.closest?.('.you')) return;
-  if (app.mode === 'globe') {
-    // Fly to where the click landed, as long as it landed on the globe and not in space beside it.
-    const back = map.project(e.lngLat);
-    if (Math.hypot(back.x - e.point.x, back.y - e.point.y) > 4) return;
-    arrive([e.lngLat.lng, e.lngLat.lat], { zoom: 16.2 });
-    return;
-  }
-  if (app.justMoved && Date.now() - app.justMoved < 400) return;
-  if (mover.active) return; // While moving, clicks on the map neither select nor deselect.
-  if (app.mode === 'house' || app.mode === 'explore' || app.mode === 'failed') {
-    const hit = house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]);
-    // A click on a building always opens its details (cost, materials, plans); Move sits beside it.
-    if (hit) selectBuilding(hit, { details: true });
-    else if (emptyLandAt(e.lngLat)) {
-      // Land with no building on it: back to its brief, to design one.
-      house.deselect();
-      openBrief();
-    } else {
-      house.deselect();
-      if (panel.dataset.view === 'house') closePanel();
-      setMode('explore'); rememberScene();
-    }
-  }
-});
-map.on('mousemove', (e) => {
-  if (outliner.active || mover.dragging) return;
-  const hit = ['house', 'explore', 'failed'].includes(app.mode) && map.getZoom() >= 15 &&
-    (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]));
-  const land = !hit && !mover.active && emptyLandAt(e.lngLat);
-  map.getCanvas().style.cursor = hit || land ? (mover.active && house.isSelected(hit) ? 'grab' : 'pointer') : app.mode === 'globe' ? 'crosshair' : '';
-  // Say what a click will open before it's clicked.
-  const show = (!!hit || !!land) && !mover.active && !e.originalEvent?.ctrlKey;
-  hoverTip.hidden = !show;
-  if (show) {
-    hoverTip.textContent = land ? 'Click to design a building on this land'
-      : panel.dataset.view === 'house' && house.isSelected(hit) ? 'Showing its details' : 'Click for details: cost, plans, materials';
-    hoverTip.style.transform = `translate(${e.point.x + 16}px, ${e.point.y + 18}px)`;
-  }
-});
-// The land being worked on, when the point is on it and it has no building yet (or its building
-// was removed or failed): a click there reopens its brief. null otherwise.
-function emptyLandAt(lngLat) {
-  const site = app.site;
-  if (!site?.ring || outliner.active || !['house', 'explore', 'failed'].includes(app.mode) || map.getZoom() < 15) return null;
-  if (!pointInPolygon(lngLat.lng, lngLat.lat, site.ring)) return null;
-  const same = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((p, i) => Math.abs(p[0] - b[i][0]) < 1e-7 && Math.abs(p[1] - b[i][1]) < 1e-7);
-  const built = house.entries.some((e) => (site.designId && e.design?.id === site.designId) || same(e.design?.site?.outline, site.ring));
-  return built ? null : site;
-}
-const hoverTip = document.createElement('div');
-hoverTip.className = 'hover-tip';
-hoverTip.hidden = true;
-map.getContainer().append(hoverTip);
-map.getCanvas().addEventListener('mouseleave', () => { hoverTip.hidden = true; });
-map.on('movestart', () => { hoverTip.hidden = true; });
-
-// Teaching Ctrl + drag (the only way to turn and tilt with a mouse): a tip at street level until it's
-// dismissed or used, and a cue beside the pointer while Ctrl is held over the map.
-const finePointer = matchMedia('(pointer: fine)').matches;
-const tiltTip = document.createElement('div');
-tiltTip.className = 'tilt-tip';
-tiltTip.hidden = true;
-tiltTip.innerHTML = `<span class="tilt-keys"><kbd>Ctrl</kbd><span aria-hidden="true">+</span>${icon('move')}</span><span>Hold <strong>Ctrl</strong> and drag to turn and tilt the view</span><button type="button" class="tilt-tip-close" aria-label="Got it, hide this tip">${icon('close')}</button>`;
-$('#main').append(tiltTip);
-let tiltLearned = store.get('tiltLearned', false);
-const learnTilt = () => { if (tiltLearned) return; tiltLearned = true; store.set('tiltLearned', true); syncTiltTip(); };
-function syncTiltTip() {
-  tiltTip.hidden = !finePointer || tiltLearned || ['globe', 'flying', 'drawing', 'sending'].includes(app.mode) || map.getZoom() < 14 || mover.active;
-}
-tiltTip.querySelector('button').addEventListener('click', learnTilt);
-map.on('moveend', syncTiltTip);
-for (const ev of ['rotatestart', 'pitchstart']) map.on(ev, (e) => { if (e.originalEvent) learnTilt(); });
-
-const ctrlCue = document.createElement('div');
-ctrlCue.className = 'hover-tip ctrl-cue';
-ctrlCue.hidden = true;
-ctrlCue.textContent = 'Drag to turn and tilt';
-map.getContainer().append(ctrlCue);
-let pointer = null;
-map.getCanvas().addEventListener('mousemove', (e) => {
-  const r = map.getCanvas().getBoundingClientRect();
-  pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
-  if (!ctrlCue.hidden) ctrlCue.style.transform = `translate(${pointer.x + 16}px, ${pointer.y + 18}px)`;
-  if (e.ctrlKey !== !ctrlCue.hidden) setCtrlCue(e.ctrlKey);
-});
-map.getCanvas().addEventListener('mouseleave', () => { pointer = null; setCtrlCue(false); });
-function setCtrlCue(on) {
-  const show = on && !!pointer && finePointer && app.mode !== 'globe' && !outliner.active && !mover.active;
-  ctrlCue.hidden = !show;
-  map.getCanvas().classList.toggle('is-ctrl', show);
-  if (show) { hoverTip.hidden = true; ctrlCue.style.transform = `translate(${pointer.x + 16}px, ${pointer.y + 18}px)`; }
-}
-addEventListener('keydown', (e) => { if (e.key === 'Control' && !e.repeat) setCtrlCue(true); });
-addEventListener('keyup', (e) => { if (e.key === 'Control') setCtrlCue(false); });
-addEventListener('blur', () => setCtrlCue(false));
-map.on('dblclick', (e) => {
-  if (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat])) e.preventDefault();
-});
-
-// ---- selecting and moving a building -----------------------------------------------------------
-// A click selects a house (a thin line round it on the ground) and opens its details. The Move button beside a selected house
-// (map/mover.js) turns on the move and turn grips.
-function selectBuilding(hit, { details = false } = {}) {
-  if (hit.id && (!house.design || hit.id !== app.savedBuilding?.id)) openSceneBuilding(hit.id, { focus: false, details });
-  else {
-    house.select();
-    if (details) openHouse();
-    else if (panel.dataset.view === 'house') closePanel();
-    rememberScene();
-  }
-  // On phones the details sheet covers the lower half: keep the building (and Move) above it.
-  if (details && !wide()) {
-    const fp = (hit.placement ?? house.placement)?.footprint;
-    if (fp) map.easeTo({ center: [fp.reduce((s, p) => s + p[0], 0) / fp.length, fp.reduce((s, p) => s + p[1], 0) / fp.length], padding: panelPadding(), duration: 600 });
-  }
-}
-const landOf = (design) => (design.previewOn ? app.site?.ring : design.site?.outline) ?? null;
-const mover = createMover(map, {
-  house, outliner, landOf,
-  canOffer: () => ['house', 'explore', 'failed'].includes(app.mode) && !outliner.active && !isSite(house.design), // a site is its land: it doesn't move
-  onDone: (placement) => savePlacement(placement),
-  // On phones the details panel covers the map, so moving puts it away.
-  onStart: () => { if (!wide() && panel.dataset.view === 'house') closePanel(); },
-  onDragEnd: () => { app.justMoved = Date.now(); }, // Ignore the click that follows a drag.
-});
-
-// Keeps a building's new spot: saved buildings save it to the account; others keep it until saved.
-function savePlacement(last) {
-  const design = house.design;
-  const uid = auth.user?.uid;
-  const version = app.displayVersion;
-  const known = app.savedBuilding;
-  const saving = app.saving;
-  const saved = known?.uid === uid && known?.designID === design.id;
-  const pending = saving?.uid === uid && saving?.version === version && saving?.designID === design.id;
-  if (!uid || (!saved && !pending)) {
-    toast('Position updated. Choose Save building to keep it in your account.');
-    return;
-  }
-  // Keep Gemma's original geometry intact; persist the actual map placement beside it.
-  persistBuilding(design, app.estimates.get(design.id) ?? null, app.site, last).then(() => {
-    if (auth.user?.uid === uid && app.displayVersion === version && house.placement === last) toast('Position saved.');
-  }).catch((err) => {
-    if (auth.user?.uid === uid && app.displayVersion === version && house.placement === last) {
-      const why = explainSaveError(err);
-      toast(`The new position wasn’t saved. ${why.text}`, { kind: 'error', action: why.action && { label: why.action, run: () => savePlacement(last) } });
-    }
-  });
-}
+const { mover, landOf } = mountBuildingInteraction({ map, app, house, outliner, panel, mainElement: $('#main'), store, auth, wide, panelPadding, arrive, openHouse, closePanel, setMode, rememberScene, openSceneBuilding, persistBuilding, isPending: (...args) => storage.pending(...args), toast, openBrief });
 
 // Space shows behind the globe whenever the map is zoomed out far enough to see it.
 const syncSpace = () => {
@@ -828,6 +679,9 @@ function lockLand(on) {
 }
 
 async function send({ keepRetryFlag = false } = {}) {
+  // With the storage service, generation runs on the account (sign in first); without it, the
+  // website calls the design service directly (api/client.js).
+  if (api.viaAccount && !await account.require()) return;
   if (!keepRetryFlag && app.site) app.site.costRetried = false;
   app.generation?.abort();
   const generation = new AbortController();
@@ -842,6 +696,7 @@ async function send({ keepRetryFlag = false } = {}) {
     if (streets.length) request.site.properties.streets = streets;
   } catch { /* the map's tiles aren't readable: the service looks the streets up itself */ }
   app.site.lastRequestId = request.id;
+  const generationSite = structuredClone(app.site);
   // The lot lights up while the design is made; the building grows out of it when it arrives.
   house.hide();
   house.generating(app.site.ring);
@@ -851,8 +706,8 @@ async function send({ keepRetryFlag = false } = {}) {
   openPanel((el) => renderSending(el, {
     request,
     fit,
-    run: (onProgress) => api.createDesign(request, { onProgress, signal: generation.signal }),
-    onDone: async ({ design, estimate }) => {
+    run: (onProgress) => api.createDesign(request, { site: generationSite, projectId: generationSite.projectId, onProgress, signal: generation.signal }),
+    onDone: async ({ design, estimate, building }) => {
       if (generation.signal.aborted || (owner && auth.user?.uid !== owner)) return;
       // A design that came back without its cost or materials is made again, once, by itself.
       if (!design.cost && !estimate && !app.site.costRetried) {
@@ -863,6 +718,17 @@ async function send({ keepRetryFlag = false } = {}) {
       }
       lockLand(false);
       if (!drawable(design, { fresh: true })) return;
+      if (building) {
+        // The storage service made it and already saved it to the account.
+        const document = storage.adopt(building);
+        api.keepLocal(design, estimate);
+        house.stopGenerating();
+        showDesign(design, estimate, { ...document, savedBuilding: { id: building.id, uid: owner, designID: design.id } });
+        rememberScene();
+        toast('Design saved to your account.');
+        return;
+      }
+      // Made directly by the design service: show it, and save it when someone's signed in.
       app.site.status = 'sent';
       app.site.designId = design.id;
       saveSite();
@@ -1197,38 +1063,6 @@ async function openSharedBuilding(hash) {
   toast('A building shared with you. Sign in and choose Save building to keep a copy.');
 }
 
-async function persistBuilding(design, estimate, site, placement) {
-  const uid = auth.user?.uid;
-  const version = app.displayVersion;
-  if (!uid) throw new Error('Sign in to save your building.');
-  const known = app.savedBuilding;
-  const id = known?.uid === uid && known?.designID === design.id ? known.id : null;
-  let writer = id ? app.savers.get(id) : null;
-  if (!writer && app.saving?.uid === uid && app.saving.version === version && app.saving.designID === design.id) writer = app.saving;
-  if (!writer) {
-    const accountVersion = app.sceneVersion;
-    writer = { uid, version, designID: design.id, id, save: createBuildingSaver({
-      id,
-      save: (input) => buildings.save(input),
-      isCurrent: () => auth.user?.uid === uid && app.sceneVersion === accountVersion && !app.removedRecords.has(writer.id),
-      onSaved: (result) => {
-        writer.id = result.id;
-        app.savers.set(result.id, writer);
-        const document = readSavedBuilding(result);
-        app.records.set(result.id, { record: result, document });
-        if (app.currentDesignID === design.id && (app.displayVersion === version || app.savedBuilding?.id === result.id)) {
-          app.savedBuilding = { id: result.id, uid, designID: design.id };
-          house.remember(result.id);
-        } else if (!house.entries.some((entry) => entry.id === result.id)) house.add(result.id, document.design, document.placement);
-        app.sceneReady = true;
-        rememberScene();
-      },
-    }) };
-  }
-  app.saving = writer;
-  return writer.save({ name: (buildingName(design) ?? design.overview.title).slice(0, 120),
-    data: savedDocument({ design, estimate, site, placement }) });
-}
 
 // ---- preview: the camera circles the building ---------------------------------------------------
 // The panel slides away and the camera turns slowly round the building, until Stop, Escape, or any
@@ -1302,71 +1136,7 @@ document.querySelector('[data-open="share"]').addEventListener('click', () => {
   if (house.design) shareBuilding(house.design);
   else openShare();
 });
-async function openSites() {
-  await auth.ready;
-  const version = ++app.libraryVersion;
-  leaveGlobe();
-  const uid = auth.user?.uid ?? null;
-  let items = [], nextOffset = null, loading = !!uid, error = '';
-  const render = () => renderSites(panel, {
-    account: auth.user, buildings: items, nextOffset, loading, error,
-    sites: store.get(scopeKey('sites'), []),
-    onOpen: (s) => {
-      closePanel();
-      app.site = s;
-      outliner.load(s.ring);
-      const c = measure(s.ring).centroid;
-      map.flyTo({ center: c, zoom: 18, pitch: 55, duration: 3500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
-      map.once('moveend', () => openBrief());
-    },
-    onDelete: (s) => store.update(scopeKey('sites'), [], (list) => list.filter((x) => x.id !== s.id)),
-    onOpenFile: (file) => openDesignFile(file),
-    onSignIn: async () => { if (await account.require()) openSites(); },
-    onOpenBuilding: async (summary) => {
-      try {
-        const record = await buildings.get(summary.id);
-        const document = readSavedBuilding(record);
-        if (auth.user?.uid !== uid) return;
-        app.records.set(record.id, { record, document });
-        app.sceneReady = true;
-        openSceneBuilding(record.id);
-      } catch (err) {
-        toast(`“${summary.name}” couldn’t be opened. ${err.message || ''}`.trim(), { kind: 'error', action: { label: 'Back to My Builds', run: () => openSites() } });
-      }
-    },
-    onDeleteBuilding: async (record) => {
-      app.removedRecords.add(record.id);
-      try { await buildings.remove(record.id); }
-      catch (error) { if (auth.user?.uid === uid) app.removedRecords.delete(record.id); throw error; }
-      if (auth.user?.uid !== uid) return;
-      items = items.filter((item) => item.id !== record.id);
-      app.savers.delete(record.id);
-      house.remove(record.id); app.records.delete(record.id); clearLands();
-      if (app.savedBuilding?.id === record.id) {
-        app.savedBuilding = null; app.currentDesignID = null; ++app.displayVersion;
-        outliner.clear(); setMode('explore');
-      }
-      rememberScene();
-      toast('Building deleted.');
-      if (!items.length && panel.dataset.view === 'sites') render();
-    },
-    onMore: () => load(nextOffset),
-    onRetry: () => load(items.length ? nextOffset ?? 0 : 0),
-  });
-  async function load(offset = 0) {
-    if (version !== app.libraryVersion) return;
-    loading = true; error = ''; render();
-    try {
-      const page = await buildings.list(offset);
-      if (auth.user?.uid !== uid || panel.dataset.view !== 'sites' || version !== app.libraryVersion) return;
-      items = offset ? [...items, ...page.items] : page.items;
-      nextOffset = page.next_offset;
-    } catch (err) { error = `Your saved buildings couldn’t be loaded. ${err.message || ''}`.trim(); }
-    finally { loading = false; if ((auth.user?.uid ?? null) === uid && panel.dataset.view === 'sites' && version === app.libraryVersion) render(); }
-  }
-  openPanel(render, 'sites');
-  if (uid) await load();
-}
+function openSites() { return library.open(); }
 document.querySelector('[data-open="sites"]').addEventListener('click', openSites);
 
 function syncUnits() {
@@ -1400,93 +1170,34 @@ document.querySelector('.brand').addEventListener('click', (e) => {
 const markEl = document.querySelector('[data-rive="mark"]');
 mountRive(markEl, { src: 'assets/rive/mark.riv', stateMachine: 'Mark', hoverInput: 'hover', hoverTarget: markEl.closest('a') });
 
-// ---- restore the account's saved scene ----------------------------------------------------------
-function rememberScene() {
-  const uid = auth.user?.uid;
-  if (!uid || !app.sceneReady) return;
-  const center = map.getCenter();
-  store.set(`scene:${uid}`, {
-    selectedID: house.design ? app.savedBuilding?.id ?? null : null,
-    selected: house.selected,
-    mode: app.mode === 'globe' ? 'globe' : 'map',
-    camera: { center: [center.lng, center.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() },
-  });
-}
 
-function openSceneBuilding(id, options = {}) {
-  const item = app.records.get(id);
-  if (!item) return;
-  // A house may have moved since its last response arrived; use its live placement.
-  const placement = house.entries.find((entry) => entry.id === id)?.placement ?? item.document.placement;
-  const { design, estimate } = item.document;
-  showDesign(design, estimate, { ...item.document, placement, selected: true, ...options,
-    savedBuilding: { id, uid: auth.user.uid, designID: design.id } });
-}
-
-async function restoreScene(uid) {
-  const sceneVersion = ++app.sceneVersion;
-  const displayVersion = app.displayVersion, navigationVersion = app.navigationVersion;
-  const previous = store.get(`scene:${uid}`, null);
-  const current = () => auth.user?.uid === uid && app.sceneVersion === sceneVersion;
-  try {
-    const { records, skipped } = await loadSavedScene({ client: buildings, isCurrent: current,
-      onRecord: (record, document) => {
-        if (app.records.has(record.id) || app.removedRecords.has(record.id)) return; // Preserve edits/deletions made during loading.
-        house.add(record.id, document.design, document.placement);
-        app.records.set(record.id, { record, document });
-      },
-    });
-    if (!current()) return;
-    app.sceneReady = true;
-    clearLands();
-    if (app.displayVersion === displayVersion && app.navigationVersion === navigationVersion && app.mode === 'globe' && !location.hash) {
-      const camera = sceneCamera(previous);
-      const newest = records.filter(({ record }) => app.records.has(record.id))
-        .sort((a, b) => b.record.created_at.localeCompare(a.record.created_at))[0];
-      const id = app.records.has(previous?.selectedID) ? previous.selectedID : newest?.record.id;
-      if (camera && previous.mode === 'globe') {
-        map.jumpTo({ ...camera, padding: globePadding() });
-      } else if (id) {
-        openSceneBuilding(id, { camera, animate: false, selected: previous?.selected === true });
-      } else if (camera) {
-        stopSpin(); intro.hidden = true; setMode('explore');
-        map.jumpTo({ ...camera, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
-      }
-    }
-    if (skipped) toast(`${skipped} saved building${skipped === 1 ? '' : 's'} couldn’t be drawn. The rest are on the map.`, { kind: 'error', action: { label: 'Open My Builds', run: () => openSites() } });
-  } catch (error) {
-    if (current()) toast('Your saved buildings couldn’t be loaded right now.', { kind: 'error', action: { label: 'Try Again', run: () => restoreScene(uid) } });
-  }
-}
-
-let previousUser;
-function accountChanged(user) {
-  const uid = user?.uid ?? null;
-  if (uid === previousUser) return;
-  if (previousUser) {
-    store.set(`designs:${previousUser}`, []);
-    store.set(`sites:${previousUser}`, []);
-    store.set(`builder:${previousUser}`, null);
-    store.set(`lastForm:${previousUser}`, null);
-    app.generation?.abort(); lockLand(false);
-    mover.cancel(); map.dragPan.enable(); map.stop();
+const storage = createBuildingStorage({ app, auth, buildings, house, rememberScene, buildingName });
+const library = createLibraryController({ app, auth, buildings, projects, storage, house, map, outliner, panel, store, scopeKey, account, leaveGlobe, closePanel, openPanel, openBrief, openDesignFile, openSceneBuilding, clearLands, setMode, rememberScene, toast });
+const generationObserver = createGenerationObserver({ api, auth, onSaved(record) {
+  const document = storage.adopt(record);
+  house.add(record.id, document.design, document.placement);
+  clearLands();
+  toast('Your design is ready and saved.', { action: { label: 'Open building', run: () => openSceneBuilding(record.id) } });
+}, onFailed() { toast('A design could not finish. Open its site draft to try again.', { kind: 'error' }); } });
+const scene = createSceneController({ app, auth, store, map, house, buildings, showDesign, clearLands,
+  globePadding, stopSpin, intro, setMode, toast, openSites, location });
+function persistBuilding(...args) { return storage.persist(...args); }
+function rememberScene() { return scene.remember(); }
+function openSceneBuilding(...args) { return scene.open(...args); }
+function restoreScene(uid) { return scene.restore(uid); }
+createAccountSession({ auth, store, app, restoreScene, panel, openSites, generationObserver, resetView() {
+    lockLand(false); mover.cancel(); map.dragPan.enable(); map.stop();
     ++app.displayVersion; ++app.sceneVersion;
     $('#walk [data-exit]')?.click();
     house.clear(); outliner.clear(); closePanel();
     app.site = null; app.estimates.clear(); app.savedBuilding = null; app.currentDesignID = null; app.names.clear();
-    app.records.clear(); app.removedRecords.clear(); app.savers.clear(); app.saving = null; app.sceneReady = false;
+    app.records.clear(); app.removedRecords.clear(); storage.reset(); app.sceneReady = false;
     intro.hidden = false; intro.classList.remove('is-leaving');
     setMode('globe');
     map.jumpTo({ center: [-40, 28], zoom: 1.9, pitch: 0, bearing: 0, padding: globePadding() });
-  }
-  previousUser = uid;
-  if (uid) restoreScene(uid);
-  if (panel.dataset.view === 'sites' && !panel.hidden) openSites();
-}
+} });
 map.on('movestart', (event) => { if (event.originalEvent) ++app.navigationVersion; });
 map.on('moveend', rememberScene);
 addEventListener('pagehide', rememberScene);
-auth.onChange(accountChanged);
-auth.ready.then(() => accountChanged(auth.user));
 // A shared building opens once everything above is ready (share links keep priority over the saved scene).
 if (location.hash.startsWith('#b=')) openSharedBuilding(location.hash);

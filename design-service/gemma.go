@@ -569,12 +569,17 @@ func (g *Gemma) Ask(msgs []Msg, maxTokens int) (string, error) {
 		return "", err
 	}
 	g.n++
-	_ = os.MkdirAll(g.LogDir, 0o755)
 	logFile := filepath.Join(g.LogDir, fmt.Sprintf("reply_%d.txt", g.n))
-	_ = os.WriteFile(logFile, []byte(fmt.Sprintf("finish_reason: %s\nmax_output_tokens: %d\nreasoning_tokens: %d\n\n"+
-		"=== answer ===\n%s\n\n=== hidden reasoning ===\n%s\n", r.finish, maxTokens, r.thoughtTokens, r.text, r.thoughts)), 0o644)
+	if g.LogDir != "" {
+		_ = os.MkdirAll(g.LogDir, 0o755)
+		_ = os.WriteFile(logFile, []byte(fmt.Sprintf("finish_reason: %s\nmax_output_tokens: %d\nreasoning_tokens: %d\n\n"+
+			"=== answer ===\n%s\n\n=== hidden reasoning ===\n%s\n", r.finish, maxTokens, r.thoughtTokens, r.text, r.thoughts)), 0o644)
+	}
 	hitLimit := strings.Contains(r.finish, "MAX_TOKENS")
 	if strings.TrimSpace(r.text) == "" {
+		if g.LogDir == "" {
+			return "", EmptyReplyError{fmt.Sprintf("finish_reason=%s after %d reasoning tokens", r.finish, r.thoughtTokens), hitLimit}
+		}
 		return "", EmptyReplyError{fmt.Sprintf("finish_reason=%s after %d reasoning tokens; saved to %s",
 			r.finish, r.thoughtTokens, logFile), hitLimit}
 	}

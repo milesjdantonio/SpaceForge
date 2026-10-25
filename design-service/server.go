@@ -315,13 +315,15 @@ type server struct {
 	resDir   string
 	// fake is -fake: no Gemma calls, see fake.go.
 	fake bool
+	// token switches on the private worker for the storage service (worker.go).
+	token string
 	// deps builds the pipeline's connections for one design; tests swap it for stand-ins.
 	deps func(ctx context.Context, log io.Writer, raw []byte) (Deps, error)
 }
 
 func serve(addr, siteDir, model, keyFile string, newGemma func() (*Gemma, error), fake bool) error {
 	s := &server{newGemma: newGemma, keyFile: keyFile, model: model, jobs: map[string]*job{}, results: map[string]*Output{},
-		queue: make(chan func(), 64), resDir: "results", fake: fake}
+		queue: make(chan func(), 64), resDir: "results", fake: fake, token: os.Getenv("GENERATION_SERVICE_TOKEN")}
 	s.deps = func(ctx context.Context, log io.Writer, raw []byte) (Deps, error) {
 		if fake {
 			// -fake: the stand-in answers every Gemma step at once (fake.go); the site data is real.
@@ -409,6 +411,7 @@ func (s *server) handler(siteDir string) http.Handler {
 	mux.HandleFunc("POST /api/designs/edit", s.editDesign)
 	mux.HandleFunc("GET /api/listings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, []any{}) })
 	mux.HandleFunc("OPTIONS /api/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	s.workerRoutes(mux)
 
 	if fileExists(filepath.Join(siteDir, "index.html")) {
 		mux.Handle("/", noCache(http.FileServer(http.Dir(siteDir))))

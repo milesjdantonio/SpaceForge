@@ -17,7 +17,8 @@ export function readSavedBuilding(record) {
   if (placement && (!pair(placement.origin) || !Number.isFinite(placement.xAxisBearingDeg) || !Array.isArray(placement.footprint) || placement.footprint.length !== 4 || !placement.footprint.every(pair))) {
     throw new Error('This saved building has an invalid placement.');
   }
-  return { design, estimate: data.estimate ?? null, site: data.site ?? null, placement: data.placement ?? design.placement };
+  const site = data.site ? { ...data.site, ...(record.project_id ? { projectId: record.project_id } : {}) } : null;
+  return { design, estimate: data.estimate ?? null, site, placement: data.placement ?? design.placement };
 }
 
 function assertDesign(design) {

@@ -4,6 +4,11 @@
 import { config } from '../config.js';
 import { store } from '../store.js';
 import { auth } from '../auth.js';
+import { createDesignClient } from './generation.js';
+
+// Signed in with a storage service: generation runs on the account (saved as it finishes).
+// Otherwise the design service is called directly, with no sign-in.
+const accountDesigns = createDesignClient();
 
 export class NotConnectedError extends Error {
   constructor() {
@@ -111,7 +116,9 @@ export const api = {
   // itself ({ design, estimate }), with { designId }, or with { jobId } to poll every 2 seconds.
   // Resolves with { design, estimate }. onProgress gets job updates ({ status, progress, message }).
   // Aborting `signal` also asks the service to stop the job, so Gemma isn't left working on it.
-  async createDesign(request, { onProgress, signal } = {}) {
+  get viaAccount() { return !!config.storageBaseUrl && !!auth.user; },
+  async createDesign(request, { site, projectId, onProgress, signal } = {}) {
+    if (this.viaAccount) return accountDesigns.createDesign(request, { site, projectId, onProgress, signal });
     return finishJob(await call('/designs', { method: 'POST', body: request, signal }), { onProgress, signal });
   },
 
@@ -136,6 +143,10 @@ export const api = {
     if (!config.apiBaseUrl) return null;
     try { return await call('/fit', { method: 'POST', body: request, signal }); } catch (e) { if (e.name === 'AbortError') throw e; return null; }
   },
+
+  // Account jobs still running (for the generation observer).
+  watch: (...args) => accountDesigns.watch(...args),
+  jobs: () => (config.storageBaseUrl && auth.user ? accountDesigns.jobs() : Promise.resolve([])),
 
   // Keeps a received design in this browser (the newest 12), so it can be reopened.
   keepLocal(design, estimate) {

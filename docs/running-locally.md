@@ -1,8 +1,8 @@
 # Running TerraSim locally
 
-Go API for Firebase authentication and private building JSON storage in PostgreSQL.
-The frontend renders buildings; this API saves, lists, loads, replaces, and deletes
-its JSON documents. See [API reference](storage-service-api.md).
+Go API for Firebase authentication, private projects/buildings, and durable design
+jobs in PostgreSQL. The frontend renders buildings; the API owns generation
+authorization and saves completed designs without depending on the browser. See [API reference](docs/storage-service-api.md).
 
 ## Run locally
 
@@ -19,7 +19,9 @@ go run ./cmd/migrate
 go run ./cmd/api
 ```
 
-Apply migrations and restart the API after backend updates. Database data persists
+Apply migrations and restart the API after backend updates. Migration 000003 adds
+projects and durable design tasks, backfilling one project per existing building
+without changing building IDs, documents, or timestamps. Applied migrations stay immutable. Database data persists
 in the Docker volume. The PostGIS image supports historical migrations; new building
 storage uses JSONB. Applied migrations and existing data are preserved.
 
@@ -83,7 +85,8 @@ per account in this browser; house documents are loaded from the authenticated A
 Selecting a house on the map keeps the other saved houses visible. Signing out
 removes all private models and resets the view; deleting a record removes its model.
 Open a Gemma design file and choose Save building, or generate through a configured
-design service: valid replies automatically save while signed in. Save changes
+design worker: generation requires sign-in and saves its result on the server.
+Closing the tab does not stop accepted jobs or prevent saving. Save changes
 updates the existing SQL record. Reopening restores the original design, estimate,
 site/brief, and actual preview placement; Delete removes the account's saved record.
 Moving a saved building automatically saves its new position when you choose Done.
@@ -97,26 +100,47 @@ Overlapping saves run in order, including moves made while the first save is sti
 running or after selecting another house. A failed position save leaves the house visible and offers Save changes
 to retry. Unsaved imports and previews still use Save building first.
 
-website/js/config.js separates storageBaseUrl (the Go API, local default port 8080)
-from apiBaseUrl (the external Gemma/design service, still selected with ?api=).
-Firebase tokens go only to the storage service. Signing out clears private render
-state and account caches. Sessions survive page reload within a tab using a Firebase
+website/js/config.js uses storageBaseUrl for every account operation, including
+generation and projects. Firebase tokens go only to that configured API. Query-string
+`?api=` overrides and provider discovery have been removed. Signing out clears private
+render state and account caches. Sessions survive reload within a tab using a Firebase
 refresh token in sessionStorage; passwords and ID tokens are kept only in memory.
 
 On non-local hosts, configure storageBaseUrl to your HTTPS API and auth.apiKey to
-the Firebase public web API key, with auth.emulatorUrl empty. No AI/provider secret
-or service-account key belongs in the frontend. Real Gemma generation still requires
-its separately configured design service; saving/importing existing JSON works
-independently.
+the Firebase public web API key, with auth.emulatorUrl empty. No AI/provider secret,
+service token, or service-account key belongs in the frontend.
+
+My Builds has project filtering, project creation, and a project selector for each
+building. Each project has an owner, name, and shared land JSON object. Multiple
+buildings can reference the same project; composite foreign keys prevent crossing
+account boundaries. Saved design/site documents remain snapshots of their original
+inputs. Creating/importing a building without project_id creates a project atomically;
+PUT without project_id keeps its current membership. The membership-only
+PUT /api/buildings/{id}/project endpoint preserves data during reassignment. Nonempty projects cannot be
+deleted. Remove their buildings/tasks or move the buildings first.
+
+Frontend orchestration lives in website/js/controllers/: building-storage handles
+ordered saves; scene restores private models/camera; account-session invalidates
+private state on account changes; building-interaction handles picking and movement;
+library handles project/building browsing; generation resumes observation after reload.
+main.js connects these controllers to the map and panels.
 
 ## Run Gemma generation
 
-The merged design-service/ module is a separate Go process. Put your Gemini key in
-GEMINI_API_KEY in the root .env, or put only the key in root APIKey.txt. Both files
-are ignored by Git. An APIKey.txt file takes precedence over the environment.
-Keep the key on the server; website/js/config.js needs no Gemini key.
+design-service/ computes designs as a private worker service. The browser never calls it.
+Configure both processes with the same random GENERATION_SERVICE_TOKEN (at least
+32 characters). Generate one with `openssl rand -hex 32` and put it in your ignored
+.env, along with:
 
-In another terminal, starting at the repository root:
+```dotenv
+GENERATION_URL=http://127.0.0.1:8000
+GENERATION_SERVICE_TOKEN=<the generated token>
+GENERATION_WORKERS=2
+```
+
+Use GEMINI_API_KEY in .env or the ignored APIKey.txt for the Gemini key. APIKey.txt
+takes precedence over the environment. Keep all these secrets on the server.
+Source .env and restart the API. In another terminal, from the repository root:
 
 ```bash
 set -a
@@ -126,18 +150,37 @@ cd design-service
 go run . -serve -addr 127.0.0.1:8000
 ```
 
-Keep the auth/storage API on 8080 and frontend on 5173 running. Reload the frontend:
-it discovers the generation service on port 8000. To select it explicitly, open
-http://127.0.0.1:5173/?api=http://127.0.0.1:8000/api (include /api).
-GET http://127.0.0.1:8000/api/health reports whether a key was found; it does not
-verify the key with Google. Designs use queued jobs, progress polling, and inline
-design.cost; signed-in users save the complete result to private SQL storage.
+Keep the frontend on 5173 and account API on 8080 running. An empty GENERATION_URL
+leaves account/storage/project features available but rejects new generation with
+503. Non-loopback worker URLs require HTTPS. The worker requires service authorization
+for /internal/generate and /api/coverage; it exposes no browser CORS or public result
+endpoints. Its optional static frontend serving still uses the account API for data.
+Current generation site-data coverage remains US-only.
 
-The generation service currently supports US sites. Its generation jobs and local
-results have no account authorization; use its loopback address for development.
-The account storage API separately enforces Firebase authentication and ownership.
-If using the frontend served directly on port 8000 instead of 5173, add that exact
-origin to ALLOWED_ORIGINS in .env and restart the storage API to enable login there.
+The workflow is:
+
+1. POST /api/designs verifies Firebase identity and records an immutable request/site
+   snapshot, project relationship, and account-scoped idempotency key in SQL.
+2. Configurable concurrent consumers claim tasks with FOR UPDATE SKIP LOCKED and
+   45-second leases. Heartbeats extend leases every 15 seconds. Multiple API instances
+   can share the queue. Each attempt has a 15-minute deadline.
+3. A consumer calls the private worker using the service token. The worker streams
+   step metadata and the result; it uses no process-local queue, result files, or
+   provider-reply files in server mode. Safe start/completion/failure messages appear
+   in the worker terminal. An unbuildable footprint returns design-does-not-fit;
+   the API persists that reason and the browser offers a smaller brief or larger lot.
+   The CLI file-output mode is unchanged.
+4. The consumer commits the building and completed task in one SQL transaction.
+   Fenced lease tokens reject late completions from an obsolete worker. SQL results
+   are committed once; after interruption, provider computation can run again.
+5. A crashed process leaves a lease for another consumer to reclaim. Transport and
+   temporary worker failures retry with backoff, up to three attempts; exhausted
+   tasks become failed. Polling is optional: the server saves while the tab is closed.
+   On reload the frontend restores saved buildings and watches pending jobs.
+
+DELETE /api/designs/jobs/{id} removes a task and revokes an active lease; deleting a
+completed task leaves its saved building. Deleting a generated building removes its
+completed task. This also removes that task's idempotency key. Lease decisions use the database clock.
 
 ## Test
 
@@ -166,14 +209,25 @@ explicitly skip. Configuration is listed in [.env.example](../.env.example).
 
 Run npm test from website/ for session/refresh/storage checks. With the local Go API
 and Auth emulator running, npm ci followed by node tools/auth-storage.mjs runs a
-browser flow for signup, fixture Gemma output, save/reload, account isolation, import,
+browser flow for signup, fixture import, save/reload, account isolation,
 and deletion. It also drags a house twice with a delayed save response and verifies
 that reopening restores the latest position. It also checks automatic restoration
 of two houses, camera/selection persistence, and removing private models on sign-out.
 It creates and cleans up isolated
-emulator test accounts. Use
+emulator test accounts. No generation provider is called by that storage test. Use
 TEST_STORAGE_URL to target a temporary test API/database rather than the app database.
 
 From website/, node tools/building-drag.mjs checks mouse and mobile selection, orange highlighting, Move mode (roof and grip dragging, turning, keeping spots inside the land),
 camera stability, release outside the canvas, and touch cancellation using fixture
 JSON only. Run browser checks one at a time.
+
+To exercise browser-to-SQL generation and project grouping with offline Firebase/model
+stand-ins, install frontend dependencies and run from storage-service/ with a dedicated
+TEST_DATABASE_URL:
+
+```bash
+RUN_BROWSER_TESTS=1 go test -race -count=1 -run TestBrowserGenerationAndProjects -v ./internal/server
+```
+
+This test calls website/tools/architecture-flow.mjs and verifies reload during a job,
+automatic server persistence, project reassignment, and account isolation in a browser.

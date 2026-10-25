@@ -1,8 +1,8 @@
 # Private building storage
 
 The Go backend stores rendered buildings in PostgreSQL JSONB. Firebase login is
-connected in the frontend. Generation remains a separate service using
-[FIELDS.md](FIELDS.md).
+connected in the frontend. The authenticated API owns private projects and durable
+generation jobs; a private worker computes designs using [FIELDS.md](FIELDS.md).
 
 ## Saved document
 
@@ -25,7 +25,7 @@ The web client sends {name, data} to POST /api/buildings. Data uses this envelop
 - placement preserves where the renderer actually placed the building, including
   relocated sample previews, without changing the original Gemma geometry.
 
-The database returns a separate SQL UUID, name, data, and creation/update timestamps.
+The database returns a separate SQL UUID, project_id, name, data, and creation/update timestamps.
 Use that UUID for later saves; it is not the Gemma design ID. JSONB preserves values,
 but can normalize whitespace, key order, and duplicate keys.
 
@@ -50,11 +50,12 @@ Requests are limited to 1 MiB. See [API reference](../docs/storage-service-api.m
 1. Sign in or create an email/password account using the top bar. A refresh token
    in this tab's sessionStorage restores login on reload; passwords and ID tokens
    remain in memory. Production needs the real Firebase public key and storage URL.
-2. Signed-in users automatically save valid Gemma replies. A failed save leaves the
-   displayed building available, with Save building to retry.
+2. Generation requires sign-in. The server records the task and automatically saves
+   its result in SQL, even if the tab closes. Reload restores saved designs and
+   resumes observation of pending tasks; no browser save bridges the two services.
 3. Imported design/estimate files and previews can be saved manually. Subsequent
    saves PUT the existing SQL UUID, avoiding duplicate records. Dragging a saved
-   building automatically saves its actual placement when the drag ends. Saves
+   building automatically saves its actual placement when Done is selected. Saves
    run in order so overlapping moves preserve the latest position; the original
    design.placement stays intact. Failed saves can be retried with Save changes.
 4. My Builds lists private saved buildings and local site drafts. Opening a SQL record
@@ -68,11 +69,21 @@ Requests are limited to 1 MiB. See [API reference](../docs/storage-service-api.m
    document caches. Switching accounts cannot display another user's delayed SQL
    response. Deleting a record removes its map model as well as its SQL document.
 
-The frontend uses storageBaseUrl for Go storage and apiBaseUrl for the external
-Gemma service. Firebase tokens are never sent to a ?api= design-service URL.
-The separate design service (design-service/) provides generation at POST /api/designs,
-with job polling and design/cost retrieval on port 8000. Its jobs/results are local
-to that service; private account persistence uses the SQL routes above.
-The Go storage API does not implement generation jobs, publishing, public listings,
-or inquiries. Share packs a copy of the building (design, placement, land) into the link itself
-(#b=..., terrasim.shared-building/1); it never grants access to the private record.
+The frontend uses storageBaseUrl for generation, projects, and saved buildings.
+Firebase tokens are sent only to that configured API; `?api=` is ignored. The API
+calls housecost using a separate server-only service token. Durable jobs and their
+progress live in SQL; successful completion commits the saved building atomically.
+
+All building records have project_id. POST /api/buildings accepts optional
+project_id; omission creates a project from the saved site snapshot. PUT may assign
+an owned project or omit the field to retain membership. Membership-only updates
+use PUT /api/buildings/{id}/project and preserve data. GET /api/projects/{id}
+returns shared land and member buildings; project CRUD and task routes are specified
+in [the API reference](../docs/storage-service-api.md). The migration preserves existing documents
+and backfills one private project per existing building.
+
+Frontend lifecycle responsibilities are split across controllers/ (account changes,
+scene restoration, storage, generation observation, map interaction and library).
+Publishing, public listings and inquiries remain unimplemented. Share packs a copy
+of the building (design, placement, land) into the link itself (#b=...,
+terrasim.shared-building/1); it never grants access to the private record.

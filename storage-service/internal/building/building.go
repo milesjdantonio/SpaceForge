@@ -13,12 +13,14 @@ var (
 )
 
 type Input struct {
-	Name string `json:"name"`
+	ProjectID *string `json:"project_id,omitempty"`
+	Name      string  `json:"name"`
 	// The web client stores design, estimate, site and placement together here.
 	Data json.RawMessage `json:"data"`
 }
 
 type Building struct {
+	ProjectID string          `json:"project_id"`
 	ID        string          `json:"id"`
 	Name      string          `json:"name"`
 	Data      json.RawMessage `json:"data"`
@@ -27,6 +29,7 @@ type Building struct {
 }
 
 type Summary struct {
+	ProjectID string    `json:"project_id"`
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
@@ -39,5 +42,6 @@ type Repository interface {
 	List(context.Context, string, int, int) ([]Summary, error)
 	Get(context.Context, string, string) (Building, error)
 	Update(context.Context, string, string, Input) (Building, error)
+	AssignProject(context.Context, string, string, string) (Building, error)
 	Delete(context.Context, string, string) error
 }
