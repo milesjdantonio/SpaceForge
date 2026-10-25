@@ -1,4 +1,4 @@
-name: Backend checks
+name: Checks
 on:
   push:
     paths: ["storage-service/**", "design-service/**", "website/**", ".github/workflows/ci.yml"]
