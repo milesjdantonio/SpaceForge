@@ -152,7 +152,7 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
       el.querySelector('[data-wait]').hidden = true;
       el.querySelector('.progress').classList.add('is-done');
       result.innerHTML = '<p class="ok-msg">Checking the design and raising it on your land…</p>';
-      await wait(1800);
+      await wait(900);
       onDone(res);
     } catch (err) {
       if (err?.name === 'AbortError') return;

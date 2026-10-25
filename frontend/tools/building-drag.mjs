@@ -26,7 +26,8 @@ try {
       await page.locator('[data-file]').setInputFiles({ name: 'fixture.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture)) });
       await page.waitForSelector('[data-save]');
       await page.waitForFunction(() => !window.__terrasim.map.isMoving());
-      await page.waitForTimeout(2800); // Let the rise finish before picking its roof.
+      await page.waitForFunction(() => window.__terrasim.house.riseRemaining === 0, null, { timeout: 15000 }); // Let the rise finish before picking its roof.
+      await page.waitForTimeout(300);
     };
     const snapshot = (page) => page.evaluate(() => ({ origin: window.__terrasim.house.placement.origin, bearing: window.__terrasim.house.placement.xAxisBearingDeg, camera: window.__terrasim.map.getCenter().toArray() }));
     const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });

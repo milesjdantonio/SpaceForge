@@ -245,7 +245,7 @@ export function createHouseLayer(map) {
       }
     });
     geometries.forEach((geometry) => geometry.dispose());
-    materials.forEach((material) => material.dispose());
+    materials.forEach((material) => { material.map?.dispose(); material.dispose(); });
     entry.scene?.clear();
   }
 
@@ -288,11 +288,16 @@ export function createHouseLayer(map) {
       }
     });
     scene.add(sun, sky, model);
-    const tiles = anim ? makeTiles(design) : null;
-    if (tiles) scene.add(tiles);
-    const entry = { id, design, placement, scene, sun, sky, model, tiles, materials,
-      rise: anim && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1, riseStart: performance.now() };
-    if (entry.rise >= 1 && tiles) tiles.visible = false;
+    const moving = !!anim && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const entry = { id, design, placement, scene, sun, sky, model, materials, rise: moving ? 0 : 1,
+      riseStart: performance.now() + (typeof anim === 'number' ? anim : 0) };
+    if (moving) {
+      entry.fx = makeRiseFx(design);
+      entry.tl = riseTimeline(design, model.userData.height);
+      scene.add(entry.fx);
+      for (const material of materials.keys()) { material.clippingPlanes = [UP]; material.needsUpdate = true; }
+      model.visible = false;
+    }
     light(entry);
     return entry;
   }
@@ -305,6 +310,7 @@ export function createHouseLayer(map) {
       camera = new THREE.Camera();
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
       renderer.autoClear = false;
+      renderer.localClippingEnabled = true; // the building's rise clips what's still below ground
     },
     render(a, b) {
       if (!state.model && !saved.size && !gen.mesh) return;
@@ -329,51 +335,198 @@ export function createHouseLayer(map) {
     },
   };
 
-  function animate(entry) {
-    if (entry.rise >= 1) return;
-    const t = Math.min(1, (performance.now() - entry.riseStart) / 2600);
-    entry.rise = t;
-    const ease = (x) => 1 - Math.pow(1 - x, 3);
-    const model = entry.model;
-    const tiles = entry.tiles;
-    // First the grid rises under the footprint, then the house grows out of it and the tiles sink.
-    const tGrid = Math.min(1, t / 0.45);
-    const tHouse = Math.max(0, (t - 0.35) / 0.65);
-    if (tiles) {
-      const dummy = new THREE.Object3D();
-      tiles.userData.cells.forEach((c, i) => {
-        const local = Math.max(0, Math.min(1, tGrid * 1.6 - c.delay));
-        const sink = Math.max(0, Math.min(1, tHouse * 1.4 - c.delay * 0.5));
-        const h = Math.max(0.02, (ease(local) * c.h) * (1 - ease(sink)));
-        dummy.position.set(c.x, c.y, h / 2);
-        dummy.scale.set(1, 1, h);
-        dummy.updateMatrix();
-        tiles.setMatrixAt(i, dummy.matrix);
-      });
-      tiles.instanceMatrix.needsUpdate = true;
-      tiles.visible = t < 1;
-    }
-    model.scale.set(1, 1, Math.max(0.001, ease(tHouse)));
-    model.visible = tHouse > 0;
+  // ---- the building's arrival: it rises out of the land ------------------------------------------
+  // Once the camera has arrived: a band of light sweeps across the ground and the tiles under it light
+  // up, a ring pulses out, then the building rises out of the ground one floor at a time through a
+  // glowing seam (everything below ground is clipped away), and lands with a second, wider ring and
+  // a warm glow that fades. About five seconds; skipped for reduced motion.
+  const RISE = { sweep: 0.9, build: 0.95, perFloor: 0.95, hold: 0.18, land: 1.1 };
+  const AMBER = new THREE.Color('#ff8a2a'), WARM = new THREE.Color('#ffd27a');
+  const UP = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // keeps z >= 0: nothing shows below ground
+
+  function riseTimeline(design, height) {
+    const levels = design.levels.filter((l) => l.elevationM >= 0);
+    // Where each floor line sits as a share of the full height, so the rise pauses at each one.
+    const stops = levels.slice(0, -1).map((l) => (l.elevationM + l.heightM + 0.3) / height).filter((x) => x > 0.05 && x < 0.95);
+    const floors = stops.length + 1;
+    const buildEnd = RISE.build + floors * RISE.perFloor + stops.length * RISE.hold;
+    return { stops: [0, ...stops, 1], buildEnd, total: buildEnd + RISE.land };
   }
 
-  function makeTiles(design) {
-    const W = design.size.widthM, D = design.size.depthM, cell = 1.2;
-    const cells = [];
-    for (let x = -1; x < W + 1; x += cell) {
-      for (let y = -1; y < D + 1; y += cell) {
-        const inside = x >= 0 && x < W && y >= 0 && y < D;
-        const d = Math.hypot(x - W / 2, y - D / 2) / Math.hypot(W / 2, D / 2);
-        cells.push({ x: x + cell / 2, y: y + cell / 2, h: inside ? 1.5 + (1 - d) * 3.5 : 0.4, delay: d * 0.6 });
+  // Emergence 0..1 at time s: each floor rises with an ease in and out, then holds for a moment.
+  function emergence(tl, s) {
+    let t = s - RISE.build;
+    if (t <= 0) return { e: 0, step: -1, stepT: 0 };
+    for (let i = 0; i < tl.stops.length - 1; i++) {
+      const a = tl.stops[i], b = tl.stops[i + 1];
+      if (t < RISE.perFloor) {
+        const k = t / RISE.perFloor;
+        const ease = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+        return { e: a + (b - a) * ease, step: i, stepT: k };
+      }
+      t -= RISE.perFloor;
+      if (i < tl.stops.length - 2) {
+        if (t < RISE.hold) return { e: b, step: i, stepT: 1, holding: t / RISE.hold };
+        t -= RISE.hold;
       }
     }
-    const geo = new THREE.BoxGeometry(cell * 0.86, cell * 0.86, 1);
-    const tileMat = new THREE.MeshStandardMaterial({ color: new THREE.Color('#ffb15c'), emissive: new THREE.Color('#ff8a2a'), emissiveIntensity: 0.9, roughness: 0.5, transparent: true, opacity: 0.9 });
-    const mesh = new THREE.InstancedMesh(geo, tileMat, cells.length);
+    return { e: 1, step: tl.stops.length - 2, stepT: 1 };
+  }
+
+  function makeRiseFx(design) {
+    const W = design.size.widthM, D = design.size.depthM;
+    const fx = new THREE.Group();
+    const glow = (opacity = 1) => new THREE.MeshBasicMaterial({ color: AMBER.clone(), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+
+    // Tiles on the ground round the footprint; they light up as the sweep passes and sink as the
+    // building comes up through them.
+    const cell = Math.max(0.9, Math.min(1.6, Math.sqrt(W * D) / 14));
+    const cells = [];
+    for (let x = -3; x < W + 3; x += cell) {
+      for (let y = -3; y < D + 3; y += cell) {
+        const cx = x + cell / 2, cy = y + cell / 2;
+        const inside = cx > 0 && cx < W && cy > 0 && cy < D;
+        const edge = Math.min(Math.abs(cx), Math.abs(W - cx), Math.abs(cy), Math.abs(D - cy));
+        cells.push({ x: cx, y: cy, inside, at: (y + 3) / (D + 6), h: inside ? 0.5 + Math.random() * 0.9 : Math.max(0.05, 0.35 - edge * 0.1), phase: Math.random() });
+      }
+    }
+    const tileMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: AMBER.clone(), emissiveIntensity: 0.9, roughness: 0.5, transparent: true, opacity: 0.92 });
+    const tiles = new THREE.InstancedMesh(new THREE.BoxGeometry(cell * 0.84, cell * 0.84, 1), tileMat, cells.length);
     const c = new THREE.Color();
-    cells.forEach((cell, i) => mesh.setColorAt(i, c.set(GLOW[i % GLOW.length])));
-    mesh.userData.cells = cells;
-    return mesh;
+    cells.forEach((cl, i) => tiles.setColorAt(i, c.set(GLOW[i % GLOW.length])));
+    fx.add(tiles);
+
+    // The sweep: a bright bar with a soft wide glow, front to back.
+    const bar = new THREE.Mesh(new THREE.PlaneGeometry(W + 8, 0.35), glow(1));
+    const haze = new THREE.Mesh(new THREE.PlaneGeometry(W + 8, 3.2), glow(0.35));
+    bar.position.set(W / 2, -4, 0.12);
+    haze.position.set(W / 2, -4, 0.1);
+    fx.add(bar, haze);
+
+    // Two rings that pulse out from the footprint.
+    const R = Math.hypot(W, D) / 2;
+    const ring = () => {
+      const m = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 128), glow(0));
+      m.position.set(W / 2, D / 2, 0.08);
+      m.scale.setScalar(R);
+      m.visible = false;
+      fx.add(m);
+      return m;
+    };
+    const rings = [ring(), ring()];
+
+    // The seam: a glowing band round the ground floor's outline, brightest at the ground, that the
+    // building rises through.
+    const outline = design.levels.find((l) => l.elevationM >= 0)?.outline ?? [[0, 0], [W, 0], [W, D], [0, D]];
+    const SEAM = 2.4;
+    // Pushed a little outside the walls, so the building doesn't hide it as it comes up.
+    const ccw = outline.reduce((a, [x1, y1], i) => { const [x2, y2] = outline[(i + 1) % outline.length]; return a + x1 * y2 - x2 * y1; }, 0) > 0;
+    const out = outline.map((p, i) => {
+      const prev = outline[(i - 1 + outline.length) % outline.length], next = outline[(i + 1) % outline.length];
+      const n = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return ccw ? [(b[1] - a[1]) / l, -(b[0] - a[0]) / l] : [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; };
+      const [n1x, n1y] = n(prev, p), [n2x, n2y] = n(p, next);
+      return [p[0] + (n1x + n2x) * 0.09, p[1] + (n1y + n2y) * 0.09];
+    });
+    const pos = [], uv = [];
+    for (let i = 0; i < out.length; i++) {
+      const [ax, ay] = out[i], [bx, by] = out[(i + 1) % out.length];
+      pos.push(ax, ay, 0, bx, by, 0, bx, by, SEAM, ax, ay, 0, bx, by, SEAM, ax, ay, SEAM);
+      uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1);
+    }
+    const seamGeo = new THREE.BufferGeometry();
+    seamGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    seamGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const fade = document.createElement('canvas');
+    fade.width = 4;
+    fade.height = 64;
+    const g2 = fade.getContext('2d');
+    const grad = g2.createLinearGradient(0, 64, 0, 0);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.25, 'rgba(255,255,255,0.45)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g2.fillStyle = grad;
+    g2.fillRect(0, 0, 4, 64);
+    const seamMat = glow(0);
+    seamMat.map = new THREE.CanvasTexture(fade);
+    const seam = new THREE.Mesh(seamGeo, seamMat);
+    const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(outline.map(([x, y]) => new THREE.Vector3(x, y, 0.06))),
+      new THREE.LineBasicMaterial({ color: WARM.clone(), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
+    fx.add(seam, line);
+
+    fx.userData = { tiles, cells, bar, haze, rings, R, seam, line, D };
+    fx.visible = false;
+    return fx;
+  }
+
+  function animate(entry) {
+    if (entry.rise >= 1) return;
+    const s = (performance.now() - entry.riseStart) / 1000;
+    const { model, fx, tl } = entry;
+    if (s < 0) { model.visible = false; fx.visible = false; return; }
+    fx.visible = true;
+    const H = model.userData.height;
+    const em = emergence(tl, s);
+    const done = s >= tl.total;
+    entry.rise = done ? 1 : Math.min(0.999, s / tl.total);
+    const u = fx.userData;
+    const ease = (x) => 1 - Math.pow(1 - x, 3);
+    const clamp = (x) => Math.max(0, Math.min(1, x));
+
+    // The sweep runs front to back, then is gone.
+    const sw = clamp(s / RISE.sweep);
+    const swY = -4 + sw * (u.D + 8);
+    u.bar.position.y = swY;
+    u.haze.position.y = swY;
+    u.bar.visible = u.haze.visible = sw < 1;
+
+    // Tiles light up behind the sweep, flicker, and sink as the building passes them.
+    const dummy = new THREE.Object3D();
+    u.cells.forEach((cl, i) => {
+      const lit = clamp((sw - cl.at) * 5);
+      const sink = cl.inside ? clamp((em.e - 0.05) * 2.2 - cl.phase * 0.3) : clamp(((s - tl.buildEnd) / RISE.land) * 1.6 - cl.phase * 0.4);
+      const h = Math.max(0.02, ease(lit) * cl.h * (0.85 + 0.15 * Math.sin(s * 9 + cl.phase * 6)) * (1 - ease(sink)));
+      dummy.position.set(cl.x, cl.y, h / 2);
+      dummy.scale.set(1, 1, h);
+      dummy.updateMatrix();
+      u.tiles.setMatrixAt(i, dummy.matrix);
+    });
+    u.tiles.instanceMatrix.needsUpdate = true;
+
+    // Rings: one as the sweep ends, a wider one as the building lands.
+    const pulse = (m, t0, len, spread) => {
+      const k = (s - t0) / len;
+      m.visible = k > 0 && k < 1;
+      if (!m.visible) return;
+      m.scale.setScalar(u.R * (1 + spread * ease(k)));
+      m.material.opacity = 0.95 * (1 - k);
+    };
+    pulse(u.rings[0], RISE.sweep * 0.7, 1.1, 1.4);
+    pulse(u.rings[1], tl.buildEnd - 0.1, 1.3, 2.6);
+
+    // The building comes up through the ground.
+    model.visible = em.e > 0;
+    model.position.z = -(1 - em.e) * H;
+    // The seam glows while it rises and flares each time a floor line comes through.
+    const flare = em.holding != null ? 1 - em.holding : em.step >= 0 && em.stepT > 0.9 ? (em.stepT - 0.9) * 10 : 0;
+    const seamOn = s < RISE.build ? clamp((s - RISE.sweep * 0.6) / 0.3) : s < tl.buildEnd ? 1 : 1 - clamp((s - tl.buildEnd) / RISE.land);
+    u.seam.material.opacity = seamOn * (0.7 + 0.3 * flare);
+    u.seam.scale.z = 1 + flare * 0.5;
+    u.line.material.opacity = seamOn;
+    // A warm glow on the building itself, fading as it lands.
+    const warm = em.e > 0 ? 0.32 * (1 - clamp((s - tl.buildEnd) / RISE.land)) + flare * 0.15 : 0;
+    for (const [material, original] of entry.materials) {
+      if (material === model.userData.glassMat) continue;
+      material.emissive.copy(original.emissive).lerp(AMBER, Math.min(1, warm * 2));
+      material.emissiveIntensity = original.intensity + warm * 0.7;
+    }
+
+    if (done) {
+      model.position.z = 0;
+      model.visible = true;
+      fx.visible = false;
+      for (const material of entry.materials.keys()) { material.clippingPlanes = null; material.needsUpdate = true; }
+      light(entry);
+    }
   }
 
   // ---- the generation grid: the whole lot lights up while the design service works --------------
@@ -505,6 +658,7 @@ export function createHouseLayer(map) {
       if (old) dispose(old);
       map.triggerRepaint();
     },
+    // `animate` is true, false, or a delay in ms before the rise starts (so the camera can arrive).
     show(design, placement, { animate: anim = true, id = null, selected = false } = {}) {
       select(null);
       if (state.model && !saved.has(state.id)) dispose(state);
@@ -626,6 +780,8 @@ export function createHouseLayer(map) {
     },
     get entries() { return entries().map((entry) => ({ id: entry.id, design: entry.design, placement: entry.placement, selected: entry === selection })); },
     get selected() { return !!state.model && state === selection; },
+    // Milliseconds until the shown building's rise has finished (0 when it isn't rising).
+    get riseRemaining() { return state.model && state.rise < 1 && state.tl ? Math.max(0, state.riseStart + state.tl.total * 1000 - performance.now()) : 0; },
     get design() { return state.design; },
     get placement() { return state.placement; },
   };

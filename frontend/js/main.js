@@ -900,13 +900,16 @@ function showDesign(design, estimate, { site = null, placement = design.placemen
   setMode('house');
   stopSpin(); intro.hidden = true;
   outliner.load(app.site.ring);
-  house.show(design, placement, { id: savedBuilding?.id ?? null, animate, selected });
+  // The rise waits for the camera to arrive, so it's seen from the start.
+  const riseDelay = focus && !camera ? 1600 : 1;
+  house.show(design, placement, { id: savedBuilding?.id ?? null, animate: animate && riseDelay, selected });
   if (camera) {
     map.jumpTo({ ...camera, padding: panelPadding() });
     app.tilted = camera.pitch > 0;
   } else if (focus) frameHouse(placement);
   if (details) {
-    if (focus && !camera) setTimeout(() => { if (version === app.displayVersion) openHouse(); }, 1900);
+    // Details open as the building lands, not while it rises.
+    if (focus && !camera) setTimeout(() => { if (version === app.displayVersion) openHouse(); }, Math.max(1900, house.riseRemaining - 500));
     else openHouse();
   }
   rememberScene();
@@ -939,7 +942,7 @@ async function previewSample() {
   app.currentDesignID = design.id;
   if (!drawable(design)) return;
   const placement = placeOnLot(design, app.site.ring);
-  house.show({ ...design, previewOn: app.site.id }, placement);
+  house.show({ ...design, previewOn: app.site.id }, placement, { animate: 1600 });
   app.site.preview = true;
   saveSite();
   setMode('house');
@@ -947,7 +950,7 @@ async function previewSample() {
   if (!placement.fits) toast('The sample house is bigger than this lot, so it hangs over the outline.');
   else toast('Sample house placed on your lot. Click it, then choose Move to move or turn it.');
   frameHouse(placement);
-  setTimeout(() => openHouse(), 2900);
+  setTimeout(() => openHouse(), Math.max(2900, house.riseRemaining - 500));
 }
 
 // Frames the house in the part of the screen the side panel leaves free.

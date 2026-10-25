@@ -109,7 +109,8 @@ try {
     const dragHouse = async ({ roof = false } = {}) => {
       if (roof) {
         await page.evaluate(() => window.__terrasim.map.jumpTo({ pitch: 70, zoom: 20 }));
-        await page.waitForTimeout(2800); // Complete the rise before targeting the visible roof.
+        await page.waitForFunction(() => window.__terrasim.house.riseRemaining === 0, null, { timeout: 15000 }); // Complete the rise before targeting the visible roof.
+        await page.waitForTimeout(300);
       }
       const points = roof ? await roofDragPoints(page) : await page.evaluate(async () => {
         const { map, house } = window.__terrasim;
