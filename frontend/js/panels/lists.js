@@ -33,11 +33,11 @@ export function renderCatalog(el, { listings, onOpen }) {
   }
 }
 
-export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore }) {
+export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore, onRetry }) {
   const statusText = { draft: 'Draft', 'not-sent': 'Not sent yet', sent: 'Sent' };
   el.innerHTML = `
     <header class="panel-head">
-      <div><h2 class="panel-title">My sites</h2><p class="panel-sub">Your buildings and site drafts</p></div>
+      <div><h2 class="panel-title">My Builds</h2><p class="panel-sub">Your buildings and site drafts</p></div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
     <section class="saved-buildings" aria-labelledby="saved-buildings-title">
@@ -45,6 +45,7 @@ export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, 
       <p class="note">${account ? 'Private to your account.' : 'Sign in to save buildings and open them on your next visit.'}</p>
       ${!account ? '<button type="button" class="btn btn-primary" data-library-signin>Sign in</button>' : ''}
       <p class="account-error" data-library-error role="alert" hidden></p>
+      ${error && onRetry ? `<div class="fail-actions"><button type="button" class="btn btn-small" data-library-retry>${icon('retry')}<span>Try again</span></button></div><p class="note">Site drafts below are kept in this browser and still work.</p>` : ''}
       ${loading ? '<p role="status">Loading saved buildings…</p>' : ''}
       ${account && !loading && !error && !buildings.length ? '<p class="empty">No saved buildings yet. Open a design and choose Save building.</p>' : ''}
       <ul class="sites" data-buildings></ul>
@@ -59,6 +60,7 @@ export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, 
   el.querySelector('[data-file]').addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) onOpenFile?.(f); });
   el.querySelector('[data-library-signin]')?.addEventListener('click', onSignIn);
   el.querySelector('[data-library-more]')?.addEventListener('click', onMore);
+  el.querySelector('[data-library-retry]')?.addEventListener('click', onRetry);
   if (error) { const note = el.querySelector('[data-library-error]'); note.textContent = error; note.hidden = false; }
   for (const building of buildings) {
     const li = document.createElement('li');

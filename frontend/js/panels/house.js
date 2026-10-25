@@ -6,6 +6,7 @@ import { renderOverTime } from '../render/chart.js';
 import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
 import { typeName } from '../lib/housing.js';
+import { explainSaveError } from '../lib/errors.js';
 
 // One line saying what the building holds.
 export function holdsLine(design) {
@@ -53,7 +54,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
       <button type="button" class="btn" data-share>${icon('share')}<span>Share site</span></button>
       ${design.sample && !preview ? `<button type="button" class="btn" data-contact>${icon('mail')}<span>Contact builder</span></button>` : ''}
     </div>
-    <p class="note">Click or tap a building to select it in orange, then drag to move it. Click empty land to deselect.</p>
+    <p class="note">To move or turn it, choose Move beside the building on the map.</p>
     <div class="tabs" role="tablist" aria-label="Details">
       ${TABS.map(([id, name]) => `<button type="button" role="tab" id="tab-${id}" aria-controls="tabpanel" aria-selected="${id === tab}" data-tab="${id}">${name}</button>`).join('')}
     </div>
@@ -144,7 +145,11 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
         const result = await onSave();
         save.textContent = result ? 'Save changes' : before;
         if (result) toast('Building saved to your account.');
-      } catch (err) { save.textContent = before; toast(err.message || 'Couldn’t save this building. Please try again.'); }
+      } catch (err) {
+        save.textContent = before;
+        const why = explainSaveError(err);
+        toast(`This building wasn’t saved. ${why.text}`, { kind: 'error', action: why.action && { label: why.action, run: () => save.click() } });
+      }
       finally { save.disabled = false; }
       return;
     }
@@ -156,7 +161,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
     if (e.target.closest('[data-share]')) {
       const url = shareUrl ? shareUrl() : location.href;
       try { await navigator.clipboard.writeText(url); toast('Site link copied. Your saved building stays private.'); }
-      catch { prompt('Copy this link:', url); }
+      catch { prompt('Your browser blocked copying. Copy this link:', url); }
     }
     if (e.target.closest('[data-contact]')) toast('Messages to builders arrive once the TerraSim API is connected.');
   }, { signal });
@@ -200,7 +205,8 @@ function homesOn(design, li) {
 }
 
 // When a design file breaks the contract: what's wrong, so it can be fixed at the source.
-export function renderDesignProblems(el, { design, result, onClose }) {
+// `actions` are the backups offered under it: [{ label, run, primary }].
+export function renderDesignProblems(el, { design, result, onClose, actions = [] }) {
   el.innerHTML = `
     <header class="panel-head">
       <div>
@@ -212,8 +218,11 @@ export function renderDesignProblems(el, { design, result, onClose }) {
     <p>The design file breaks ${result.errors.length === 1 ? 'a rule' : `${result.errors.length} rules`} the website relies on (contracts/FIELDS.md, “Rules the renderer checks”). Nothing is drawn rather than drawing it wrong.</p>
     <ul class="ticks ticks-warn">${result.errors.slice(0, 12).map((e) => `<li>${esc(e.message)}</li>`).join('')}</ul>
     ${result.errors.length > 12 ? `<p class="note">And ${result.errors.length - 12} more.</p>` : ''}
-    ${result.warnings.length ? `<details class="request"><summary>${result.warnings.length} smaller ${result.warnings.length === 1 ? 'issue' : 'issues'}</summary><ul class="ticks">${result.warnings.map((w) => `<li>${esc(w.message)}</li>`).join('')}</ul></details>` : ''}`;
+    ${result.warnings.length ? `<details class="request"><summary>${result.warnings.length} smaller ${result.warnings.length === 1 ? 'issue' : 'issues'}</summary><ul class="ticks">${result.warnings.map((w) => `<li>${esc(w.message)}</li>`).join('')}</ul></details>` : ''}
+    <p class="fail-next"><strong>What to try:</strong> ${actions.length ? 'Gemma’s drawings vary from run to run, so generating again usually gives a design that draws.' : 'Open the design file again once it’s been fixed, or choose another.'}</p>
+    <div class="fail-actions">${actions.map((a, i) => `<button type="button" class="btn${a.primary ? ' btn-primary' : ''}" data-act="${i}">${esc(a.label)}</button>`).join('')}</div>`;
   el.querySelector('[data-close]').addEventListener('click', () => onClose?.());
+  el.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => actions[Number(b.dataset.act)].run()));
 }
 
 // The soil under the building and the foundation chosen for it (design.site.soil).

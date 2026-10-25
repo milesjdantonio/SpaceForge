@@ -57,12 +57,12 @@ Requests are limited to 1 MiB. See [API reference](../docs/api.md).
    building automatically saves its actual placement when the drag ends. Saves
    run in order so overlapping moves preserve the latest position; the original
    design.placement stays intact. Failed saves can be retried with Save changes.
-4. My sites lists private saved buildings and local site drafts. Opening a SQL record
+4. My Builds lists private saved buildings and local site drafts. Opening a SQL record
    validates the design and restores the same building, estimate, site, and placement
    without calling Gemma again. Load more follows next_offset.
    Sign-in/session restoration also loads every page automatically and draws all
    valid saved houses. The last selected SQL UUID and camera view are remembered
-   per account in the browser, so refresh restores the scene without My sites.
+   per account in the browser, so refresh restores the scene without My Builds.
    Selecting another saved house keeps the remaining models on the map.
 5. Owners can delete records. Signing out clears private rendered data and account
    document caches. Switching accounts cannot display another user's delayed SQL

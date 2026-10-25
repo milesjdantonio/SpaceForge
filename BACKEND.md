@@ -75,10 +75,10 @@ npm start
 ```
 
 Open http://127.0.0.1:5173. Choose Sign in to log in or create an email/password
-account. My sites lists your private saved buildings and browser site drafts.
+account. My Builds lists your private saved buildings and browser site drafts.
 After sign-in or a page refresh, the map automatically loads all your saved houses
 at their saved positions. It restores the last selected house and map view without
-requiring My sites. The view preference (camera and selected SQL UUID) is stored
+requiring My Builds. The view preference (camera and selected SQL UUID) is stored
 per account in this browser; house documents are loaded from the authenticated API.
 Selecting a house on the map keeps the other saved houses visible. Signing out
 removes all private models and resets the view; deleting a record removes its model.
@@ -86,9 +86,10 @@ Open a Gemma design file and choose Save building, or generate through a configu
 design service: valid replies automatically save while signed in. Save changes
 updates the existing SQL record. Reopening restores the original design, estimate,
 site/brief, and actual preview placement; Delete removes the account's saved record.
-Moving a saved building automatically saves its new position when the drag ends.
+Moving a saved building automatically saves its new position when you choose Done.
 Zoom close to the house and click or tap its visible roof or walls to select it in
-orange. The first gesture only selects; drag on a subsequent press to move it.
+orange, then choose Move beside it: drag the top grip (or the roof) to move it and
+the ring grip to turn it. Done keeps spots inside the land; Escape puts it back.
 Click empty land to deselect; dragging empty land still pans the map. Picking uses
 the rendered 3D model in tilted views. Releasing outside the map or cancelling a
 touch restores the controls. Selection tint never changes the saved design colors.
@@ -173,6 +174,6 @@ It creates and cleans up isolated
 emulator test accounts. Use
 TEST_STORAGE_URL to target a temporary test API/database rather than the app database.
 
-From frontend/, node tools/building-drag.mjs checks mouse and mobile selection, orange highlighting and subsequent roof dragging,
+From frontend/, node tools/building-drag.mjs checks mouse and mobile selection, orange highlighting, Move mode (roof and grip dragging, turning, keeping spots inside the land),
 camera stability, release outside the canvas, and touch cancellation using fixture
 JSON only. Run browser checks one at a time.

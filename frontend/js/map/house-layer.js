@@ -525,6 +525,17 @@ export function createHouseLayer(map) {
       }
       return closest;
     },
+    // Where a point on the shown building (house metres: x along the width, y along the depth, z up)
+    // is on screen, in CSS pixels, or null when it's off screen or not drawn yet.
+    screenPoint([x, y, z]) {
+      if (!state.model || !renderMatrix || map.getZoom() < 13) return null;
+      const v = new THREE.Vector4(x, y, z, 1).applyMatrix4(renderMatrix.clone().multiply(placementMatrix(state.placement)));
+      if (v.w <= 0) return null;
+      const canvas = map.getCanvas();
+      return { x: (v.x / v.w + 1) / 2 * canvas.clientWidth, y: (1 - v.y / v.w) / 2 * canvas.clientHeight };
+    },
+    // The shown building's size in metres: width, depth and the height of its highest point.
+    get size() { return state.model ? { W: state.model.userData.W, D: state.model.userData.D, height: state.model.userData.height } : null; },
     clear() {
       select(null);
       for (const entry of entries()) dispose(entry);

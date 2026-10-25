@@ -24,6 +24,7 @@ const files = [
   ['three/build/three.module.js', 'three/three.module.js'],
   ['three/build/three.core.js', 'three/three.core.js'],
   ['three/examples/jsm/controls/PointerLockControls.js', 'three/addons/PointerLockControls.js'],
+  ['three/examples/jsm/utils/BufferGeometryUtils.js', 'three/addons/utils/BufferGeometryUtils.js'],
   ['three/LICENSE', 'three/LICENSE', true],
   ['motion/dist/motion.js', 'motion/motion.js'],
   ['motion/LICENSE.md', 'motion/LICENSE.md', true],

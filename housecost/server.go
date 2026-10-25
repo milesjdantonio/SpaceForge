@@ -45,10 +45,10 @@ type stepDef struct {
 var stepDefs = []stepDef{
 	{"sizing", "Sizing the building to the land", false, regexp.MustCompile(`^Sizing a first version`)},
 	{"site", "Gathering site data", false, regexp.MustCompile(`^Gathering site data`)},
-	{"assessment", "Gemma 1 of 3: site assessment", true, regexp.MustCompile(`^Gemma: site assessment \(attempt (\d+) of (\d+)\)`)},
-	{"program", "Gemma 2 of 3: design program", true, regexp.MustCompile(`^Gemma: design program \(attempt (\d+) of (\d+)\)`)},
+	{"assessment", "Assessing the site", true, regexp.MustCompile(`^Gemma: site assessment \(attempt (\d+) of (\d+)\)`)},
+	{"program", "Planning the design", true, regexp.MustCompile(`^Gemma: design program \(attempt (\d+) of (\d+)\)`)},
 	{"drawing", "Drawing floors, walls and furniture", false, regexp.MustCompile(`^Drawing the design`)},
-	{"materials", "Gemma 3 of 3: materials", true, regexp.MustCompile(`^Gemma: materials \(attempt (\d+) of (\d+)\)`)},
+	{"materials", "Choosing materials", true, regexp.MustCompile(`^Gemma: materials \(attempt (\d+) of (\d+)\)`)},
 	{"pricing", "Pricing and nearby suppliers", false, regexp.MustCompile(`^Pricing:`)},
 }
 

@@ -40,8 +40,21 @@ export function mountAccount(button, dialog) {
           form.elements.password.value = '';
           finish(user); dialog.close();
         } catch (err) {
-          error.textContent = err.message || 'Sign-in is unavailable. Please try again.';
+          // The service itself can't be reached (or isn't set up): say so, and offer to carry on.
+          const down = err instanceof TypeError || err.status >= 500 || /not configured|unavailable/i.test(err.message ?? '');
+          error.textContent = down
+            ? 'Sign-in can’t be reached right now. You can keep designing without an account; your work stays in this browser.'
+            : err.message || 'Sign-in didn’t work. Check your email and password and try again.';
           error.hidden = false;
+          if (down && !form.querySelector('[data-continue]')) {
+            const go = document.createElement('button');
+            go.type = 'button';
+            go.className = 'btn';
+            go.dataset.continue = '';
+            go.textContent = 'Continue without signing in';
+            go.onclick = () => dialog.close();
+            error.after(go);
+          }
         } finally {
           busy = false;
           form.querySelectorAll('button').forEach((el) => { el.disabled = false; });

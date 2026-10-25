@@ -2,11 +2,14 @@
 // height. The file lists every wall, opening, stair, elevator, balcony and piece of furniture, and
 // this draws exactly those. Look around by dragging; click a spot on the floor (or a step, or a floor
 // seen up the stairwell) to glide there, the way Street View moves. Inside an elevator, pick a floor.
-// Building metres map to three.js as x -> X, y -> Z, height -> Y.
+// Building metres map to three.js as x -> X, y -> Z, height -> Y, inside a world group that flips Z
+// so the building isn't mirrored (see openWalkthrough). Outside the windows are the real ground and
+// neighbouring buildings (surroundings.js).
 
 import * as THREE from 'three';
 import { icon } from '../ui/icons.js';
 import { buildFurnishings } from './furniture.js';
+import { buildSurroundings } from './surroundings.js';
 import { openingSegment, wallLength, rectPoly, bounds, centroid, pointInPolygon, roomAt } from '../lib/design.js';
 
 const EYE = 1.6;
@@ -287,7 +290,8 @@ function startSpot(design) {
   return { level: design.levels.indexOf(g), x: best.x, z: best.y, yaw };
 }
 
-export function openWalkthrough(host, design) {
+// `map` and `placement` (where the building stands) let the view outside show the real surroundings.
+export function openWalkthrough(host, design, { map = null, placement = null } = {}) {
   host.hidden = false;
   const title = design.overview?.title ?? 'Walkthrough';
   host.innerHTML = `
@@ -311,35 +315,74 @@ export function openWalkthrough(host, design) {
   try {
     renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   } catch {
-    host.querySelector('.walk-start').innerHTML = '<p class="walk-start-title">The walkthrough needs WebGL, which this browser has turned off.</p>';
-    host.querySelector('[data-exit]').addEventListener('click', close);
+    host.querySelector('.walk-start').innerHTML = `<p class="walk-start-title">The walkthrough can’t start here</p>
+      <p>It needs WebGL (3D graphics), which this browser has turned off. Turn on hardware acceleration in the browser’s settings and reload, or look at the floor plans instead.</p>
+      <button type="button" class="btn btn-primary" data-plans>See the floor plans</button>`;
+    // Nothing else was set up, so closing only hides the walkthrough.
+    const leave = () => { host.hidden = true; host.replaceChildren(); };
+    host.querySelector('[data-plans]').addEventListener('click', () => { leave(); document.querySelector('#panel [data-tab="plans"]')?.click(); });
+    host.querySelector('[data-exit]').addEventListener('click', leave);
     return;
   }
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xb7cde3);
-  scene.fog = new THREE.Fog(0xb7cde3, 40, 160);
+  // The fog closes in where the real ground ends (surroundings.js draws 180 m round the building).
+  scene.fog = new THREE.Fog(0xb7cde3, 45, 175);
   scene.add(new THREE.HemisphereLight(0xffffff, 0xd9cfc0, 1.5));
   scene.add(new THREE.AmbientLight(0xffffff, 0.5));
   const sun = new THREE.DirectionalLight(0xfff3e0, 1.3);
   sun.position.set(-8, 14, -12);
   scene.add(sun);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0x77925a, roughness: 1 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ color: 0x7a7866, roughness: 1 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.03;
   scene.add(ground);
 
   const { group, walkable, stairs } = buildBuilding(design);
-  scene.add(group);
+  // Building metres are right-handed (x and y on the ground, height up). Putting y on three.js's Z
+  // alone would show the building mirrored, so the world group flips Z back: inside matches the map
+  // and the plans. Positions below (`pos`, stair routes, paths) stay in building metres; only the
+  // camera, the click ring and raycast hits are in three.js space.
+  const world = new THREE.Group();
+  world.scale.z = -1;
+  world.add(group);
+  scene.add(world);
+  const toBuilding = (v) => new THREE.Vector3(v.x, v.y, -v.z);
 
-  const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 500);
+  // The real ground and neighbours outside, once they load; the walkthrough works without them.
+  const outside = new AbortController();
+  let surroundings = null;
+  if (map && placement) {
+    buildSurroundings({ map, placement, W: design.size.widthM, D: design.size.depthM, signal: outside.signal })
+      .then((s) => {
+        if (outside.signal.aborted) return;
+        surroundings = s;
+        world.add(s);
+        // The far ground sits just under the real ground's edge, past the fog.
+        ground.position.y = s.userData.edgeHeight - 0.6;
+        host.__walk.surroundings = s.userData;
+      })
+      .catch((e) => {
+        if (e.name === 'AbortError') return;
+        console.warn('[TerraSim] The view outside could not load:', e);
+        const note = document.createElement('p');
+        note.className = 'walk-note walk-note-outside';
+        note.textContent = 'The view outside couldn’t load, so plain ground shows. The rooms are exact.';
+        host.append(note);
+      });
+  }
+
+  // 58° tall is about what eyes see; wider stretches rooms like a wide-angle lens, so they feel too big.
+  const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 500);
   camera.rotation.order = 'YXZ';
-  let yaw = 0, pitch = -0.05;
+  const pos = new THREE.Vector3(); // where you stand, in building metres (x, height, y)
+  let yaw = 0, pitch = -0.05;      // yaw is in three.js space, so dragging and keys turn the way they look
   {
     const s = startSpot(design);
-    camera.position.set(s.x, design.levels[s.level].elevationM + EYE, s.z);
-    yaw = s.yaw;
+    pos.set(s.x, design.levels[s.level].elevationM + EYE, s.z);
+    yaw = Math.PI - s.yaw; // startSpot faces along building metres; the world flips Z
   }
 
   // Look: drag with mouse, finger or pen. Click without dragging: move.
@@ -354,7 +397,7 @@ export function openWalkthrough(host, design) {
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.hypot(dx, dy) > 4) drag.moved = true;
     const k = (camera.fov * Math.PI / 180) / canvas.clientHeight;
-    yaw = drag.yaw + dx * k;
+    yaw = drag.yaw - dx * k; // drag right to turn right
     pitch = Math.max(-1.35, Math.min(1.35, drag.pitch + dy * k));
   });
   canvas.addEventListener('pointerup', (e) => {
@@ -363,7 +406,7 @@ export function openWalkthrough(host, design) {
   });
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    camera.fov = Math.max(35, Math.min(90, camera.fov + Math.sign(e.deltaY) * 4));
+    camera.fov = Math.max(35, Math.min(75, camera.fov + Math.sign(e.deltaY) * 4));
     camera.updateProjectionMatrix();
   }, { passive: false });
   const onKey = (e) => {
@@ -419,12 +462,13 @@ export function openWalkthrough(host, design) {
   function moveTo(e) {
     const hit = pick(e);
     if (!hit) return;
-    const back = new THREE.Vector3(camera.position.x - hit.point.x, 0, camera.position.z - hit.point.z);
+    const at = toBuilding(hit.point);
+    const back = new THREE.Vector3(pos.x - at.x, 0, pos.z - at.z);
     const pull = Math.min(0.45, back.length() * 0.3);
     if (back.lengthSq() > 0) back.normalize().multiplyScalar(pull);
-    let target = new THREE.Vector3(hit.point.x + back.x, hit.point.y + EYE, hit.point.z + back.z);
+    let target = new THREE.Vector3(at.x + back.x, at.y + EYE, at.z + back.z);
     const stair = hit.object.userData.stair;
-    const from = camera.position.clone();
+    const from = pos.clone();
     const path = [from];
     if (stair) {
       // Clicking the stairs takes you to the far end: up if you're below, down if you're above.
@@ -463,7 +507,7 @@ export function openWalkthrough(host, design) {
     const b = ev.target.closest('[data-lift]');
     if (!b) return;
     const to = design.levels[Number(b.dataset.lift)];
-    const p = camera.position.clone();
+    const p = pos.clone();
     glide([p, new THREE.Vector3(p.x, to.elevationM + EYE, p.z)]);
     liftShown = null;
   });
@@ -474,9 +518,10 @@ export function openWalkthrough(host, design) {
   host.querySelector('[data-exit]').addEventListener('click', close);
   const unitName = new Map((design.units || []).map((u) => [u.id, u.name]));
 
-  // For automated checks: put the camera somewhere and point it.
+  // For automated checks: stand somewhere (building metres: x, eye height, y) and look (three.js yaw).
   host.__walk = {
-    pose(x, y, z, yawDeg = 0, pitchDeg = 0) { travel = null; camera.position.set(x, y, z); yaw = (yawDeg * Math.PI) / 180; pitch = (pitchDeg * Math.PI) / 180; },
+    pose(x, y, z, yawDeg = 0, pitchDeg = 0) { travel = null; pos.set(x, y, z); yaw = (yawDeg * Math.PI) / 180; pitch = (pitchDeg * Math.PI) / 180; },
+    surroundings: null,
   };
 
   let raf = 0;
@@ -496,15 +541,16 @@ export function openWalkthrough(host, design) {
       let i = 1;
       while (i < travel.lengths.length - 1 && travel.lengths[i] < d) i++;
       const seg = travel.lengths[i] - travel.lengths[i - 1] || 1;
-      camera.position.lerpVectors(travel.path[i - 1], travel.path[i], (d - travel.lengths[i - 1]) / seg);
+      pos.lerpVectors(travel.path[i - 1], travel.path[i], (d - travel.lengths[i - 1]) / seg);
       if (t >= 1) travel = null;
     }
+    camera.position.set(pos.x, pos.y, -pos.z);
     camera.rotation.set(pitch, yaw, 0);
-    const li = levelAtHeight(design, camera.position.y);
+    const li = levelAtHeight(design, pos.y);
     const lvl = design.levels[li];
-    const x = camera.position.x, z = camera.position.z;
+    const x = pos.x, z = pos.z;
     const r = roomAt(lvl, x, z);
-    const onStairs = stairs.some((s) => (s.level === li || s.toLevel === li) && pointInPolygon(x, z, s.rect) && Math.abs(camera.position.y - EYE - lvl.elevationM) > 0.2);
+    const onStairs = stairs.some((s) => (s.level === li || s.toLevel === li) && pointInPolygon(x, z, s.rect) && Math.abs(pos.y - EYE - lvl.elevationM) > 0.2);
     const balcony = (lvl.balconies || []).find((b) => pointInPolygon(x, z, b.polygon));
     const where = onStairs ? 'Stairs' : balcony ? 'Balcony' : r ? r.name : 'Outside';
     const home = (balcony?.unitId ?? r?.unitId) && design.units?.length > 1 ? unitName.get(balcony?.unitId ?? r?.unitId) : null;
@@ -517,6 +563,8 @@ export function openWalkthrough(host, design) {
   raf = requestAnimationFrame(tick);
 
   function close() {
+    outside.abort();
+    surroundings?.traverse((o) => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); });
     cancelAnimationFrame(raf);
     removeEventListener('keydown', onKey);
     renderer?.dispose();

@@ -14,17 +14,22 @@ import { savedDocument, readSavedBuilding } from './lib/saved-building.js';
 import { createBuildingSaver } from './lib/building-saver.js';
 import { loadSavedScene, sceneCamera } from './lib/saved-scene.js';
 import { mountAccount } from './ui/account.js';
+import { mountHelp } from './ui/help.js';
+import { enablePress } from './ui/press.js';
 import { icon } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { renderBriefPanel } from './panels/brief.js';
 import { buildRequest } from './api/request.js';
 import { renderSending } from './panels/send.js';
 import { renderHousePanel, renderDesignProblems } from './panels/house.js';
-import { checkDesign, footprintOutside } from './lib/design.js';
+import { checkDesign } from './lib/design.js';
+import { landFit } from './lib/fit.js';
+import { explainSaveError } from './lib/errors.js';
+import { createMover } from './map/mover.js';
 import { renderCatalog, renderSites } from './panels/lists.js';
 import { mountRive } from './rive.js';
 import { createStarfield } from './map/stars.js';
-import { searchPlaces, placeName } from './map/places.js';
+import { searchPlaces, suggestPlaces, placeName } from './map/places.js';
 
 const $ = (sel) => document.querySelector(sel);
 const body = document.body;
@@ -32,8 +37,9 @@ const panel = $('#panel');
 const toolbar = $('#toolbar');
 const hint = $('#draw-hint');
 const intro = $('#intro');
-const introHint = $('#intro-hint');
 const account = mountAccount($('#account-button'), $('#dialog'));
+mountHelp($('#help-button'), $('#help'));
+enablePress();
 const scopeKey = (key) => auth.user ? `${key}:${auth.user.uid}` : key;
 
 const app = {
@@ -60,8 +66,6 @@ const app = {
 
 // Declared early: a share link opens the brief (and the hint) before the rest of this file runs.
 const hintPin = { el: null, rive: null, replay: false }; // the drawing hint's Rive pin
-let moving = null;                                       // a building being dragged within its land
-let selecting = false;                                  // first gesture selects; the next can drag
 
 function setMode(mode) {
   app.mode = mode;
@@ -110,12 +114,31 @@ function globePadding() {
 map.setPadding(globePadding());
 addEventListener('resize', () => { if (app.mode === 'globe') map.setPadding(globePadding()); });
 
-const verb = () => (matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click');
+const touch = () => matchMedia('(pointer: coarse)').matches;
+const verb = () => (touch() ? 'Tap' : 'Click');
+// The three ways to start on the intro: your marker (once the location is known), anywhere on the
+// globe, or zooming in. Wording follows the device; the marker option says why when it can't be used.
+let located = false;
+for (const slot of intro.querySelectorAll('[data-icon]')) slot.innerHTML = icon(slot.dataset.icon === 'scroll' && touch() ? 'pinch' : slot.dataset.icon);
 function globeHint() {
-  introHint.textContent = app.you
-    ? `${verb()} your marker to fly home, or anywhere on the globe to go there.`
-    : `${verb()} anywhere on the globe to fly there, or search for a place.`;
+  const option = (name) => intro.querySelector(`[data-start="${name}"]`);
+  const home = option('marker');
+  home.querySelector('[data-start-title]').textContent = `${verb()} your marker`;
+  home.querySelector('[data-start-note]').textContent = !located ? 'Finding your location…'
+    : app.you ? 'Fly straight to where you are.' : 'Your location wasn’t shared.';
+  home.disabled = !app.you;
+  home.classList.toggle('is-loading', !located);
+  home.setAttribute('aria-busy', String(!located));
+  home.classList.toggle('is-unavailable', located && !app.you);
+  // Once it can be used, a Rive pointer hovers over it and presses, to show it's clickable.
+  const tap = home.querySelector('[data-start-tap]');
+  if (app.you && !tap.__rive) tap.__rive = mountRive(tap, { src: 'assets/rive/tap.riv' }) ?? true;
+  tap.hidden = !app.you;
+  option('anywhere').querySelector('[data-start-title]').textContent = `${verb()} anywhere`;
+  option('zoom').querySelector('[data-start-title]').textContent = touch() ? 'Pinch to zoom in' : 'Scroll on the world';
 }
+intro.querySelector('[data-start="marker"]').addEventListener('click', () => goHome());
+globeHint();
 
 const marker = { current: null };
 if (location.hash.startsWith('#s=')) await openShared(location.hash);
@@ -124,11 +147,10 @@ else if (location.hash.startsWith('#l=')) {
 }
 getLocation().then((you) => {
   app.you = you;
+  located = true;
   if (you) marker.current = locationMarker(map, you, { onClick: () => goHome() });
   globeHint();
-  if (!you) introHint.textContent = `Your location wasn’t shared. ${globeHintTail()}`;
 });
-const globeHintTail = () => `${verb()} anywhere on the globe to fly there, or search for a place.`;
 
 function goHome() {
   if (!app.you) return;
@@ -146,9 +168,11 @@ map.on('click', (e) => {
     return;
   }
   if (app.justMoved && Date.now() - app.justMoved < 400) return;
+  if (mover.active) return; // While moving, clicks on the map neither select nor deselect.
   if (app.mode === 'house' || app.mode === 'explore' || app.mode === 'failed') {
     const hit = house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]);
-    if (hit) selectBuilding(hit, { details: house.isSelected(hit) });
+    // A click on a building always opens its details (cost, materials, plans); Move sits beside it.
+    if (hit) selectBuilding(hit, { details: true });
     else {
       house.deselect();
       if (panel.dataset.view === 'house') closePanel();
@@ -157,18 +181,31 @@ map.on('click', (e) => {
   }
 });
 map.on('mousemove', (e) => {
-  if (outliner.active || moving || selecting) return;
+  if (outliner.active || mover.dragging) return;
   const hit = ['house', 'explore', 'failed'].includes(app.mode) && map.getZoom() >= 15 &&
     (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]));
-  map.getCanvas().style.cursor = hit ? (house.isSelected(hit) ? 'grab' : 'pointer') : app.mode === 'globe' ? 'crosshair' : '';
+  map.getCanvas().style.cursor = hit ? (mover.active && house.isSelected(hit) ? 'grab' : 'pointer') : app.mode === 'globe' ? 'crosshair' : '';
+  // Say what a click will open before it's clicked.
+  const show = !!hit && !mover.active;
+  hoverTip.hidden = !show;
+  if (show) {
+    hoverTip.textContent = panel.dataset.view === 'house' && house.isSelected(hit) ? 'Showing its details' : 'Click for details: cost, plans, materials';
+    hoverTip.style.transform = `translate(${e.point.x + 16}px, ${e.point.y + 18}px)`;
+  }
 });
+const hoverTip = document.createElement('div');
+hoverTip.className = 'hover-tip';
+hoverTip.hidden = true;
+map.getContainer().append(hoverTip);
+map.getCanvas().addEventListener('mouseleave', () => { hoverTip.hidden = true; });
+map.on('movestart', () => { hoverTip.hidden = true; });
 map.on('dblclick', (e) => {
   if (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat])) e.preventDefault();
 });
 
-// ---- moving the building within its land -------------------------------------------------------
-// First click/tap selects the house in orange. A subsequent press can drag it,
-// but only to spots where every corner stays inside the outlined land.
+// ---- selecting and moving a building -----------------------------------------------------------
+// A click selects a house in orange and opens its details. The Move button beside a selected house
+// (map/mover.js) turns on the move and turn grips.
 function selectBuilding(hit, { details = false } = {}) {
   if (hit.id && (!house.design || hit.id !== app.savedBuilding?.id)) openSceneBuilding(hit.id, { focus: false, details });
   else {
@@ -177,61 +214,24 @@ function selectBuilding(hit, { details = false } = {}) {
     else if (panel.dataset.view === 'house') closePanel();
     rememberScene();
   }
+  // On phones the details sheet covers the lower half: keep the building (and Move) above it.
+  if (details && !wide()) {
+    const fp = (hit.placement ?? house.placement)?.footprint;
+    if (fp) map.easeTo({ center: [fp.reduce((s, p) => s + p[0], 0) / fp.length, fp.reduce((s, p) => s + p[1], 0) / fp.length], padding: panelPadding(), duration: 600 });
+  }
 }
 const landOf = (design) => (design.previewOn ? app.site?.ring : design.site?.outline) ?? null;
-const shift = (pts, dx, dy) => pts.map(([x, y]) => [x + dx, y + dy]);
-function startMove(e) {
-  if (e.defaultPrevented || moving || selecting) return;
-  const event = e.originalEvent;
-  if (event && 'button' in event && (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey)) return;
-  if (outliner.active || map.getZoom() < 15) return;
-  if (!['house', 'explore', 'failed'].includes(app.mode)) return;
-  const hit = house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]);
-  if (!hit) return;
-  const land = landOf(hit.design);
-  if (!land) return;
-  e.preventDefault();
-  map.stop();
-  if (!house.isSelected(hit)) {
-    selectBuilding(hit);
-    selecting = true;
-    map.getCanvas().style.cursor = 'pointer';
-    return; // This press selects only, even if the pointer then moves.
-  }
-  const p = house.placement, design = house.design;
-  if (!p || !design) return;
-  const panEnabled = map.dragPan.isEnabled();
-  map.dragPan.disable();
-  moving = { start: e.lngLat, from: p, land, last: p, moved: false, panEnabled };
-  map.getCanvas().style.cursor = 'grabbing';
-}
-function dragMove(e) {
-  if (!moving) return;
-  e.originalEvent?.preventDefault();
-  const dx = e.lngLat.lng - moving.start.lng, dy = e.lngLat.lat - moving.start.lat;
-  const footprint = shift(moving.from.footprint, dx, dy);
-  if (Math.abs(dx) + Math.abs(dy) > 1e-7) moving.moved = true;
-  // Only accept spots fully inside the land; otherwise the building stays at its last good spot.
-  if (footprintOutside(footprint, moving.land)) return;
-  const [ox, oy] = moving.from.origin;
-  moving.last = { ...moving.from, origin: [ox + dx, oy + dy], footprint };
-  house.move(moving.last);
-}
-function endMove() {
-  if (selecting) {
-    selecting = false;
-    app.justMoved = Date.now(); // Ignore the synthetic click after mouseup/touchend.
-    map.getCanvas().style.cursor = house.selected ? 'grab' : '';
-    return;
-  }
-  if (!moving) return;
-  const { moved, from, last, panEnabled } = moving;
-  moving = null;
-  if (panEnabled) map.dragPan.enable();
-  map.getCanvas().style.cursor = '';
-  if (!moved) return;
-  app.justMoved = Date.now();
-  if (last === from) return; // A drag outside the land did not change the placement.
+const mover = createMover(map, {
+  house, outliner, landOf,
+  canOffer: () => ['house', 'explore', 'failed'].includes(app.mode) && !outliner.active,
+  onDone: (placement) => savePlacement(placement),
+  // On phones the details panel covers the map, so moving puts it away.
+  onStart: () => { if (!wide() && panel.dataset.view === 'house') closePanel(); },
+  onDragEnd: () => { app.justMoved = Date.now(); }, // Ignore the click that follows a drag.
+});
+
+// Keeps a building's new spot: saved buildings save it to the account; others keep it until saved.
+function savePlacement(last) {
   const design = house.design;
   const uid = auth.user?.uid;
   const version = app.displayVersion;
@@ -248,19 +248,11 @@ function endMove() {
     if (auth.user?.uid === uid && app.displayVersion === version && house.placement === last) toast('Position saved.');
   }).catch((err) => {
     if (auth.user?.uid === uid && app.displayVersion === version && house.placement === last) {
-      toast('Position was not saved. Choose Save changes to retry. ' + err.message);
+      const why = explainSaveError(err);
+      toast(`The new position wasn’t saved. ${why.text}`, { kind: 'error', action: why.action && { label: why.action, run: () => savePlacement(last) } });
     }
   });
 }
-map.on('mousedown', startMove);
-map.on('touchstart', (e) => { if (e.points?.length === 1) startMove(e); else endMove(); });
-map.on('mousemove', dragMove);
-map.on('touchmove', dragMove);
-map.on('mouseup', endMove);
-map.on('touchend', endMove);
-map.on('touchcancel', endMove);
-document.addEventListener('mouseup', endMove);
-addEventListener('blur', endMove);
 
 // Space shows behind the globe whenever the map is zoomed out far enough to see it.
 const syncSpace = () => {
@@ -386,28 +378,62 @@ let found = [];
 let searchAbort = null;
 search.querySelector('.search-icon').innerHTML = icon('search');
 const closeResults = () => { results.hidden = true; searchInput.setAttribute('aria-expanded', 'false'); };
-search.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const q = searchInput.value.trim();
-  if (q.length < 2) return;
+// Suggestions appear as you type (the cursor stays in the box); Enter goes to the first one, or
+// runs a full search when there are no suggestions yet.
+let suggestTimer = 0, foundFor = '';
+async function runSearch(q, { typing }) {
   searchAbort?.abort();
   searchAbort = new AbortController();
+  const signal = searchAbort.signal;
   results.hidden = false;
   searchInput.setAttribute('aria-expanded', 'true');
-  results.innerHTML = '<li class="search-note">Searching…</li>';
+  if (!found.length || !typing) results.innerHTML = '<li class="search-note">Searching…</li>';
   try {
-    found = await searchPlaces(q, { signal: searchAbort.signal });
+    const c = map.getCenter();
+    const list = typing
+      ? await suggestPlaces(q, { signal, near: app.mode === 'globe' ? null : [c.lng, c.lat] })
+      : await searchPlaces(q, { signal });
+    if (signal.aborted) return;
+    found = list; foundFor = q;
     results.innerHTML = found.length
       ? found.map((p, i) => `<li role="option" id="sr-${i}" tabindex="-1" data-i="${i}"><span class="sr-name">${esc(p.name)}</span><span class="sr-detail">${esc(p.detail)}</span></li>`).join('')
       : '<li class="search-note">No places found. Try a town, address or landmark.</li>';
-    results.querySelector('[data-i]')?.focus();
+    if (!typing) results.querySelector('[data-i]')?.focus();
   } catch (err) {
-    if (err.name !== 'AbortError') results.innerHTML = '<li class="search-note">Search isn’t reachable right now.</li>';
+    if (err.name !== 'AbortError') {
+      results.innerHTML = `<li class="search-note">Search isn’t reachable right now. You can still click anywhere on the globe to fly there.</li><li role="option" tabindex="-1" data-retry class="search-retry">${icon('retry')}<span>Try the search again</span></li>`;
+    }
   }
+}
+const searchClear = $('#search-clear');
+searchClear.innerHTML = icon('close');
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchInput.dispatchEvent(new Event('input'));
+  searchInput.focus();
+});
+searchInput.addEventListener('input', () => {
+  clearTimeout(suggestTimer);
+  searchClear.hidden = !searchInput.value;
+  const q = searchInput.value.trim();
+  if (q.length < 2) { searchAbort?.abort(); found = []; foundFor = ''; closeResults(); return; }
+  suggestTimer = setTimeout(() => runSearch(q, { typing: true }), 250);
+});
+searchInput.addEventListener('focus', () => {
+  if (found.length && foundFor === searchInput.value.trim()) { results.hidden = false; searchInput.setAttribute('aria-expanded', 'true'); }
+});
+search.addEventListener('submit', (e) => {
+  e.preventDefault();
+  clearTimeout(suggestTimer);
+  const q = searchInput.value.trim();
+  if (q.length < 2) return;
+  if (found.length && foundFor === q) { goToPlace(found[0]); return; }
+  runSearch(q, { typing: false });
 });
 function goToPlace(p) {
   closeResults();
   searchInput.value = p.name;
+  searchClear.hidden = false;
   searchInput.blur();
   stopSpin();
   if (app.mode === 'globe') { intro.classList.add('is-leaving'); }
@@ -422,6 +448,7 @@ function goToPlace(p) {
   map.once('moveend', done);
 }
 results.addEventListener('click', (e) => {
+  if (e.target.closest('[data-retry]')) { const q = searchInput.value.trim(); if (q.length >= 2) runSearch(q, { typing: false }); return; }
   const li = e.target.closest('[data-i]');
   if (li) goToPlace(found[Number(li.dataset.i)]);
 });
@@ -460,7 +487,10 @@ function shareLink({ preview = false } = {}) {
 }
 async function openShared(hash) {
   const data = decodeShare(hash.slice(3));
-  if (!data?.r || data.r.length < 3) { toast('That link doesn’t contain a site.'); return false; }
+  if (!data?.r || data.r.length < 3) {
+    toast('That link is incomplete, so there’s no land to show. Ask for the link again, or outline land yourself.', { kind: 'error', action: { label: 'Outline land', run: () => { leaveGlobe(); startOutline(); } } });
+    return false;
+  }
   stopSpin();
   intro.hidden = true;
   app.site = { id: `site-${Date.now().toString(36)}`, ring: data.r, form: data.v === 2 ? data.f ?? null : null, mode: 'dream', builder: null, status: 'shared', createdAt: new Date().toISOString() };
@@ -501,7 +531,10 @@ toolbar.addEventListener('click', (e) => {
 
 async function locate() {
   const you = app.you ?? (await getLocation());
-  if (!you) { toast('Your browser didn’t share a location.'); return; }
+  if (!you) {
+    toast('Your browser didn’t share your location. Allow it in the address bar, or search for a place.', { kind: 'error', action: { label: 'Search', run: () => searchInput.focus() } });
+    return;
+  }
   app.you = you;
   if (!marker.current) marker.current = locationMarker(map, you);
   map.flyTo({ center: you, zoom: 17.5, pitch: app.tilted ? 58 : 0, duration: 2500 });
@@ -688,12 +721,15 @@ async function send() {
   // The lot lights up while the design is made; the building grows out of it when it arrives.
   house.hide();
   house.generating(app.site.ring);
+  const form = app.site.form ?? {};
+  const fit = form.housingType ? landFit(form.housingType, form.answers ?? {}, form.advanced ?? {}, measure(app.site.ring)) : null;
   openPanel((el) => renderSending(el, {
     request,
+    fit,
     run: (onProgress) => api.createDesign(request, { onProgress, signal: generation.signal }),
     onDone: async ({ design, estimate }) => {
       if (generation.signal.aborted || (owner && auth.user?.uid !== owner)) return;
-      if (!drawable(design)) return;
+      if (!drawable(design, { fresh: true })) return;
       app.site.status = 'sent';
       app.site.designId = design.id;
       saveSite();
@@ -702,8 +738,14 @@ async function send() {
       const site = app.site;
       showDesign(design, estimate, { site });
       if (owner) {
-        try { await persistBuilding(design, estimate, site, design.placement); toast('Design saved to your account.'); }
-        catch (err) { toast('Design received, but it was not saved. ' + err.message); }
+        const save = async () => {
+          try { await persistBuilding(design, estimate, site, house.design === design ? house.placement : design.placement); toast('Design saved to your account.'); }
+          catch (err) {
+            const why = explainSaveError(err);
+            toast(`Design received, but not saved. ${why.text}`, { kind: 'error', action: why.action && { label: why.action, run: () => (err.code === 'sign-in-required' || err.status === 401 ? account.require().then((u) => u && save()) : save()) } });
+          }
+        };
+        save();
       }
     },
     onFailed: (err) => {
@@ -717,19 +759,35 @@ async function send() {
     onRetry: () => send(),
     onEdit: () => openBrief(),
     onPreview: () => previewSample(),
+    onOutline: () => { closePanel(); outliner.clear(); app.site = null; setMode('explore'); startOutline(); },
+    // A suggested change: apply it to the brief and open the brief so it can be checked and sent.
+    onFix: (patch) => {
+      const f = app.site.form ?? { answers: {} };
+      app.site.form = { ...f, answers: { ...f.answers, ...patch } };
+      store.set(scopeKey('lastForm'), app.site.form);
+      saveSite();
+      openBrief();
+      toast('Brief changed. Check it, then send it again.');
+    },
   }));
 }
 
 // Checks a design against the contract before anything is drawn; a broken file opens a panel that
 // says what's wrong instead.
-function drawable(design) {
+// `fresh` is set for a design Gemma just sent, which can be generated again.
+function drawable(design, { fresh = false } = {}) {
   let result;
   try { result = checkDesign(design); }
   catch { result = { ok: false, errors: [{ rule: 0, message: 'The design file has an incomplete structure.' }], warnings: [] }; }
   for (const w of result.warnings) console.warn(`[design ${design?.id}] ${w.message}`);
   if (result.ok) return true;
+  if (fresh) house.stopGenerating();
   setMode(house.design ? 'house' : 'explore');
-  openPanel((el) => renderDesignProblems(el, { design, result, onClose: closePanel }));
+  const actions = fresh
+    ? [{ label: 'Generate again', primary: true, run: () => send() }, { label: 'Edit the brief', run: () => openBrief() }]
+    : [{ label: 'Choose another file', primary: true, run: () => openSites().then(() => panel.querySelector('[data-file]')?.click()) }];
+  if (config.showSample && app.site) actions.push({ label: 'Preview the sample house', run: () => previewSample() });
+  openPanel((el) => renderDesignProblems(el, { design, result, onClose: closePanel, actions }));
   return false;
 }
 
@@ -760,18 +818,27 @@ function showDesign(design, estimate, { site = null, placement = design.placemen
 // Opens a design file from disk: a Gemma reply ({ design, estimate }) or a bare design.
 async function openDesignFile(file) {
   let data;
+  const another = { label: 'Choose another file', run: () => openSites().then(() => panel.querySelector('[data-file]')?.click()) };
   try { data = JSON.parse(await file.text()); }
-  catch { toast('That file isn’t JSON.'); return; }
+  catch { toast(`“${file.name}” isn’t a JSON file, so it can’t be opened. Choose a design file saved from TerraSim or Gemma.`, { kind: 'error', action: another }); return; }
   const design = data?.design ?? data;
   const estimate = data?.estimate ?? null;
-  if (design?.schema !== 'terrasim.design/2') { toast('That file isn’t a terrasim.design/2 design.'); return; }
+  if (design?.schema !== 'terrasim.design/2') {
+    toast(`“${file.name}” isn’t a TerraSim design (it needs "schema": "terrasim.design/2").`, { kind: 'error', action: another });
+    return;
+  }
   showDesign(design, estimate);
 }
 
 async function previewSample() {
   ++app.displayVersion;
   app.savedBuilding = null;
-  const design = await api.design('sample-0001');
+  let design;
+  try { design = await api.design('sample-0001'); }
+  catch {
+    toast('The sample house couldn’t load. Check your connection and try again.', { kind: 'error', action: { label: 'Try again', run: () => previewSample() } });
+    return;
+  }
   app.currentDesignID = design.id;
   if (!drawable(design)) return;
   const placement = placeOnLot(design, app.site.ring);
@@ -781,7 +848,7 @@ async function previewSample() {
   setMode('house');
   closePanel();
   if (!placement.fits) toast('The sample house is bigger than this lot, so it hangs over the outline.');
-  else toast('Sample house placed on your lot. Click to select it, then drag to move it within your land.');
+  else toast('Sample house placed on your lot. Click it, then choose Move to move or turn it.');
   frameHouse(placement);
   setTimeout(() => openHouse(), 2900);
 }
@@ -866,7 +933,8 @@ async function openWalk(design) {
   const version = app.displayVersion;
   const { openWalkthrough } = await import('./walk/walk.js');
   if (version !== app.displayVersion) return;
-  openWalkthrough($('#walk'), design);
+  // The shown building's live placement, so the view outside matches where it stands now.
+  openWalkthrough($('#walk'), design, { map, placement: house.design === design ? house.placement : design.placement });
 }
 
 // Top bar: lists and units.
@@ -914,7 +982,9 @@ async function openSites() {
         app.records.set(record.id, { record, document });
         app.sceneReady = true;
         openSceneBuilding(record.id);
-      } catch (err) { toast(err.message || 'Couldn’t open the building.'); }
+      } catch (err) {
+        toast(`“${summary.name}” couldn’t be opened. ${err.message || ''}`.trim(), { kind: 'error', action: { label: 'Back to My Builds', run: () => openSites() } });
+      }
     },
     onDeleteBuilding: async (record) => {
       app.removedRecords.add(record.id);
@@ -933,6 +1003,7 @@ async function openSites() {
       if (!items.length && panel.dataset.view === 'sites') render();
     },
     onMore: () => load(nextOffset),
+    onRetry: () => load(items.length ? nextOffset ?? 0 : 0),
   });
   async function load(offset = 0) {
     if (version !== app.libraryVersion) return;
@@ -942,7 +1013,7 @@ async function openSites() {
       if (auth.user?.uid !== uid || panel.dataset.view !== 'sites' || version !== app.libraryVersion) return;
       items = offset ? [...items, ...page.items] : page.items;
       nextOffset = page.next_offset;
-    } catch (err) { error = err.message || 'Couldn’t load saved buildings.'; }
+    } catch (err) { error = `Your saved buildings couldn’t be loaded. ${err.message || ''}`.trim(); }
     finally { loading = false; if ((auth.user?.uid ?? null) === uid && panel.dataset.view === 'sites' && version === app.libraryVersion) render(); }
   }
   openPanel(render, 'sites');
@@ -1031,9 +1102,9 @@ async function restoreScene(uid) {
         map.jumpTo({ ...camera, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
       }
     }
-    if (skipped) toast('Some saved buildings could not be loaded. Open My sites to retry them.');
+    if (skipped) toast(`${skipped} saved building${skipped === 1 ? '' : 's'} couldn’t be drawn. The rest are on the map.`, { kind: 'error', action: { label: 'Open My Builds', run: () => openSites() } });
   } catch (error) {
-    if (current()) toast('Couldn’t restore your saved houses. Open My sites to retry. ' + error.message);
+    if (current()) toast('Your saved buildings couldn’t be loaded right now.', { kind: 'error', action: { label: 'Try again', run: () => restoreScene(uid) } });
   }
 }
 
@@ -1047,7 +1118,7 @@ function accountChanged(user) {
     store.set(`builder:${previousUser}`, null);
     store.set(`lastForm:${previousUser}`, null);
     app.generation?.abort();
-    moving = null; selecting = false; map.dragPan.enable(); map.stop();
+    mover.cancel(); map.dragPan.enable(); map.stop();
     ++app.displayVersion; ++app.sceneVersion;
     $('#walk [data-exit]')?.click();
     house.clear(); outliner.clear(); closePanel();

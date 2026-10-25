@@ -89,6 +89,7 @@ export async function createMap(container) {
   });
   map.dragRotate.enable();
   map.touchZoomRotate.enableRotation();
+  rightDragPans(map);
 
   await new Promise((ok) => map.once('load', ok));
   // Start with the attribution folded into its (i) button.
@@ -123,6 +124,35 @@ export async function createMap(container) {
   startSpin();
 
   return { map, stopSpin, startSpin };
+}
+
+// Holding either mouse button and dragging moves the whole map. MapLibre turns and tilts on a
+// right-drag; here the right button pans like the left, and Ctrl-drag stays the way to turn and tilt.
+function rightDragPans(map) {
+  const canvas = map.getCanvasContainer();
+  let last = null;
+  const move = (e) => {
+    if (!last) return;
+    map.panBy([last.x - e.clientX, last.y - e.clientY], { duration: 0 });
+    last = { x: e.clientX, y: e.clientY };
+  };
+  const up = (e) => {
+    if (e.button !== 2) return;
+    last = null;
+    removeEventListener('mousemove', move);
+    removeEventListener('mouseup', up);
+  };
+  // Capture phase, so MapLibre's own right-drag rotate never sees the press.
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 2 || e.ctrlKey || e.metaKey) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    map.stop();
+    last = { x: e.clientX, y: e.clientY };
+    addEventListener('mousemove', move);
+    addEventListener('mouseup', up);
+  }, true);
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 // OpenFreeMap's buildings as solid volumes: opaque, light stone that cools a little with height,

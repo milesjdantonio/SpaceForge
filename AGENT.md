@@ -56,25 +56,28 @@ use SpaceForge. See [PRODUCT.md](PRODUCT.md) for product context,
   restoration. Local loopback hosts use the Auth emulator; production needs its
   real Firebase public web API key and HTTPS storage URL in frontend/js/config.js.
 - Signed-in users automatically save validated Gemma replies. Imported designs and
-  previews have a Save building action. My sites lists private SQL records and
+  previews have a Save building action. My Builds lists private SQL records and
   supports reopen/delete. Account changes clear private render state and caches.
 - Session restoration automatically loads every page of the account's saved houses
   and renders all of them. The browser remembers the last selected SQL UUID and
   camera per account. Selection preserves other saved models; sign-out clears every
   private model and cancels stale restoration callbacks. Shared links keep priority.
-- Dragging a saved building automatically persists its actual map placement beside
-  the original design. Saves run in order per building, survive selection changes, and reuse the SQL
+- Moving or turning a saved building (Done in move mode) automatically persists its
+  actual map placement beside the original design. Saves run in order per building, survive selection changes, and reuse the SQL
   UUID, including moves during initial creation. Unsaved imports/previews require
   Save building; failed position saves offer Save changes to retry.
 - Building interaction picks rendered 3D geometry before falling back to ground
   footprints. Keep pitched roof/wall dragging separate from map panning, release
   controls on mouseup outside the canvas and touch cancellation, and preserve
   normal empty-land pan and multi-touch gestures.
-- Clicking/tapping a building selects it in orange. The first gesture selects only;
-  a subsequent gesture can drag the selected house. Empty-land clicks deselect it.
-  Keep visual selection separate from the displayed document and do not mutate
-  the original design palette when highlighting. First selection keeps the details
-  panel closed so it cannot cover the house before the next drag on mobile.
+- Clicking/tapping a building selects it in orange and shows a Move button beside
+  it (map/mover.js). Move opens a ground ring with a turn grip (any angle) and a
+  grip above the roof; the building can also be dragged by its roof. It may go past
+  its land while moving (the outline turns red) but Done only keeps spots inside;
+  Escape restores it. Outside move mode, a drag on a building pans the map.
+  Empty-land clicks deselect. Keep visual selection separate from the displayed
+  document and do not mutate the original design palette when highlighting. First
+  selection keeps the details panel closed so it cannot cover the house on mobile.
 - Preserve the existing contracts and renderer. Building storage accepts a flexible
   JSON object without imposing a new scene schema. The frontend stores an envelope
   with the original design, estimate, site/brief and actual preview placement; its

@@ -22,6 +22,9 @@ export const config = {
   // Place search and place names: OpenStreetMap Nominatim (free for light use, no key). See
   // js/map/places.js. Replace with a hosted geocoder before real traffic.
   geocoder: 'https://nominatim.openstreetmap.org',
+  // Search as you type. Nominatim forbids autocomplete, so suggestions come from Photon (komoot's
+  // OpenStreetMap search, built for it, no key). Also replace before real traffic.
+  typeahead: 'https://photon.komoot.io',
 
   map: {
     // OpenStreetMap vector style with 3D buildings, from OpenFreeMap (free, no key).
@@ -32,6 +35,9 @@ export const config = {
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       attribution: 'Imagery © Esri, Maxar, Earthstar Geographics, and the GIS User Community',
     },
+    // Ground heights for the walkthrough's view outside: Terrarium elevation tiles from the AWS
+    // open terrain dataset (free, no key). Tiles are {z}/{x}/{y}.png under this address.
+    terrain: 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium',
   },
 };
 

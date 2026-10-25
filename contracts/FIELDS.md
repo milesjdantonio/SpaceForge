@@ -114,7 +114,7 @@ Style isn't a choice from a list: the user writes it in `designPrompt`.
 ## Part 2: `design` (Gemma → database → renderer)
 
 A complete example, the sample house, is [frontend/fixtures/mock-house/design.json](../frontend/fixtures/mock-house/design.json).
-On the website, **My sites → Open a design file** loads any design file, checks it against the rules
+On the website, **My Builds → Open a design file** loads any design file, checks it against the rules
 below and draws it where it stands, so Gemma's output can be checked before the API exists.
 
 ### How the building is described
