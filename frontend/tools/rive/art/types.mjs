@@ -1,5 +1,5 @@
 // types.riv: one small isometric drawing per housing type, for the brief's type cards. Artboards:
-// House, Tiny, Townhouse, Duplex, Apartment, Condo, Dorm. Each draws itself in, lifts on hover and
+// House, Tiny, Townhouse, Duplex, Mansion, Villa, Apartment, Condo, Dorm, Hotel. Each draws itself in, lifts on hover and
 // lights its windows when selected.
 //
 // State machine "Type": bool `hover`, bool `selected`.
@@ -188,6 +188,48 @@ export default function build() {
     d.door(1.8, 1.95, 0.5, 0.6);
     d.windowsR(4.4, [0.3, 1.0], [0.3, 1.05, 1.8], 0.36, 0.42);
     d.box([1.75, 1.8, 0.75], [2.85, 2.2, 0.85]);
+  });
+
+  // A tall middle block between two lower wings, every block under its own gable.
+  drawing(f, 'Mansion', 12, [70, 36], (d) => {
+    d.box([-1.1, 0.25, 0], [0, 1.65, 1.3], { top: false });
+    d.windowsL(1.65, [-0.85, -0.4], [0.45], 0.3, 0.38);
+    d.gable([-1.1, 0.25], [0, 1.65], 1.3, 0.55, 0.06);
+    d.box([0, 0, 0], [2.4, 1.9, 2.1], { top: false });
+    d.windowsL(1.9, [0.25, 0.75, 1.45, 1.95], [0.4, 1.3], 0.28, 0.42);
+    d.door(1.9, 1.04, 0.34, 0.66);
+    d.windowsR(2.4, [0.3, 1.2], [0.4, 1.3], 0.32, 0.42);
+    d.gable([0, 0], [2.4, 1.9], 2.1, 0.85, 0.1);
+    d.box([2.4, 0.25, 0], [3.5, 1.65, 1.3], { top: false });
+    d.windowsL(1.65, [2.65, 3.1], [0.45], 0.3, 0.38);
+    d.windowsR(3.5, [0.55, 1.05], [0.45], 0.3, 0.38);
+    d.gable([2.4, 0.25], [3.5, 1.65], 1.3, 0.55, 0.06);
+  });
+
+  // Long and low under a shallow tile roof, a wing behind, and a pergola over the terrace.
+  drawing(f, 'Villa', 15, [66, 42], (d) => {
+    d.box([0, -1.1, 0], [1.2, 0, 0.95], { top: false });
+    d.gable([0, -1.1], [1.2, 0], 0.95, 0.35, 0.08);
+    d.box([0, 0, 0], [3.0, 1.7, 1.0], { top: false });
+    d.windowsL(1.7, [0.3, 0.9, 2.2], [0.3], 0.34, 0.5);
+    d.door(1.7, 1.45, 0.4, 0.66);
+    d.windowsR(3.0, [0.35, 1.0], [0.3], 0.34, 0.5);
+    d.gable([0, 0], [3.0, 1.7], 1.0, 0.42, 0.14);
+    // Terrace and pergola beside it.
+    d.poly([[3.0, 0.2, 0.04], [4.1, 0.2, 0.04], [4.1, 1.7, 0.04], [3.0, 1.7, 0.04]], FACE_T, { line: false });
+    for (const [x, y] of [[4.0, 0.3], [4.0, 1.6]]) d.poly([[x, y, 0], [x + 0.08, y, 0], [x + 0.08, y, 0.85], [x, y, 0.85]], mix(LINE, FACE_R, 0.4), { line: false });
+    for (const y of [0.3, 0.75, 1.2, 1.6]) d.poly([[3.0, y, 0.85], [4.1, y, 0.85], [4.1, y + 0.06, 0.9], [3.0, y + 0.06, 0.9]], mix(LINE, FACE_T, 0.5), { line: false });
+  });
+
+  // A tall block with a glazed ground floor, a canopy over the entrance and a sign on the roof.
+  drawing(f, 'Hotel', 12, [76, 22], (d) => {
+    d.box([0, 0, 0], [2.8, 2.0, 4.8]);
+    d.windowsL(2.0, [0.2, 0.75, 1.3, 1.85, 2.4], [1.25, 2.0, 2.75, 3.5, 4.2], 0.26, 0.38);
+    d.windowsR(2.8, [0.25, 0.8, 1.35], [1.25, 2.0, 2.75, 3.5, 4.2], 0.3, 0.38);
+    d.windowsL(2.0, [0.15, 0.85, 1.95], [0.2], 0.6, 0.65);
+    d.door(2.0, 1.2, 0.55, 0.75);
+    d.box([0.95, 2.0, 0.85], [2.0, 2.45, 0.95]);
+    d.box([0.8, 0.9, 4.8], [2.0, 1.05, 5.25]);
   });
 
   return f;

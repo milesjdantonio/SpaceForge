@@ -85,7 +85,7 @@ open `frontend/fixtures/mock-house` from My Builds.
 - `-fake` test mode for the design service.
 - New building types: mansion, villa and hotel (brief, fit check, rooms, plans, Gemma prompts).
   Mansion and villa use the house plan with their own rooms; a hotel is numbered guest rooms with
-  their own baths over a lobby, restaurant and kitchen. No Rive pictures for them yet (icons show).
+  their own baths over a lobby, restaurant and kitchen. Their type cards have Rive pictures too.
 - L, U and courtyard plans for a house, mansion or villa (`housecost/wings.go`): wings joined at
   their halls, a roof per wing (`roof.wings`), a courtyard outline with an open court; "an L-shaped
   house" or "round a courtyard" in the description asks for one, and Gemma may choose one for a big
@@ -165,7 +165,6 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 
 **Gemma and backend (`housecost/`)**
 - New types: trailer park and neighborhood on `terrasim.design/3`.
-- Rive pictures for the mansion, villa and hotel cards in `types.riv`.
 - Run a full design with real Gemma end to end.
 
 **Needs the user**

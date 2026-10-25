@@ -465,5 +465,5 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
 
 // Artboard names in types.riv.
 export function typeArtboard(id) {
-  return { house: 'House', 'tiny-home': 'Tiny', townhouse: 'Townhouse', duplex: 'Duplex', apartment: 'Apartment', condo: 'Condo', dorm: 'Dorm' }[id];
+  return { house: 'House', 'tiny-home': 'Tiny', townhouse: 'Townhouse', duplex: 'Duplex', mansion: 'Mansion', villa: 'Villa', apartment: 'Apartment', condo: 'Condo', dorm: 'Dorm', hotel: 'Hotel' }[id];
 }
