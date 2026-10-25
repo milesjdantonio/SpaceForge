@@ -456,6 +456,36 @@ func homeLevels(p Program) ([][]slot, []string) {
 			names = append(names, fmt.Sprintf("Floor %d", lvl+1))
 		}
 	}
+	// Rooms the description asks for that the plan doesn't have yet.
+	base := 0
+	if p.Basement {
+		base = 1
+	}
+	has := map[string]bool{}
+	for _, lv := range levels {
+		for _, s := range lv {
+			has[s.name] = true
+		}
+	}
+	for _, k := range p.ExtraRooms {
+		s := descRoomSlot(k, A)
+		if s.name == "" || has[s.name] {
+			continue
+		}
+		at := base + publicLvl
+		switch k {
+		case "wine":
+			at = 0 // the basement when there is one, else the ground floor
+		case "mudroom":
+			at, s.pin = base, 1
+		case "gym", "media", "playroom", "music":
+			if F > 1 {
+				at = len(levels) - 1
+			}
+		}
+		levels[at] = append(levels[at], s)
+		has[s.name] = true
+	}
 	return levels, names
 }
 

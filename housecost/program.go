@@ -46,6 +46,9 @@ type Program struct {
 	CurvedInside bool
 	// Bridge: a glazed bridge joins a U plan's wings on the top floor (wings.go).
 	Bridge bool
+	// From the description (describe.go): the roof it asks for, and rooms to add.
+	RoofTypeAsked string
+	ExtraRooms    []string
 	Palette         []PaletteColor
 	Text            ProgramText
 }
@@ -146,6 +149,7 @@ func DefaultProgram(r Request) Program {
 		p.Shape, p.ShapeFromUser = shapeForType(ht, s), true
 	}
 	p.CurvedInside = curvedInsideFromPrompt(sv(b.DesignPrompt))
+	p.RoofTypeAsked, p.ExtraRooms = r.asks.RoofType, r.asks.Rooms
 	if bridgeRe.MatchString(sv(b.DesignPrompt)) {
 		p.Bridge = true
 		// A bridge joins two wings: a home that can have wings becomes a U.
@@ -474,6 +478,23 @@ func (p Program) Merge(pr ProgramReply) Program {
 		p.AreaM2 = *pr.AreaM2
 	}
 	p.RoofType, p.RoofPitch = pr.RoofType, pr.RoofPitch
+	// The roof the description asks for wins, with a pitch its roofing can take.
+	switch {
+	case p.RoofTypeAsked == "flat" && p.RoofType != "flat":
+		p.RoofType, p.RoofPitch = "flat", 0
+		if p.Roofing != "membrane" && p.Roofing != "metal" {
+			p.Roofing = "membrane"
+		}
+	case (p.RoofTypeAsked == "gable" || p.RoofTypeAsked == "hip") && p.RoofType != p.RoofTypeAsked:
+		p.RoofType = p.RoofTypeAsked
+		minPitch := map[string]float64{"asphalt-shingle": 0.17, "tile": 0.33, "slate": 0.33, "metal": 0.08}[p.Roofing]
+		if p.Roofing == "membrane" || p.Roofing == "" {
+			p.Roofing, minPitch = "asphalt-shingle", 0.17
+		}
+		if p.RoofPitch < 0.17 || p.RoofPitch < minPitch {
+			p.RoofPitch = maxF(0.4, minPitch)
+		}
+	}
 	if !p.ShapeFromUser && pr.Shape != "" {
 		p.Shape = shapeForType(p.HousingType, pr.Shape)
 	}
@@ -549,8 +570,11 @@ SITE (measured):
 ASSESSMENT: verdict %s; foundation %s; risks: %s
 
 SIZING: %s
+Use the LAND line in SIZING: size and shape the building to the land as well as to the brief.
 
-The user's DESCRIPTION (brief.designPrompt, in their own words) is the base of the request. Follow
+The user's DESCRIPTION (brief.designPrompt, in their own words) is the base of the request. It
+matters more than any default: a design that ignores it fails. Choices it plainly made (a roof,
+materials, rooms, a garage) are already in advanced. Follow
 it: pick the style value closest to what it describes (write the code exactly, for example
 farmhouse rather than "modern farmhouse"; the same for cladding and roofing, and put the nuance in the
 description), take its feel, materials and colours into the
@@ -769,4 +793,22 @@ func keepUserChoices(pr *ProgramReply, r Request) []string {
 		include("commonSpaces", a.CommonSpaces, &pr.CommonSpaces)
 	}
 	return notes
+}
+
+func maxF(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// joinAnd joins "a", "b" and "c" as "a, b and c".
+func joinAnd(xs []string) string {
+	switch len(xs) {
+	case 0:
+		return ""
+	case 1:
+		return xs[0]
+	}
+	return strings.Join(xs[:len(xs)-1], ", ") + " and " + xs[len(xs)-1]
 }

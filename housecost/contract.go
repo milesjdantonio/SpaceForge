@@ -25,6 +25,8 @@ type Request struct {
 	Mode        *string     `json:"mode"`
 	Builder     *Builder    `json:"builder"`
 	Client      ClientInfo  `json:"client"`
+	// asks is what the description plainly asks for, read by code (describe.go).
+	asks descAsks
 }
 
 type SiteFeature struct {

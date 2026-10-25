@@ -249,6 +249,12 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		out.Report.Verdict, out.Report.Problems = "invalid_request", probs
 		return out, fmt.Errorf("request problems:\n- %s", strings.Join(probs, "\n- "))
 	}
+	// The description's plain asks become the user's choices where the form left them open.
+	var took []string
+	r, r.asks, took = applyDescription(r)
+	if len(took) > 0 {
+		fmt.Fprintf(log, "From the description: %s\n", strings.Join(took, ", "))
+	}
 	ring, _ := r.SiteRing()
 	setback := r.Setback()
 	var cLng, cLat float64
@@ -371,6 +377,7 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	}
 	sizing := fmt.Sprintf("a first version is %.1f × %.1f m with %d levels; site %.0f m² with a %.0f m setback from every boundary",
 		f0.l.W, f0.l.D, len(f0.l.Levels), siteArea, setback)
+	sizing += "\n" + landNote(local, setback, f0.l)
 	// The user's own choices are put back by code when Gemma changes them, instead of a retry.
 	parseProgram := func(text string) (ProgramReply, error) {
 		pr, err := ParseProgram(text)
@@ -386,6 +393,9 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		return out, err
 	}
 	p := DefaultProgram(rAdj).Merge(pr)
+	if len(took) > 0 {
+		p.Text.Features = append(p.Text.Features, "From your description: "+joinAnd(took)+".")
+	}
 	if p.HousingType == "dorm" && p.BathroomSharing == "suite" {
 		p.RoomType = "suite"
 	}
@@ -702,4 +712,33 @@ func streetBearings(f Frame, centre Pt, streets [][]Pt) []float64 {
 		return nil
 	}
 	return roadFacingBearings(centre, bestA, bestB)
+}
+
+// landNote tells Gemma what the land offers, so the program uses it: how much is buildable, how
+// much the first version covers, and the lot's proportions.
+func landNote(local []Pt, setback float64, l *Layout) string {
+	build := buildableArea(local, setback)
+	if build <= 0 {
+		return ""
+	}
+	b := boundsOf(local)
+	long, short := b.W(), b.D()
+	if short > long {
+		long, short = short, long
+	}
+	share := l.W * l.D / build
+	var advice string
+	switch {
+	case share > 0.8:
+		advice = "The building nearly fills the buildable area: keep the footprint compact (a rectangle), go up a floor if the type allows, and leave out what spreads it (deck, wide garage)."
+	case share < 0.2 && build > 600:
+		advice = "There's plenty of land to spare: the home can spread out and live outdoors (a deck or terrace, a porch, one or two floors rather than three), and a large home reads well as wings (footprintShape l, u or courtyard) round a yard."
+	default:
+		advice = "The building uses a fair share of the land: keep the yard usable and put the deck or terrace on the side away from the street."
+	}
+	if long/short > 2.2 {
+		advice += " The lot is long and narrow: a long, narrow building along it suits it better than wings."
+	}
+	return fmt.Sprintf("LAND: %.0f m² is buildable inside the setbacks; the first version covers %.0f%% of it. The lot is about %.0f × %.0f m. %s",
+		build, share*100, long, short, advice)
 }

@@ -98,6 +98,12 @@ open `frontend/fixtures/mock-house` from My Builds.
   the top floor across the far end of the yard; a home that can have wings becomes a U for it. Left
   out, with a caution, for one-floor homes and plans without two wings.
 - Fixed: the expanded plan was cut off (a CSS rule left it taller than its box).
+- The description is read by code too (`housecost/describe.go`): a roof, roofing, outside walls,
+  extras, a garage size and rooms (library, gym, media room, sunroom, mudroom, pantry, studio…) it
+  plainly asks for become the user's choices where the form left them open, so Gemma keeps them and
+  the rooms are drawn; the features list says "From your description: …". Gemma also gets a LAND
+  note (buildable area, how much the first version covers, the lot's proportions) with advice to
+  spread out, go up or use wings.
 
 **2026-10-25 (on `FrontEnd-Refresh`, pushed, not merged into main):**
 - Cancel while generating (asks once more; the service stops the job and any Gemma call).
@@ -158,7 +164,6 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 - Spell and text check across the site. (Sign-in was tested end to end by a teammate.)
 
 **Gemma and backend (`housecost/`)**
-- Gemma following the description more strongly, and using the land better.
 - New types: trailer park and neighborhood on `terrasim.design/3`.
 - Rive pictures for the mansion, villa and hotel cards in `types.riv`.
 - Run a full design with real Gemma end to end.

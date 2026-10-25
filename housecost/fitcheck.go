@@ -33,6 +33,7 @@ type FitReply struct {
 
 // FitCheck sizes a first version of the building and tries to place it on the land.
 func FitCheck(r Request) (FitReply, error) {
+	r, r.asks, _ = applyDescription(r)
 	ht := sv(r.HousingType)
 	if !contains(HousingTypes, ht) {
 		return FitReply{}, fmt.Errorf("housingType must be one of %v", HousingTypes)
