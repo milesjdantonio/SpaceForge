@@ -1,7 +1,7 @@
 ---
 version: 1
 slug: "frontend-index-html"
-primary_target: "frontend/index.html"
+primary_target: "website/index.html"
 related_targets: []
 ---
 

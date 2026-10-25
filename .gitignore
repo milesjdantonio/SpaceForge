@@ -1,6 +1,6 @@
 # Dependencies and build output
 node_modules/
-backend/bin/
+storage-service/bin/
 coverage.out
 
 # Local configuration and credentials
@@ -35,8 +35,15 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
-# Design service (housecost): the Gemini key and local outputs
+# Design service (design-service/): the Gemini key and local outputs
 APIKey.txt
-housecost/gemma_log/
-housecost/results/
-housecost/*.result.json
+design-service/gemma_log/
+design-service/results/
+design-service/*.result.json
+
+# Built programs (go build / go test -c)
+*.exe
+*.exe~
+
+# Render build output
+bin/

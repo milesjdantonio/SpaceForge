@@ -18,7 +18,7 @@ gaps: anything it needs is a field in the file. If the file breaks a rule in thi
 shows an error instead of a broken building.
 
 The instructions Gemma itself gets (what each user answer should mean for the design, and the order
-to work in) are built in code by the design service, in `housecost/` (for example `BuildProgramPrompt`
+to work in) are built in code by the design service, in `design-service/` (for example `BuildProgramPrompt`
 in program.go).
 
 Conventions:
@@ -46,7 +46,7 @@ Conventions:
 |---|---|---|
 | `schema` | string | Always `"terrasim.design-request/2"`. |
 | `id` | string | Request id made by the website. Gemma copies it into `design.requestId`. |
-| `housingType` | string | `house`, `tiny-home`, `townhouse`, `duplex`, `apartment`, `condo` or `dorm`. Gemma designs the **whole building** for every type. |
+| `housingType` | string | `house`, `tiny-home`, `townhouse`, `duplex`, `mansion`, `villa`, `apartment`, `condo`, `dorm` or `hotel`; or `neighborhood` or `trailer-park` for a whole site (see "Sites"). Gemma designs the **whole building** for every type. |
 | `site` | GeoJSON Feature | The land the user outlined. |
 | `brief` | object | The required questions (main form). Each one is its own box; the website won't send until every box that applies is filled. |
 | `advanced` | object | The optional questions (Advanced menu at the bottom of the form). `null` or `[]` means Gemma decides. |
@@ -64,23 +64,30 @@ Conventions:
 | `properties.areaM2` | Area of the outline. |
 | `properties.perimeterM` | Length around the outline. |
 | `properties.centroid` | `[lng, lat]` of the middle of the outline. |
+| `properties.streets` | Optional. Streets within about 150 m of the land, as `[lng, lat]` lines from the website's map. The design service faces the front toward the nearest; without them it looks the streets up itself (slower). |
 | `properties.setbackM` | Distance kept clear from every boundary (currently 3). |
 
 ### `brief`: required questions, by housing type
 
 ✓ = required box. – = doesn't apply, sent as `null`. A number = fixed by the type, filled in by the website.
 
-| Field | house | tiny-home | townhouse | duplex | apartment | condo | dorm |
-|---|---|---|---|---|---|---|---|
-| `designPrompt` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `floors` | ✓ 1–3 | ✓ 1–2 | ✓ 2–4 | ✓ 1–3 | ✓ 2–12 | ✓ 2–12 | ✓ 2–12 |
-| `areaM2` | ✓ living area | ✓ living area | ✓ per home | ✓ per home | ✓ average per home | ✓ average per home | – |
-| `unitCount` | 1 | 1 | ✓ 2–12 | 2 | ✓ 4–200 | ✓ 4–200 | – |
-| `bedrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ typical per home | ✓ typical per home | – |
-| `bathrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ typical per home | ✓ typical per home | – |
-| `residents` | – | – | – | – | – | – | ✓ beds in the building |
-| `roomType` | – | – | – | – | – | – | ✓ `single`, `double` or `suite` |
-| `budgetUSD` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Field | house | tiny-home | townhouse | duplex | mansion | villa | apartment | condo | dorm | hotel |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `designPrompt` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `floors` | ✓ 1–3 | ✓ 1–2 | ✓ 2–4 | ✓ 1–3 | ✓ 1–4 | ✓ 1–3 | ✓ 2–12 | ✓ 2–12 | ✓ 2–12 | ✓ 2–12 |
+| `areaM2` | ✓ living area | ✓ living area | ✓ per home | ✓ per home | ✓ living area | ✓ living area | ✓ average per home | ✓ average per home | – | – |
+| `unitCount` | 1 | 1 | ✓ 2–12 | 2 | 1 | 1 | ✓ 4–200 | ✓ 4–200 | – | ✓ guest rooms, 8–400 |
+| `bedrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ 3–12 | ✓ 1–10 | ✓ typical per home | ✓ typical per home | – | – |
+| `bathrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ 2–14 | ✓ 1–10 | ✓ typical per home | ✓ typical per home | – | – |
+| `residents` | – | – | – | – | – | – | – | – | ✓ beds in the building | – |
+| `roomType` | – | – | – | – | – | – | – | – | ✓ `single`, `double` or `suite` | ✓ `single` (king rooms), `double` (two-queen rooms) or `suite` |
+| `budgetUSD` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+A mansion gets a formal living room, family room, library, mudroom and pantry, and a media room and
+gym from about 550 m² (in the basement if there is one, with a wine cellar). A villa gets one big
+living room opening onto its terrace, a study, a pantry, and a family room from about 250 m². A hotel
+is guest rooms (each an entry, its own bath and a bedroom; a suite adds a sitting room) along
+corridors, over a ground floor with the lobby and its common spaces.
 
 - `designPrompt` is the user's own description of the building and its style, 15 to 1,000
   characters, for example "A bright modern farmhouse that opens to the view, with a big kitchen at
@@ -88,7 +95,7 @@ Conventions:
   style, feel, and anything to keep or avoid all come from here. The numbers in the other boxes
   are firm requirements; where the text and a box disagree, the box wins.
 - `areaM2` never includes garages or parking. `null` means the user ticked "Let Gemma choose the size": Gemma
-  chooses it (see the program prompt in housecost/program.go), and `aiDecides` includes `"areaM2"`.
+  chooses it (see the program prompt in design-service/program.go), and `aiDecides` includes `"areaM2"`.
 - `budgetUSD` is for the whole building. `null` here means the user ticked "No limit"; the website
   never sends an empty budget otherwise.
 
@@ -97,16 +104,16 @@ Conventions:
 | Field | Values | Applies to |
 |---|---|---|
 | `quality` | `essential`, `standard`, `premium` | all |
-| `garage` | cars: `0`–`3` | house, tiny-home, townhouse (per home), duplex (per home) |
-| `parkingSpaces` | number, for the whole site | apartment, condo, dorm |
+| `garage` | cars: `0`–`3` (`0`–`4` for a mansion) | house, tiny-home, townhouse (per home), duplex (per home), mansion, villa |
+| `parkingSpaces` | number, for the whole site | apartment, condo, dorm, hotel |
 | `structure` | `wood-frame`, `steel-frame`, `concrete`, `mass-timber`, `masonry` | all |
 | `cladding` | `board-batten`, `lap-siding`, `brick`, `stucco`, `stone`, `fiber-cement`, `metal-panel`, `timber` | all |
 | `roofing` | `asphalt-shingle`, `metal`, `tile`, `slate`, `membrane` | all |
 | `priorities` | any of `efficiency`, `maintenance`, `light`, `privacy`, `accessible`, `quiet` | all |
-| `extras` | any of `office`, `porch`, `deck`, `basement`, `balconies`, `roof-terrace` | all |
+| `extras` | any of `office`, `porch`, `deck`, `basement`, `balconies`, `roof-terrace` (makes the roof flat and adds a stair house and a railed terrace on it) | all |
 | `unitMix` | counts of `studio`, `oneBed`, `twoBed`, `threeBed`; they add up to `unitCount` | apartment, condo |
 | `bathroomSharing` | `private`, `suite` (shared by a few rooms), `hall` (shared per floor) | dorm |
-| `commonSpaces` | any of `lobby`, `lounge`, `study`, `gym`, `laundry`, `kitchen`, `bike-storage`, `mail` | apartment, condo, dorm |
+| `commonSpaces` | any of `lobby`, `lounge`, `study`, `gym`, `laundry`, `kitchen`, `bike-storage`, `mail`, `restaurant` (a hotel's comes with its kitchen) | apartment, condo, dorm, hotel |
 
 Style isn't a choice from a list: the user writes it in `designPrompt`.
 
@@ -114,7 +121,7 @@ Style isn't a choice from a list: the user writes it in `designPrompt`.
 
 ## Part 2: `design` (Gemma → database → renderer)
 
-A complete example, the sample house, is [frontend/fixtures/mock-house/design.json](../frontend/fixtures/mock-house/design.json).
+A complete example, the sample house, is [website/fixtures/mock-house/design.json](../website/fixtures/mock-house/design.json).
 On the website, **My Builds → Open a design file** loads any design file, checks it against the rules
 below and draws it where it stands, so Gemma's output can be checked before the API exists.
 
@@ -124,7 +131,7 @@ A building is a stack of **levels**. Each level is drawn from four lists, all in
 
 - **`outline`**: the outer edge of the floor slab. The floor and ceiling fill it.
 - **`rooms`**: the named spaces, each a polygon, each tagged with the home it belongs to.
-- **`walls`**: every wall to draw, as straight segments. Nothing else becomes a wall.
+- **`walls`**: every wall to draw, as straight or curved segments. Nothing else becomes a wall.
 - **`openings`**: doors, windows and openings, each placed on one wall.
 
 Stairs and elevators are listed once for the whole building, because they connect levels.
@@ -158,10 +165,10 @@ The roof, garage, porch, parking and materials are in `exterior`.
 |---|---|
 | `floors` | Storeys above ground. |
 | `levelsBelowGround` | Basement levels (usually 0). |
-| `unitCount` | Homes in the building (1 for a house; 0 for a dorm). |
-| `bedrooms`, `bathrooms` | Totals for the whole building. A half bath (toilet and sink) counts 0.5. |
+| `unitCount` | Homes in the building (1 for a house; 0 for a dorm or hotel). |
+| `bedrooms`, `bathrooms` | Totals for the whole building. A half bath (toilet and sink) counts 0.5. For a hotel, its guest rooms and their baths. |
 | `residents` | Beds, for dorms. `null` for other types. |
-| `finishedAreaM2` | Total finished area of all homes (or all dorm rooms and suites). |
+| `finishedAreaM2` | Total finished area of all homes (or all dorm rooms and suites, or all hotel guest rooms). |
 | `grossAreaM2` | Total floor area including corridors, stairs, lobbies, walls and common rooms. |
 | `parkingSpaces` | Garage spaces plus parking spaces. |
 
@@ -171,10 +178,11 @@ The roof, garage, porch, parking and materials are in `exterior`.
 |---|---|
 | `site.outline` | The user's outline, copied from the request, `[lng, lat]` points (not closed). |
 | `site.areaM2` | Its area. |
+| `site.estimated` | `true` when the land is outside the US and the site data is estimated (see "Where site data reaches"). Left out otherwise. |
 | `site.soil` | What the soil survey found under the building and the foundation chosen for it: `{ source, name, uscsClass, bearingPsf, shrinkSwell, depthToBedrockIn, depthToWaterTableIn, foundation, foundationReason, note }`. |
 | `placement.origin` | `[lng, lat]` of the building's `[0, 0]` corner on the ground (front left). |
-| `placement.xAxisBearingDeg` | Compass bearing of the building's x axis (0 = north, 90 = east). The front faces this bearing minus 90°. |
-| `placement.footprint` | The four corners of the `size` rectangle as `[lng, lat]`, in the order (0,0), (W,0), (W,D), (0,D). |
+| `placement.xAxisBearingDeg` | Compass bearing of the building's x axis (0 = north, 90 = east). The y axis is the x axis turned 90° counter-clockwise (seen from above), so the front (y = 0) faces this bearing plus 90°. For x pointing east, y points north and the front faces south. |
+| `placement.footprint` | The ground floor's outline as `[lng, lat]` points: for a rectangular building its four corners in the order (0,0), (W,0), (W,D), (0,D); for a round or shaped one, its outline with curves sampled (at most about 100 points). |
 | `size.widthM`, `size.depthM` | The rectangle every level's `outline` fits inside. |
 | `size.heightM` | Ground to the highest point of the roof. |
 
@@ -185,7 +193,7 @@ own copy.
 
 ### `units`: the homes in the building
 
-One item per home. A house has one. A dorm has none (`[]`); its rooms use `unitId: null`.
+One item per home. A house has one. A dorm or hotel has none (`[]`); its rooms use `unitId: null`.
 
 | Field | Meaning |
 |---|---|
@@ -206,12 +214,13 @@ One item per home. A house has one. A dorm has none (`[]`); its rooms use `unitI
 | `elevationM` | Floor level relative to the ground floor's floor (0 for the ground floor, negative for a basement). |
 | `heightM` | Floor to the next floor, usually 2.8–3.2 for homes and 3.5–4.5 for a ground-floor lobby. |
 | `ceilingHeightM` | Floor to ceiling, usually `heightM` − 0.3. |
-| `outline` | Polygon of the outer edge of this level's floor. Rectangle or any shape made of straight sides (an L, a U, a courtyard). Upper levels may be smaller than lower ones. |
+| `outline` | Polygon of the outer edge of this level's floor. Rectangle, any shape made of straight sides (an L, a U, a courtyard), or with curved edges (see "Curved walls"). Upper levels may be smaller than lower ones. |
 | `rooms` | Every space on this level. |
 | `walls` | Every wall on this level. |
 | `openings` | Every door, window and opening on this level. |
 | `balconies` | Outdoor platforms on this level, or `[]`. |
 | `furnishings` | Furniture, or `[]`. |
+| `roof` | Optional, `true` on the stair house of a roof terrace: the last level, named "Roof", holding the stair up and a landing; its `outline` is just the stair house. Its balcony is the terrace, standing on the flat roof of the level below. It isn't counted in `totals.floors`. |
 
 **`rooms`**
 
@@ -225,7 +234,7 @@ neighbouring rooms share an edge exactly.
 | `name` | "Kitchen", "Bedroom 2", "Corridor", "Stair A". |
 | `type` | One of the room types below. |
 | `unitId` | The home it belongs to, or `null` for shared space (corridors, lobby, stairs, common rooms, every dorm room). |
-| `polygon` | Corners in building metres. Straight sides only, not self-crossing. |
+| `polygon` | Corners in building metres, not self-crossing. Sides are straight unless a corner carries a curve (see "Curved walls"). |
 | `areaM2` | Area of the polygon. |
 | `floorFinish` | `wood`, `tile`, `carpet`, `concrete`, `stone` or `vinyl`. |
 
@@ -248,6 +257,7 @@ kitchen and living room), leave the wall out.
 | `id` | For example `"L2-W14"`. |
 | `kind` | `exterior` (outer wall), `party` (between two homes, or a home and a corridor, stair or lobby; thick for sound and fire), `interior` (inside a home or a shared area). |
 | `x1`, `y1`, `x2`, `y2` | The centre line of the wall, end to end. |
+| `arc` | Optional. `{ cx, cy, rx, ry }`: the wall curves along this ellipse from (x1, y1) to (x2, y2) (see "Curved walls"). Leave it out for a straight wall. |
 | `thicknessM` | `exterior` 0.3, `party` 0.25, `interior` 0.12 are good defaults. |
 
 Walls run along room edges. Exterior walls run along the level's `outline`. A wall stops where
@@ -260,10 +270,49 @@ another wall meets it; walls don't cross each other.
 | `id` | For example `"L2-O5"`. |
 | `kind` | `window`; `door` (ordinary door inside); `entry` (the front door of the building or of a home); `patio` (glass door to the outside or a balcony); `garage` (garage door); `passage` (opening with no door); `cased` (wide opening with no door, 1.2 m or more). |
 | `wallId` | The wall it sits in. |
-| `offsetM` | Distance from the wall's (x1, y1) end to the near edge of the opening. |
+| `offsetM` | Distance from the wall's (x1, y1) end to the near edge of the opening, measured along the wall (along the curve for a curved wall). |
 | `widthM` | Width. `offsetM + widthM` is no more than the wall's length. Doors 0.8–0.9 (0.9 for `accessible`), entries 0.9–1.0, building entries 1.8, garage doors 2.5 per car. |
 | `sillM`, `headM` | Windows: bottom and top above the floor (for example 0.8 and 2.2). Doors and other kinds: `null` for sill, `headM` 2.1 (2.4 for building entries and garage doors). |
 | `connects` | The two sides: two room ids, or a room id and `"outside"`. Every room that isn't open to a neighbour through a missing wall needs at least one door, passage or cased opening. |
+
+**Curved walls**
+
+A round or curved building is described with curved edges. An ellipse is `{ "cx", "cy", "rx", "ry" }`
+in building metres: its centre, and its radius along x and along y (`rx` = `ry` for a circle). A curve
+runs from one end to the other along the ellipse the short way round (less than half way), and both
+ends lie on the ellipse.
+
+- In an `outline` or room `polygon`, a curved side is written as a third item on the corner it starts
+  from: `[x, y, { "cx": 8, "cy": 6, "rx": 8, "ry": 6 }]` means the side from this corner to the next
+  one follows that ellipse. Corners without it start straight sides, so straight-sided files are
+  unchanged.
+- A curved wall has the same ellipse in `arc`.
+- Areas, lengths and `offsetM` are measured along the curve. The website draws a curve as short
+  straight pieces (a quarter of a metre or less), and checks it the same way.
+
+The design service draws round buildings with `round` and land-shaped ones with `land` as the program's
+`footprintShape` (rectangle is the default). The description decides it: "make it a circle" gives a
+round building.
+
+**Wing plans (L, U and courtyard)**
+
+A house, mansion or villa can also be `l`, `u` or `courtyard` ("an L-shaped house", "round a
+courtyard"). The main wing runs along the street; an L adds a side wing at one end, a U one at each
+end round a yard, and a courtyard a fourth wing across the back round an open court. The side and
+back wings of a U or courtyard are one room deep, their hall a gallery along the yard or court. A
+home too small for the plan it asks for is drawn as one straight wing, and its cautions say so.
+
+- Every level has the same `outline`, made of straight sides.
+- **Courtyards.** The outline of a level with a court is one ring: round the outside, then along a
+  slit into the court, round the court the other way, and back along the slit. The slit's two edges
+  cancel, so the ring's area is the floor's and the usual inside test (even-odd) is right. Readers
+  that draw edges or fill the floor split it into the outside ring and the court (the website's
+  `outlineRings` in `lib/design.js`); the slit is never a wall.
+- `exterior.roof.wings` holds one pitched roof per wing (below).
+- **Bridges.** A U plan of two floors or more may have a glazed bridge on its top floor, a room named
+  "Bridge" (type `hall`) across the far end of the yard, open to both side halls. That floor's outline
+  then runs round the part of the yard the bridge doesn't cover, the same way a courtyard's does, and
+  `roof.wings` has a roof for the bridge.
 
 **`balconies`**
 
@@ -330,16 +379,48 @@ buildings of four or more floors, have at least one elevator.
 
 | Field | Meaning |
 |---|---|
-| `roof.type` | `gable`, `hip` or `flat`. Apartments, condos and dorms are usually `flat`. |
+| `roof.type` | `gable`, `hip`, `flat` or `cone`. Apartments, condos and dorms are usually `flat`. `cone` rises from the eaves all round to one point over the middle of the top level's outline: a cone over a round plan, a pyramid over a straight-sided one. |
 | `roof.pitch` | Rise over run (0 for flat). |
 | `roof.eaveM` | Overhang past the walls (0.1 for flat with a parapet). |
-| `roof.ridgeAxis` | `x` or `y`: the direction the ridge runs. `null` for flat. |
+| `roof.ridgeAxis` | `x` or `y`: the direction the ridge runs. `null` for flat and cone. |
 | `roof.ridgeHeightM` | Ground to the top of the roof. Equals `size.heightM`. |
+| `roof.wings` | Optional, for wing plans: `[{ x0, y0, x1, y1, ridgeAxis }]`, one gable or hip per wing over that rectangle (eaves added outside it), ridge along `x` or `y`. A wing's rectangle runs into the wing it joins as far as that wing's ridge, so the roofs meet in valleys. When it's there, `ridgeAxis` describes the main wing. |
 | `garage` | `{ cars, polygon, heightM }`, or `null`. A detached or attached garage outside the main `outline` (negative x or y is fine). A garage inside a level's outline is a room of type `garage` instead, with this field still filled in for the map. |
 | `porch` | `{ polygon }`, or `null`. |
 | `parking` | Outdoor parking areas `{ polygon, spaces, covered }`, or `[]`. |
+| `foundation` | How the building meets the ground, filled in by the design service from the land's slope: `{ type, groundM, dropM, downhill }`, or missing when there's no elevation data. `type` is `slab`, `crawlspace`, `basement`, `stepped` (a footing that steps down the slope), `walkout` (a lower level open to the downhill side) or `piers` (the floor raised on pillars). `groundM` is the ground's height at the corners of the `size` rectangle, (0,0), (W,0), (W,D), (0,D), in metres from the ground floor's floor (0 on the uphill side, negative below it). `dropM` is how far the ground falls across the building; `downhill` is `front`, `back`, `left` or `right` (empty under 0.3 m). With `dropM` of 0.4 or more, the map raises the building by `dropM` onto its piers or footing, and the walkthrough draws them down to the real ground. |
 | `materials.structure`, `cladding`, `roofing` | One of the advanced values each. |
 | `materials.palette` | `{ name, hex, use }` items. `use` is one of `walls`, `roof`, `trim`, `windows`, `doors`, `accent`, `interior-walls`, `floors`. The renderer needs at least `walls`, `roof` and `windows`. |
+
+## Sites: neighborhoods and trailer parks (`terrasim.design/3`)
+
+A request with `housingType` `neighborhood` or `trailer-park` comes back as one site holding many
+homes. Brief: `unitCount` is the homes (neighborhood 4–150) or home pads (trailer park 4–300);
+`areaM2`, `bedrooms`, `bathrooms` and `floors` describe each home (a trailer park's homes are one
+floor, `roomType` `single` for single-wide or `double` for double-wide). `advanced.commonSpaces`
+may hold `park`, `playground`, `pool`, `clubhouse` (and `laundry` for a trailer park).
+
+The site has the same top-level fields as a building, so it's shown, saved and shared the same way:
+`schema` ("terrasim.design/3"), `id`, `requestId`, `createdAt`, `housingType`, `overview`, `site`
+(the land), `placement` (where the site frame stands: `origin`, `xAxisBearingDeg`, and `footprint`,
+the land itself), `size` (the frame's extent and the tallest home), `cost` (homes, streets,
+utilities, shared spaces and engineering together). `totals` adds `lots`, `roadLengthM` and
+`landAreaM2` to a building's totals (summed over the homes).
+
+Everything inside is in site metres: x along `placement.xAxisBearingDeg`, y turned 90° counter-clockwise
+from it, as in a building.
+
+| Field | Meaning |
+|---|---|
+| `roads` | `{ id, name, widthM, line, polygon }`: a street's centre line and the area it paves. |
+| `lots` | `{ id, number, polygon, roadId, use, homeId }`: `use` is `home` or `amenity`. |
+| `amenities` | `{ id, kind, name, polygon, heightM }`: `kind` is `park`, `playground`, `pool` or `clubhouse` (a building `heightM` tall). |
+| `variants` | `{ id, name, count, design }`: each home design, a whole `terrasim.design/2` building with its own placement on the lot it was designed on. |
+| `homes` | `{ id, variant, lotId, x, y, rotationDeg }`: a variant placed on a lot. A point (hx, hy) of the variant's building frame is at (x, y) + R(rotationDeg)·(hx, hy) in the site, rotationDeg counter-clockwise; the home's compass bearing is the site's minus rotationDeg. |
+
+The website checks every variant with the building rules, and that every home stays inside its lot
+(`lib/site.js`). A site doesn't move (its footprint is its land); its walkthrough opens the first
+home where it stands.
 
 ### Rules the renderer checks
 
@@ -355,7 +436,7 @@ The website rejects a design that breaks these, and shows the user which rule fa
 6. Stairs connect neighbouring levels and line up at the same rectangle, and their stair rooms exist
    on both levels. Elevators are rooms on every level they serve.
 7. `totals` matches the `units` and `rooms` (bedroom, bathroom and area counts).
-8. `placement.footprint` lies inside the site outline.
+8. `placement.footprint` lies inside the site outline (every point of it).
 
 ---
 
@@ -384,7 +465,10 @@ accepts that.)
 
 ## Where site data reaches
 
-The site data (USDA soil, USGS elevation and seismic, FEMA flood zones, BLS wages) covers the United
-States. The design service answers `GET /api/coverage?lng=…&lat=…` with `{ covered, message }`; the
-website asks as soon as land is outlined and blocks sending, with that message, when it isn't covered.
-`POST /designs` refuses such land with a 422 and the same message.
+The detailed site data (USDA soil, USGS elevation and seismic, FEMA flood zones, BLS wages) covers
+the United States. Anywhere else the design is still made, from worldwide sources (Terrarium elevation
+tiles, ISRIC SoilGrids soil, Open-Meteo climate) and stated assumptions (no flood zone, moderate
+earthquake risk, US average prices in USD), and `design.site.estimated` is `true`; every assumption
+is in `overview.cautions`. `GET /api/coverage?lng=…&lat=…` answers `{ covered: true }` in the US and
+`{ covered: true, estimated: true, message }` elsewhere; the website shows that message in the brief
+and labels the finished design "Estimated site data".
