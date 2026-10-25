@@ -23,6 +23,8 @@ metric and imperial units; estimates are in USD.
 
 ## Who TerraSim is for
 
+**Try it yourself:** [https://terrasim.house](https://terrasim.house)
+
 TerraSim is for people who want to turn land into more housing but need a clearer way to evaluate an
 idea before moving forward. Seeing a proposed home or multi-unit development in 3D helps people
 understand what could fit on a real site. Floor plans, material quantities and cost estimates help
