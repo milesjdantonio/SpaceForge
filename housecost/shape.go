@@ -98,9 +98,43 @@ type target interface {
 	same(a, b Pt) bool           // whether a and b are on one smooth piece (so walls between them may merge)
 }
 
-type ellipseTarget struct{ e Arc }
+// ellipseTarget: with perp set, a point on a side of the W × D plan meets the ellipse straight out
+// from (or back in from) that side, so the walls between rooms run on straight; corners go along
+// the ray from the middle.
+type ellipseTarget struct {
+	e    Arc
+	perp bool
+	W, D float64
+}
 
 func (t ellipseTarget) hit(c, p Pt) (Pt, bool) {
+	if t.perp {
+		e := t.e
+		corner := (near(p[0], 0) || near(p[0], t.W)) && (near(p[1], 0) || near(p[1], t.D))
+		if !corner {
+			off := func(v, cv, r float64) (float64, bool) {
+				k := 1 - ((v-cv)/r)*((v-cv)/r)
+				if k < 0 {
+					return 0, false
+				}
+				return math.Sqrt(k), true
+			}
+			switch {
+			case near(p[0], 0):
+				k, ok := off(p[1], e.CY, e.RY)
+				return Pt{e.CX - e.RX*k, p[1]}, ok
+			case near(p[0], t.W):
+				k, ok := off(p[1], e.CY, e.RY)
+				return Pt{e.CX + e.RX*k, p[1]}, ok
+			case near(p[1], 0):
+				k, ok := off(p[0], e.CX, e.RX)
+				return Pt{p[0], e.CY - e.RY*k}, ok
+			case near(p[1], t.D):
+				k, ok := off(p[0], e.CX, e.RX)
+				return Pt{p[0], e.CY + e.RY*k}, ok
+			}
+		}
+	}
 	dx, dy := p[0]-c[0], p[1]-c[1]
 	k := math.Sqrt((dx/t.e.RX)*(dx/t.e.RX) + (dy/t.e.RY)*(dy/t.e.RY))
 	if k == 0 {
@@ -274,23 +308,48 @@ func segCross(p, q, a, b Pt) bool {
 func ApplyShape(d *Design, shape string, land []Pt, setback float64) (Pt, error) {
 	W, D := d.Size.WidthM, d.Size.DepthM
 	c := Pt{W / 2, D / 2}
-	var tg target
 	switch shape {
 	case ShapeRound:
-		tg = ellipseTarget{Arc{CX: c[0], CY: c[1], RX: W / math.Sqrt2, RY: D / math.Sqrt2}}
+		// The circle (an oval for a long plan) is as small as the rooms allow: first one with the
+		// plan's own floor area, so the plan's corners are trimmed and the middles of its sides
+		// bulge out; then a little larger each time a room, stair or fixture wouldn't fit; last
+		// the circle through the plan's corners, which trims nothing.
+		orig := cloneDesign(d)
+		var lastErr error
+		for _, s := range []float64{math.Sqrt(2 / math.Pi), 0.84, 0.88, 0.92, 0.96, 1} {
+			work := cloneDesign(orig)
+			tg := ellipseTarget{e: Arc{CX: c[0], CY: c[1], RX: s * W / math.Sqrt2, RY: s * D / math.Sqrt2}, perp: true, W: W, D: D}
+			ok := true
+			for li := range work.Levels {
+				if err := shapeLevel(&work.Levels[li], W, D, c, tg); err != nil {
+					if shapeDebug != nil {
+						shapeDebug(s, err)
+					}
+					lastErr, ok = fmt.Errorf("level %d: %w", li, err), false
+					break
+				}
+			}
+			if ok {
+				*d = *work
+				lastErr = nil
+				break
+			}
+		}
+		if lastErr != nil {
+			return Pt{}, lastErr
+		}
 	case ShapeLand:
 		pt, err := landTarget(land, c, W, D, setback, W*D*1.3)
 		if err != nil {
 			return Pt{}, err
 		}
-		tg = pt
+		for li := range d.Levels {
+			if err := shapeLevel(&d.Levels[li], W, D, c, pt); err != nil {
+				return Pt{}, fmt.Errorf("level %d: %w", li, err)
+			}
+		}
 	default:
 		return Pt{}, fmt.Errorf("unknown shape %q", shape)
-	}
-	for li := range d.Levels {
-		if err := shapeLevel(&d.Levels[li], W, D, c, tg); err != nil {
-			return Pt{}, fmt.Errorf("level %d: %w", li, err)
-		}
 	}
 	// Move everything so the shape's box starts at (0, 0).
 	minX, minY, maxX, maxY := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
@@ -320,7 +379,18 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 	}
 	// Points on the rectangle's edge where something meets it, in order round the middle.
 	var bs []bpt
+	badHit := false
+	// inward: the new outline passes inside the plan here (a trimmed corner), so what reached the
+	// old edge is cut back to it.
+	inward := func(q Pt) bool { return q[0] > 0.01 && q[0] < W-0.01 && q[1] > 0.01 && q[1] < D-0.01 }
+	trimmed := false
+	if et, ok := tg.(ellipseTarget); ok && et.perp {
+		trimmed = true
+	}
 	addB := func(p Pt) {
+		if trimmed && (near(p[0], 0) || near(p[0], W)) && (near(p[1], 0) || near(p[1], D)) {
+			return // corners never divide rooms (see below)
+		}
 		for _, b := range bs {
 			if samePt(b.p, p) {
 				return
@@ -329,11 +399,16 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 		q, ok := tg.hit(c, p)
 		if !ok {
 			q = p
+			badHit = true
 		}
 		bs = append(bs, bpt{p: p, q: q, angle: math.Atan2(p[1]-c[1], p[0]-c[0])})
 	}
-	for _, corner := range []Pt{{0, 0}, {W, 0}, {W, D}, {0, D}} {
-		addB(corner)
+	// The plan's corners never divide two rooms. A trimmed circle leaves them out: the outline runs
+	// straight on between the points either side, and their room keeps the whole curve.
+	if et, ok := tg.(ellipseTarget); !ok || !et.perp {
+		for _, corner := range []Pt{{0, 0}, {W, 0}, {W, D}, {0, D}} {
+			addB(corner)
+		}
 	}
 	for _, r := range lv.Rooms {
 		for _, p := range r.Polygon.Pts {
@@ -351,6 +426,17 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 	}
 	sort.Slice(bs, func(i, j int) bool { return bs[i].angle < bs[j].angle })
 	n := len(bs)
+	if badHit {
+		return fmt.Errorf("the outline doesn't reach every room")
+	}
+	// The points must meet the new outline in the same order round the middle.
+	for k := range bs {
+		a := math.Atan2(bs[k].q[1]-c[1], bs[k].q[0]-c[0])
+		b := math.Atan2(bs[(k+1)%n].q[1]-c[1], bs[(k+1)%n].q[0]-c[0])
+		if d := math.Mod(b-a+4*math.Pi, 2*math.Pi); d > math.Pi && !samePt(bs[k].q, bs[(k+1)%n].q) {
+			return fmt.Errorf("the outline crosses itself near %.1f, %.1f", bs[k].p[0], bs[k].p[1])
+		}
+	}
 	idx := func(p Pt) int {
 		for i, b := range bs {
 			if samePt(b.p, p) {
@@ -373,6 +459,24 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 			for i := range pts {
 				if sameSide(pts[i], pts[(i+1)%len(pts)]) && sameSide(pts[i], m) && distToSeg(m, pts[i], pts[(i+1)%len(pts)]) < 1e-3 {
 					owner[k] = ri
+				}
+			}
+		}
+		if owner[k] < 0 && !sameSide(a, b) {
+			// A stretch that turns a corner (trimmed circles leave corners out) belongs to the
+			// room at the first corner it turns, counter-clockwise from a.
+			ang := func(q Pt) float64 { return math.Mod(math.Atan2(q[1]-c[1], q[0]-c[0])+2*math.Pi, 2*math.Pi) }
+			from, span := ang(a), math.Mod(ang(b)-ang(a)+2*math.Pi, 2*math.Pi)
+			best := math.Inf(1)
+			for _, corner := range []Pt{{0, 0}, {W, 0}, {W, D}, {0, D}} {
+				if d := math.Mod(ang(corner)-from+2*math.Pi, 2*math.Pi); d > 0 && d < span && d < best {
+					for ri, r := range lv.Rooms {
+						for _, v := range r.Polygon.Pts {
+							if samePt(v, corner) {
+								owner[k], best = ri, d
+							}
+						}
+					}
 				}
 			}
 		}
@@ -456,11 +560,40 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 			rm.Polygon = lv.Outline
 			continue
 		}
+		// Where the outline passes inside the plan, the room's corner on the old edge is cut off:
+		// its side runs only to the outline.
+		skip := map[int]bool{}
+		for i := range pts {
+			prevEdge, nextEdge := edge[(i-1+m)%m], edge[i]
+			if prevEdge == nextEdge {
+				continue // not the end of a run along the edge
+			}
+			bi := idx(pts[i])
+			if bi < 0 || !inward(bs[bi].q) {
+				continue
+			}
+			if fixed {
+				return fmt.Errorf("%s would be cut by the curve", rm.Name)
+			}
+			// The cut point must lie on the room's own side that ends here.
+			other := pts[(i+1)%m]
+			if prevEdge && !nextEdge {
+				other = pts[(i+1)%m]
+			} else {
+				other = pts[(i-1+m)%m]
+			}
+			if distToSeg(bs[bi].q, pts[i], other) > 0.02 || math.Hypot(bs[bi].q[0]-other[0], bs[bi].q[1]-other[1]) < 0.6 {
+				return fmt.Errorf("%s is too shallow to trim", rm.Name)
+			}
+			skip[i] = true
+		}
 		var r ringB
 		for k := 0; k < m; k++ {
 			i := (start + k) % m
 			if !edge[i] {
-				add(&r, pts[i], nil)
+				if !skip[i] {
+					add(&r, pts[i], nil)
+				}
 				continue
 			}
 			if edge[(i-1+m)%m] {
@@ -485,10 +618,15 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 					Polygon: finish(&al), FloorFinish: rm.FloorFinish})
 				continue
 			}
-			add(&r, pts[i], nil)
+			if !skip[i] {
+				add(&r, pts[i], nil)
+			}
 			along(&r, a, b)
 		}
 		rm.Polygon = finish(&r)
+		if old := polyRectArea(pts); rm.Polygon.Area() < old*0.5 || ringSelfCrosses(rm.Polygon.Flat()) {
+			return fmt.Errorf("%s would lose too much to the curve", rm.Name)
+		}
 	}
 	lv.Rooms = append(lv.Rooms, alcoves...)
 
@@ -558,6 +696,13 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 		}
 		if from == nil {
 			continue // open plan: no wall between them
+		}
+		if inward(b.q) {
+			// The wall is cut back to the outline; its doors and windows keep their places.
+			if !trimWall(from, b.p, b.q, lv) {
+				return fmt.Errorf("a wall can't be cut back to the curve")
+			}
+			continue
 		}
 		kept = append(kept, DWall{ID: newID(), Kind: from.Kind, X1: rd(b.p[0]), Y1: rd(b.p[1]), X2: rd(b.q[0]), Y2: rd(b.q[1]), ThicknessM: from.ThicknessM})
 	}
@@ -666,6 +811,141 @@ func shapeLevel(lv *DLevel, W, D float64, c Pt, tg target) error {
 		kept = append(kept, e.DWall)
 	}
 	lv.Walls = kept
+	return keepFurnitureInside(lv)
+}
+
+// polyRectArea is the area of a straight-sided polygon.
+func polyRectArea(p []Pt) float64 { return PolyArea(p) }
+
+// ringSelfCrosses: does a closed ring cross itself?
+func ringSelfCrosses(p []Pt) bool {
+	n := len(p)
+	for i := 0; i < n; i++ {
+		for j := i + 2; j < n; j++ {
+			if i == 0 && j == n-1 {
+				continue
+			}
+			if segCross(p[i], p[(i+1)%n], p[j], p[(j+1)%n]) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// trimWall cuts wall w back from its end at p to q (a point on it), moving its doors and windows
+// with the end they're measured from; a door that no longer fits fails the trim.
+func trimWall(w *DWall, p, q Pt, lv *DLevel) bool {
+	if distToSeg(q, Pt{w.X1, w.Y1}, Pt{w.X2, w.Y2}) > 0.02 {
+		return false
+	}
+	cut := math.Hypot(q[0]-p[0], q[1]-p[1])
+	fromStart := samePt(Pt{w.X1, w.Y1}, p)
+	if fromStart {
+		w.X1, w.Y1 = rd(q[0]), rd(q[1])
+	} else {
+		w.X2, w.Y2 = rd(q[0]), rd(q[1])
+	}
+	L := w.Length()
+	if L < 0.3 {
+		return false
+	}
+	var keep []DOpening
+	for _, o := range lv.Openings {
+		if o.WallID != w.ID {
+			keep = append(keep, o)
+			continue
+		}
+		if fromStart {
+			o.OffsetM = rd(o.OffsetM - cut)
+		}
+		if o.OffsetM < 0.05 || o.OffsetM+o.WidthM > L-0.05 {
+			if o.Kind == "window" {
+				continue
+			}
+			if o.WidthM > L-0.2 {
+				return false
+			}
+			o.OffsetM = rd((L - o.WidthM) / 2)
+		}
+		keep = append(keep, o)
+	}
+	lv.Openings = keep
+	return true
+}
+
+// keepFurnitureInside removes furniture the curve cut into, and fails when a room would lose
+// something it can't do without (a bed, a toilet, a sink or cooktop counter, a fridge).
+func keepFurnitureInside(lv *DLevel) error {
+	rooms := map[string]DRoom{}
+	for _, r := range lv.Rooms {
+		rooms[r.ID] = r
+	}
+	essential := map[string]bool{"bed": true, "toilet": true, "vanity": true, "shower": true, "bathtub": true, "fridge": true}
+	box := func(f DFurnishing) [4]float64 {
+		w, dd := f.W, f.D
+		if f.RotationDeg == 90 || f.RotationDeg == 270 {
+			w, dd = dd, w
+		}
+		return [4]float64{f.X - w/2, f.Y - dd/2, f.X + w/2, f.Y + dd/2}
+	}
+	inRoom := func(b [4]float64, poly []Pt) bool {
+		for _, q := range []Pt{{b[0], b[1]}, {b[2], b[1]}, {b[2], b[3]}, {b[0], b[3]}} {
+			if !PointInPoly(q, poly) && distToPolyEdge(q, poly) > 0.05 {
+				return false
+			}
+		}
+		return true
+	}
+	flat := func(f DFurnishing) bool { return f.Type == "rug" || f.Type == "pendant" }
+	overlaps := func(b [4]float64, f DFurnishing, all []DFurnishing) bool {
+		for _, o := range all {
+			if o.RoomID != f.RoomID || flat(o) || flat(f) || (o.X == f.X && o.Y == f.Y && o.Type == f.Type) {
+				continue
+			}
+			ob := box(o)
+			if b[0] < ob[2]-0.02 && ob[0] < b[2]-0.02 && b[1] < ob[3]-0.02 && ob[1] < b[3]-0.02 {
+				return true
+			}
+		}
+		return false
+	}
+	var keep []DFurnishing
+	for _, f := range lv.Furnishings {
+		r, ok := rooms[f.RoomID]
+		if !ok {
+			continue
+		}
+		poly := r.Polygon.Flat()
+		if inRoom(box(f), poly) {
+			keep = append(keep, f)
+			continue
+		}
+		// Cut by the curve: slide it toward the middle of the room until it fits clear of the rest.
+		ctr := PolyCentroid(poly)
+		dx, dy := ctr[0]-f.X, ctr[1]-f.Y
+		l := math.Hypot(dx, dy)
+		moved := false
+		for step := 0.1; l > 0 && step <= math.Min(1.6, l); step += 0.1 {
+			g := f
+			g.X, g.Y = rd(f.X+dx/l*step), rd(f.Y+dy/l*step)
+			if inRoom(box(g), poly) && !overlaps(box(g), g, append(keep, lv.Furnishings...)) {
+				keep = append(keep, g)
+				moved = true
+				break
+			}
+		}
+		if moved {
+			continue
+		}
+		if essential[f.Type] || (f.Type == "counter" && (f.Sink != nil || f.Cooktop != nil)) {
+			return fmt.Errorf("the %s in %s would be cut by the curve", f.Type, r.Name)
+		}
+	}
+	if keep == nil {
+		keep = []DFurnishing{}
+	}
+	lv.Furnishings = keep
 	return nil
 }
 
@@ -914,3 +1194,4 @@ func shapeDesign(d *Design, p Program, sp SitePlan, f Frame, local []Pt, setback
 	*d = *c
 	return nil
 }
+var shapeDebug func(float64, error)
