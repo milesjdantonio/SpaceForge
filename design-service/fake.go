@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // fataler is a *testing.T; outside tests it's nil and an unknown prompt is an error instead.
@@ -18,6 +19,7 @@ type fataler interface {
 }
 
 type fakeGemma struct {
+	mu         sync.Mutex // a site designs its home variants at the same time
 	t          fataler
 	r          Request
 	calls      []string
@@ -31,6 +33,8 @@ var echoRe = map[string]*regexp.Regexp{
 }
 
 func (f *fakeGemma) ask(msgs []Msg, maxTokens int) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	prompt := msgs[0].Text
 	last := msgs[len(msgs)-1].Text
 	switch {

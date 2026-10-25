@@ -276,10 +276,13 @@ func sround3(x float64) float64 { return float64(int(x*1000+0.5)) / 1000 }
 // jobLog copies the pipeline's (and Gemma's) output to the console and into the job.
 type jobLog struct {
 	j   *job
+	mu  sync.Mutex // a site's home variants log at the same time
 	buf bytes.Buffer
 }
 
 func (w *jobLog) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	os.Stdout.Write(p)
 	w.buf.Write(p)
 	for {

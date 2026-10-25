@@ -473,6 +473,15 @@ func RunSiteRequest(r Request, raw []byte, dp Deps, out *Output) (*Output, error
 	results := make([]result, len(variants))
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	// The variants gather their site data side by side but take turns with Gemma: the client keeps
+	// per-call state (its reply counter, what the model accepts) that isn't safe to share.
+	var askMu sync.Mutex
+	ask := dp.Ask
+	lockedAsk := func(msgs []Msg, maxTokens int) (string, error) {
+		askMu.Lock()
+		defer askMu.Unlock()
+		return ask(msgs, maxTokens)
+	}
 	for vi, v := range variants {
 		var lot *plotLot
 		for _, lt := range usedLots {
@@ -495,6 +504,7 @@ func RunSiteRequest(r Request, raw []byte, dp Deps, out *Output) (*Output, error
 		vdp := dp
 		vdp.Log = &sitePrefixWriter{mu: &mu, w: log, prefix: "Home " + v.id + ": "}
 		vdp.Advise = nil
+		vdp.Ask = lockedAsk
 		wg.Add(1)
 		go func(vi int, lot *plotLot) {
 			defer wg.Done()
