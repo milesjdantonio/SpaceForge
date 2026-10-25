@@ -810,7 +810,8 @@ function lockLand(on) {
   renderToolbar();
 }
 
-async function send() {
+async function send({ keepRetryFlag = false } = {}) {
+  if (!keepRetryFlag && app.site) app.site.costRetried = false;
   app.generation?.abort();
   const generation = new AbortController();
   app.generation = generation;
@@ -836,6 +837,13 @@ async function send() {
     run: (onProgress) => api.createDesign(request, { onProgress, signal: generation.signal }),
     onDone: async ({ design, estimate }) => {
       if (generation.signal.aborted || (owner && auth.user?.uid !== owner)) return;
+      // A design that came back without its cost or materials is made again, once, by itself.
+      if (!design.cost && !estimate && !app.site.costRetried) {
+        app.site.costRetried = true;
+        toast('The design came back without its cost and materials, so it’s being made again.');
+        send({ keepRetryFlag: true });
+        return;
+      }
       lockLand(false);
       if (!drawable(design, { fresh: true })) return;
       app.site.status = 'sent';

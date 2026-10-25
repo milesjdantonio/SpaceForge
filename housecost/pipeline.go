@@ -3,6 +3,7 @@ package main
 // The request → design + estimate pipeline.
 
 import (
+	"errors"
 	"context"
 	"crypto/sha1"
 	"encoding/json"
@@ -454,8 +455,14 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		}
 		return mp, err
 	}
-	mp, err := AskUntilValid(BuildMaterialsPlanPrompt(p, a, d, site), parseFixed,
-		func(x MaterialPlan) []string { return ValidateMaterialPlan(x, a, p, d, site) }, dp.Ask, "materials", 16384, 3, log)
+	checkMaterials := func(x MaterialPlan) []string { return ValidateMaterialPlan(x, a, p, d, site) }
+	mp, err := AskUntilValid(BuildMaterialsPlanPrompt(p, a, d, site), parseFixed, checkMaterials, dp.Ask, "materials", 16384, 3, log)
+	if err != nil && !errors.Is(err, ErrCancelled) && !dp.stopped() && strings.Contains(err.Error(), "still fails") {
+		// A design without materials has no cost: start the materials over once, in a fresh
+		// conversation (a long back-and-forth sometimes keeps Gemma stuck on the same mistake).
+		fmt.Fprintln(log, "Materials didn't pass the checks; asking again from the start...")
+		mp, err = AskUntilValid(BuildMaterialsPlanPrompt(p, a, d, site), parseFixed, checkMaterials, dp.Ask, "materials", 16384, 3, log)
+	}
 	if err != nil {
 		out.Design = d
 		out.Report.Verdict, out.Report.Problems = "error", []string{err.Error()}
