@@ -28,7 +28,7 @@ func New(log *slog.Logger, db Pinger, verifier auth.Verifier, users auth.UserSto
 		}
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ready"})
 	})
-	// TODO(frontend): attach Firebase ID tokens and handle refresh/sign-in on 401.
+	// The frontend storage client attaches Firebase ID tokens to these routes.
 	requireUser := auth.RequireUser(verifier, users)
 	mux.Handle("GET /api/me", requireUser(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, _ := auth.CurrentUser(r.Context())

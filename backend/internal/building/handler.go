@@ -19,7 +19,7 @@ import (
 
 type Handler struct{ Store Repository }
 
-// TODO(frontend): send exported JSON here and retain the returned building ID.
+// Create stores the client's building document and returns its SQL ID.
 func (h Handler) Create(w http.ResponseWriter, r *http.Request) {
 	owner, ok := currentOwner(w, r)
 	if !ok {
@@ -79,7 +79,7 @@ func (h Handler) List(w http.ResponseWriter, r *http.Request) {
 	}{Items: items, NextOffset: nextOffset})
 }
 
-// TODO(frontend): pass response.data to the renderer's import/load function.
+// Get returns the complete document for the frontend's validated renderer.
 func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 	owner, id, ok := ownerAndID(w, r)
 	if !ok {
@@ -94,7 +94,6 @@ func (h Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update replaces both the name and complete renderer JSON object.
-// TODO(frontend): autosave the full exported document using the existing ID.
 func (h Handler) Update(w http.ResponseWriter, r *http.Request) {
 	owner, id, ok := ownerAndID(w, r)
 	if !ok {
@@ -170,7 +169,7 @@ func decodeInput(w http.ResponseWriter, r *http.Request) (Input, bool) {
 		httpx.Error(w, r, http.StatusBadRequest, "invalid_building", "Name must be 1-120 characters and data must be a JSON object.")
 		return input, false
 	}
-	// TODO(building-module): validate the document once its format is agreed.
+	// Scene-specific validation belongs to the client; this API stores JSON objects.
 	return input, true
 }
 

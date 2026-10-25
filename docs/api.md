@@ -30,7 +30,8 @@ POST and PUT require Content-Type: application/json:
 ```
 
 Name is required, trimmed, and limited to 1-120 characters. Data must be a JSON
-object; its internal building format is not defined yet. Only name and data are
+object. The web client stores {schema, design, estimate, site, placement}, using
+schema "terrasim.saved-building/1"; the API remains flexible. Only name and data are
 accepted at the top level. Requests are limited to 1 MiB.
 
 Create, get, and update responses contain id, name, data, created_at, and updated_at.
@@ -80,4 +81,4 @@ Responses include X-Request-ID and Cache-Control: no-store. Errors use this enve
 
 Configured exact CORS origins may send GET, HEAD, POST, PUT, and DELETE with
 Authorization and Content-Type headers. X-Request-ID and Location are exposed.
-See [BACKEND.md](../BACKEND.md) for setup and integration TODOs.
+See [BACKEND.md](../BACKEND.md) for setup and the connected frontend workflow.

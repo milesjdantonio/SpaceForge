@@ -1,12 +1,39 @@
 name: Backend checks
 on:
   push:
-    paths: ["backend/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "housecost/**", "frontend/**", ".github/workflows/backend.yml"]
   pull_request:
-    paths: ["backend/**", ".github/workflows/backend.yml"]
+    paths: ["backend/**", "housecost/**", "frontend/**", ".github/workflows/backend.yml"]
 permissions:
   contents: read
 jobs:
+  generation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: housecost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
   test:
     runs-on: ubuntu-latest
     services:

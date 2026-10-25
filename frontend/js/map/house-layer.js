@@ -227,8 +227,75 @@ function placementMatrix(placement) {
 const GLOW = ['#ff8a2a', '#ffb15c', '#ffd27a', '#ff9d4c'];
 
 export function createHouseLayer(map) {
-  const state = { design: null, model: null, placement: null, rise: 1, riseStart: 0, night: false, tiles: null };
-  let renderer, scene, camera;
+  const empty = () => ({ id: null, design: null, model: null, placement: null, rise: 1 });
+  let state = empty();
+  let selection = null;
+  const orange = new THREE.Color('#ff8a2a');
+  let night = false;
+  const saved = new Map();
+  let renderer, camera, renderMatrix;
+  const entries = () => [...saved.values(), ...(state.model && !saved.has(state.id) ? [state] : [])];
+
+  function dispose(entry) {
+    const geometries = new Set(), materials = new Set();
+    entry.scene?.traverse((object) => {
+      if (object.geometry) geometries.add(object.geometry);
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (material) materials.add(material);
+      }
+    });
+    geometries.forEach((geometry) => geometry.dispose());
+    materials.forEach((material) => material.dispose());
+    entry.scene?.clear();
+  }
+
+  function light(entry) {
+    for (const [material, original] of entry.materials) {
+      material.color.copy(original.color);
+      material.emissive.copy(original.emissive);
+      material.emissiveIntensity = material === entry.model.userData.glassMat ? (night ? 1.1 : 0) : original.intensity;
+      if (entry === selection) {
+        material.color.lerp(orange, 0.5);
+        material.emissive.copy(orange);
+        material.emissiveIntensity = Math.max(material.emissiveIntensity, 0.22);
+      }
+    }
+    entry.sun.intensity = night ? 0.5 : 2.2;
+    entry.sky.intensity = night ? 0.5 : 1.6;
+  }
+
+  function select(entry) {
+    if (selection === entry) return;
+    const previous = selection;
+    selection = entry;
+    if (previous) light(previous);
+    if (entry) light(entry);
+    map.triggerRepaint();
+  }
+
+  function makeEntry(id, design, placement, anim = false) {
+    const scene = new THREE.Scene();
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    sun.position.set(-0.4, -0.7, 1).normalize();
+    const sky = new THREE.HemisphereLight(0xeef3fa, 0x5a4e3e, 1.6);
+    const model = buildHouseModel(design);
+    const materials = new Map();
+    model.traverse((object) => {
+      for (const material of Array.isArray(object.material) ? object.material : [object.material]) {
+        if (material?.color && material.emissive && !materials.has(material)) materials.set(material, {
+          color: material.color.clone(), emissive: material.emissive.clone(), intensity: material.emissiveIntensity,
+        });
+      }
+    });
+    scene.add(sun, sky, model);
+    const tiles = anim ? makeTiles(design) : null;
+    if (tiles) scene.add(tiles);
+    const entry = { id, design, placement, scene, sun, sky, model, tiles, materials,
+      rise: anim && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1, riseStart: performance.now() };
+    if (entry.rise >= 1 && tiles) tiles.visible = false;
+    light(entry);
+    return entry;
+  }
 
   const layer = {
     id: 'house-3d',
@@ -236,44 +303,39 @@ export function createHouseLayer(map) {
     renderingMode: '3d',
     onAdd(m, gl) {
       camera = new THREE.Camera();
-      scene = new THREE.Scene();
-      const sun = new THREE.DirectionalLight(0xffffff, 2.2);
-      sun.position.set(-0.4, -0.7, 1).normalize();
-      scene.add(sun);
-      const sky = new THREE.HemisphereLight(0xeef3fa, 0x5a4e3e, 1.6);
-      scene.add(sky);
-      state.lights = { sun, sky };
       renderer = new THREE.WebGLRenderer({ canvas: m.getCanvas(), context: gl, antialias: true });
       renderer.autoClear = false;
     },
     render(a, b) {
-      if (!state.model && !gen.mesh) return;
+      if (!state.model && !saved.size && !gen.mesh) return;
       const args = b ?? a;
       // Mercator-space matrix (the globe has flattened to mercator by street zoom).
       const matrix = args.defaultProjectionData?.mainMatrix ?? args.modelViewProjectionMatrix;
       if (!matrix || map.getZoom() < 13) return;
+      renderMatrix = new THREE.Matrix4().fromArray(matrix);
       renderer.resetState();
-      if (state.model) {
-        animate();
-        camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(placementMatrix(state.placement));
-        renderer.render(scene, camera);
+      const visible = entries();
+      for (const entry of visible) {
+        animate(entry);
+        camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(placementMatrix(entry.placement));
+        renderer.render(entry.scene, camera);
       }
       if (gen.mesh) {
         animateGen();
         camera.projectionMatrix = new THREE.Matrix4().fromArray(matrix).multiply(placementMatrix(gen.placement));
         renderer.render(genScene, camera);
       }
-      if (state.rise < 1 || gen.mesh) map.triggerRepaint();
+      if (visible.some((entry) => entry.rise < 1) || gen.mesh) map.triggerRepaint();
     },
   };
 
-  function animate() {
-    if (state.rise >= 1) return;
-    const t = Math.min(1, (performance.now() - state.riseStart) / 2600);
-    state.rise = t;
+  function animate(entry) {
+    if (entry.rise >= 1) return;
+    const t = Math.min(1, (performance.now() - entry.riseStart) / 2600);
+    entry.rise = t;
     const ease = (x) => 1 - Math.pow(1 - x, 3);
-    const model = state.model;
-    const tiles = state.tiles;
+    const model = entry.model;
+    const tiles = entry.tiles;
     // First the grid rises under the footprint, then the house grows out of it and the tiles sink.
     const tGrid = Math.min(1, t / 0.45);
     const tHouse = Math.max(0, (t - 0.35) / 0.65);
@@ -391,19 +453,83 @@ export function createHouseLayer(map) {
 
   return {
     layer,
-    show(design, placement, { animate: anim = true } = {}) {
-      if (state.model) scene.remove(state.model);
-      if (state.tiles) scene.remove(state.tiles);
-      state.design = design;
-      state.placement = placement;
-      state.model = buildHouseModel(design);
-      scene.add(state.model);
-      state.tiles = anim ? makeTiles(design) : null;
-      if (state.tiles) scene.add(state.tiles);
-      state.rise = anim && !matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1;
-      state.riseStart = performance.now();
-      if (state.rise >= 1) { state.model.scale.set(1, 1, 1); if (state.tiles) state.tiles.visible = false; }
-      this.setNight(state.night);
+    // Saved entries remain in the scene when another building is selected.
+    add(id, design, placement) {
+      if (saved.get(id)?.design === design) return;
+      const old = saved.get(id);
+      const selected = old === selection;
+      if (selected) select(null);
+      const entry = makeEntry(id, design, placement);
+      saved.set(id, entry);
+      if (old === state) state = entry;
+      if (selected) select(entry);
+      if (old) dispose(old);
+      map.triggerRepaint();
+    },
+    show(design, placement, { animate: anim = true, id = null, selected = false } = {}) {
+      select(null);
+      if (state.model && !saved.has(state.id)) dispose(state);
+      let entry = id && saved.get(id);
+      if (!entry || entry.design !== design) {
+        if (entry) dispose(entry);
+        entry = makeEntry(id, design, placement, anim);
+        if (id) saved.set(id, entry);
+      } else entry.placement = placement;
+      state = entry;
+      if (selected) select(entry);
+      map.triggerRepaint();
+    },
+    select() { if (state.model) select(state); },
+    deselect() { select(null); },
+    isSelected(entry) { return !!entry && entry === selection; },
+    // Promote a newly saved preview without rebuilding it or reverting a newer drag.
+    remember(id) {
+      if (!state.model) return;
+      const old = saved.get(id);
+      if (old && old !== state) dispose(old);
+      state.id = id;
+      saved.set(id, state);
+    },
+    remove(id) {
+      const entry = saved.get(id);
+      if (!entry) return;
+      if (selection === entry) select(null);
+      if (state === entry) state = empty();
+      saved.delete(id); dispose(entry);
+      map.triggerRepaint();
+    },
+    at(point) {
+      return [state, ...saved.values()].find((entry) => entry.model &&
+        pointInPolygon(point[0], point[1], entry.placement.footprint)) ?? null;
+    },
+    // Pick actual roof/wall geometry. A tilted camera projects elevated surfaces
+    // outside the ground footprint, so map.unproject alone cannot identify them.
+    pick(point) {
+      if (!point || !renderMatrix || map.getZoom() < 13) return null;
+      const canvas = map.getCanvas();
+      const x = point.x / canvas.clientWidth * 2 - 1, y = 1 - point.y / canvas.clientHeight * 2;
+      const ray = new THREE.Raycaster();
+      let closest = null, depth = Infinity;
+      for (const entry of entries()) {
+        if (!entry.model.visible) continue;
+        const projection = renderMatrix.clone().multiply(placementMatrix(entry.placement));
+        const inverse = projection.clone().invert();
+        const near = new THREE.Vector3(x, y, -1).applyMatrix4(inverse);
+        const far = new THREE.Vector3(x, y, 1).applyMatrix4(inverse);
+        ray.set(near, far.sub(near).normalize());
+        entry.model.updateMatrixWorld(true);
+        const hit = ray.intersectObject(entry.model, true)[0];
+        if (!hit) continue;
+        const z = hit.point.clone().applyMatrix4(projection).z;
+        if (z >= -1 && z <= 1 && z < depth) { closest = entry; depth = z; }
+      }
+      return closest;
+    },
+    clear() {
+      select(null);
+      for (const entry of entries()) dispose(entry);
+      saved.clear(); state = empty();
+      if (gen.mesh) { genScene.remove(gen.mesh); gen.mesh.geometry.dispose(); gen.mesh.material.dispose(); gen.mesh = null; }
       map.triggerRepaint();
     },
     // While a design is being made: a glowing grid rises over the outlined land ([lng, lat] ring).
@@ -427,21 +553,18 @@ export function createHouseLayer(map) {
       map.triggerRepaint();
     },
     hide() {
-      if (state.model) scene.remove(state.model);
-      if (state.tiles) scene.remove(state.tiles);
-      state.model = null;
-      state.design = null;
+      select(null);
+      if (state.model && !saved.has(state.id)) dispose(state);
+      state = empty();
       map.triggerRepaint();
     },
     setNight(on) {
-      state.night = on;
-      if (state.model) state.model.userData.glassMat.emissiveIntensity = on ? 1.1 : 0;
-      if (state.lights) {
-        state.lights.sun.intensity = on ? 0.5 : 2.2;
-        state.lights.sky.intensity = on ? 0.5 : 1.6;
-      }
+      night = on;
+      entries().forEach(light);
       map.triggerRepaint();
     },
+    get entries() { return entries().map((entry) => ({ id: entry.id, design: entry.design, placement: entry.placement, selected: entry === selection })); },
+    get selected() { return !!state.model && state === selection; },
     get design() { return state.design; },
     get placement() { return state.placement; },
   };

@@ -319,6 +319,25 @@ func (s *server) listen(addr, siteDir string) error {
 		}
 	}()
 
+	abs, _ := filepath.Abs(siteDir)
+	if fileExists(filepath.Join(siteDir, "index.html")) {
+		fmt.Printf("Website: %s\n", abs)
+	} else {
+		fmt.Printf("No website found at %s (use -site); serving the API only.\n", abs)
+	}
+	if _, _, err := loadKey(s.keyFile); err != nil {
+		fmt.Printf("\nWARNING: %v\nDesigns will fail until a key is in place.\n\n", err)
+	}
+	host := addr
+	if strings.HasPrefix(host, ":") {
+		host = "localhost" + host
+	}
+	fmt.Printf("TerraSim is running: open http://%s\n", host)
+	return http.ListenAndServe(addr, s.handler(siteDir))
+}
+
+// handler is shared by the running server and HTTP integration tests.
+func (s *server) handler(siteDir string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("POST /api/designs", s.create)
@@ -342,22 +361,10 @@ func (s *server) listen(addr, siteDir string) error {
 	mux.HandleFunc("GET /api/listings", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 200, []any{}) })
 	mux.HandleFunc("OPTIONS /api/", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
 
-	abs, _ := filepath.Abs(siteDir)
 	if fileExists(filepath.Join(siteDir, "index.html")) {
 		mux.Handle("/", noCache(http.FileServer(http.Dir(siteDir))))
-		fmt.Printf("Website: %s\n", abs)
-	} else {
-		fmt.Printf("No website found at %s (use -site); serving the API only.\n", abs)
 	}
-	if _, _, err := loadKey(s.keyFile); err != nil {
-		fmt.Printf("\nWARNING: %v\nDesigns will fail until a key is in place.\n\n", err)
-	}
-	host := addr
-	if strings.HasPrefix(host, ":") {
-		host = "localhost" + host
-	}
-	fmt.Printf("TerraSim is running: open http://%s\n", host)
-	return http.ListenAndServe(addr, cors(mux))
+	return cors(mux)
 }
 
 func (s *server) health(w http.ResponseWriter, r *http.Request) {

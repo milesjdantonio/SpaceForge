@@ -12,18 +12,20 @@
 import { chromium } from 'playwright';
 import { existsSync, readdirSync, writeFileSync, unlinkSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { tmpdir, homedir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 
 const LOCK = join(tmpdir(), 'terrasim-test-browser.lock');
 
 function findChromium() {
-  const cache = join(process.env.LOCALAPPDATA || '', 'ms-playwright');
+  const cache = process.env.PLAYWRIGHT_BROWSERS_PATH || (process.platform === 'win32'
+    ? join(process.env.LOCALAPPDATA || '', 'ms-playwright')
+    : join(process.env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'ms-playwright'));
   if (existsSync(cache)) {
     const dirs = readdirSync(cache).filter((d) => /^chromium-\d+$/.test(d)).sort().reverse();
     for (const d of dirs) {
-      for (const sub of ['chrome-win64', 'chrome-win']) {
-        const exe = join(cache, d, sub, 'chrome.exe');
+      for (const sub of ['chrome-win64/chrome.exe', 'chrome-win/chrome.exe', 'chrome-linux64/chrome', 'chrome-linux/chrome']) {
+        const exe = join(cache, d, sub);
         if (existsSync(exe)) return exe;
       }
     }
@@ -83,7 +85,7 @@ export async function withBrowser(fn, { maxSeconds = 180 } = {}) {
     server = await chromium.launchServer({
       executablePath: findChromium(),
       headless: true,
-      args: ['--mute-audio', '--disable-extensions', '--no-first-run', '--disable-background-networking'],
+      args: ['--mute-audio', '--disable-extensions', '--no-first-run', '--disable-background-networking', '--enable-unsafe-swiftshader'],
     });
     pid = server.process()?.pid;
     browser = await chromium.connect(server.wsEndpoint());

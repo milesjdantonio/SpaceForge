@@ -14,7 +14,7 @@ var (
 
 type Input struct {
 	Name string `json:"name"`
-	// TODO(building-module): agree the JSON export/import format with the renderer.
+	// The web client stores design, estimate, site and placement together here.
 	Data json.RawMessage `json:"data"`
 }
 
