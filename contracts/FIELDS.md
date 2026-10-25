@@ -46,7 +46,7 @@ Conventions:
 |---|---|---|
 | `schema` | string | Always `"terrasim.design-request/2"`. |
 | `id` | string | Request id made by the website. Gemma copies it into `design.requestId`. |
-| `housingType` | string | `house`, `tiny-home`, `townhouse`, `duplex`, `mansion`, `villa`, `apartment`, `condo`, `dorm` or `hotel`. Gemma designs the **whole building** for every type. |
+| `housingType` | string | `house`, `tiny-home`, `townhouse`, `duplex`, `mansion`, `villa`, `apartment`, `condo`, `dorm` or `hotel`; or `neighborhood` or `trailer-park` for a whole site (see "Sites"). Gemma designs the **whole building** for every type. |
 | `site` | GeoJSON Feature | The land the user outlined. |
 | `brief` | object | The required questions (main form). Each one is its own box; the website won't send until every box that applies is filled. |
 | `advanced` | object | The optional questions (Advanced menu at the bottom of the form). `null` or `[]` means Gemma decides. |
@@ -391,6 +391,36 @@ buildings of four or more floors, have at least one elevator.
 | `foundation` | How the building meets the ground, filled in by the design service from the land's slope: `{ type, groundM, dropM, downhill }`, or missing when there's no elevation data. `type` is `slab`, `crawlspace`, `basement`, `stepped` (a footing that steps down the slope), `walkout` (a lower level open to the downhill side) or `piers` (the floor raised on pillars). `groundM` is the ground's height at the corners of the `size` rectangle, (0,0), (W,0), (W,D), (0,D), in metres from the ground floor's floor (0 on the uphill side, negative below it). `dropM` is how far the ground falls across the building; `downhill` is `front`, `back`, `left` or `right` (empty under 0.3 m). With `dropM` of 0.4 or more, the map raises the building by `dropM` onto its piers or footing, and the walkthrough draws them down to the real ground. |
 | `materials.structure`, `cladding`, `roofing` | One of the advanced values each. |
 | `materials.palette` | `{ name, hex, use }` items. `use` is one of `walls`, `roof`, `trim`, `windows`, `doors`, `accent`, `interior-walls`, `floors`. The renderer needs at least `walls`, `roof` and `windows`. |
+
+## Sites: neighborhoods and trailer parks (`terrasim.design/3`)
+
+A request with `housingType` `neighborhood` or `trailer-park` comes back as one site holding many
+homes. Brief: `unitCount` is the homes (neighborhood 4–150) or home pads (trailer park 4–300);
+`areaM2`, `bedrooms`, `bathrooms` and `floors` describe each home (a trailer park's homes are one
+floor, `roomType` `single` for single-wide or `double` for double-wide). `advanced.commonSpaces`
+may hold `park`, `playground`, `pool`, `clubhouse` (and `laundry` for a trailer park).
+
+The site has the same top-level fields as a building, so it's shown, saved and shared the same way:
+`schema` ("terrasim.design/3"), `id`, `requestId`, `createdAt`, `housingType`, `overview`, `site`
+(the land), `placement` (where the site frame stands: `origin`, `xAxisBearingDeg`, and `footprint`,
+the land itself), `size` (the frame's extent and the tallest home), `cost` (homes, streets,
+utilities, shared spaces and engineering together). `totals` adds `lots`, `roadLengthM` and
+`landAreaM2` to a building's totals (summed over the homes).
+
+Everything inside is in site metres: x along `placement.xAxisBearingDeg`, y turned 90° counter-clockwise
+from it, as in a building.
+
+| Field | Meaning |
+|---|---|
+| `roads` | `{ id, name, widthM, line, polygon }`: a street's centre line and the area it paves. |
+| `lots` | `{ id, number, polygon, roadId, use, homeId }`: `use` is `home` or `amenity`. |
+| `amenities` | `{ id, kind, name, polygon, heightM }`: `kind` is `park`, `playground`, `pool` or `clubhouse` (a building `heightM` tall). |
+| `variants` | `{ id, name, count, design }`: each home design, a whole `terrasim.design/2` building with its own placement on the lot it was designed on. |
+| `homes` | `{ id, variant, lotId, x, y, rotationDeg }`: a variant placed on a lot. A point (hx, hy) of the variant's building frame is at (x, y) + R(rotationDeg)·(hx, hy) in the site, rotationDeg counter-clockwise; the home's compass bearing is the site's minus rotationDeg. |
+
+The website checks every variant with the building rules, and that every home stays inside its lot
+(`lib/site.js`). A site doesn't move (its footprint is its land); its walkthrough opens the first
+home where it stands.
 
 ### Rules the renderer checks
 

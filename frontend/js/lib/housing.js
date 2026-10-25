@@ -13,11 +13,17 @@ export const HOUSING_TYPES = [
   { id: 'condo', name: 'Condos', blurb: 'A building of owned homes' },
   { id: 'dorm', name: 'Dorm', blurb: 'Student rooms and shared spaces' },
   { id: 'hotel', name: 'Hotel', blurb: 'Guest rooms over a lobby and restaurant' },
+  { id: 'neighborhood', name: 'Neighborhood', blurb: 'Homes on lots along new streets' },
+  { id: 'trailer-park', name: 'Trailer park', blurb: 'Manufactured homes on pads' },
 ];
+
+// Sites: many homes, with streets, lots and shared spaces (a terrasim.design/3 file).
+const SITE_TYPES = new Set(['neighborhood', 'trailer-park']);
+export const isSiteType = (type) => SITE_TYPES.has(type);
 
 export const typeName = (id) => HOUSING_TYPES.find((t) => t.id === id)?.name ?? 'Building';
 
-const MULTI = new Set(['townhouse', 'duplex', 'apartment', 'condo']);
+const MULTI = new Set(['townhouse', 'duplex', 'apartment', 'condo', 'neighborhood', 'trailer-park']);
 const SHARED_BUILDING = new Set(['apartment', 'condo', 'dorm', 'hotel']);
 // One home on its own: the brief asks about that home's size and rooms.
 const SINGLE_HOME = new Set(['house', 'tiny-home', 'mansion', 'villa']);
@@ -38,11 +44,14 @@ export const BRIEF_RULES = {
   villa: { floors: [1, 3], areaM2: [120, 1200], unitCount: { fixed: 1 }, bedrooms: [1, 10], bathrooms: [1, 10] },
   dorm: { floors: [2, 12], residents: [8, 800], roomType: { options: ['single', 'double', 'suite'] } },
   hotel: { floors: [2, 12], unitCount: [8, 400], roomType: { options: ['single', 'double', 'suite'] } },
+  neighborhood: { floors: [1, 3], areaM2: [70, 400], unitCount: [4, 150], bedrooms: [1, 6], bathrooms: [1, 5] },
+  'trailer-park': { floors: { fixed: 1 }, unitCount: [4, 300], roomType: { options: ['single', 'double'] }, bedrooms: [1, 4], bathrooms: [1, 3] },
 };
 
 export const ROOM_TYPES = [['single', 'Single rooms'], ['double', 'Double rooms'], ['suite', 'Suites']];
 const HOTEL_ROOM_TYPES = [['single', 'King rooms'], ['double', 'Two-queen rooms'], ['suite', 'Suites']];
-export const roomTypeOptions = (type) => (type === 'hotel' ? HOTEL_ROOM_TYPES : ROOM_TYPES);
+const HOME_WIDTHS = [['single', 'Single-wide'], ['double', 'Double-wide']];
+export const roomTypeOptions = (type) => (type === 'hotel' ? HOTEL_ROOM_TYPES : type === 'trailer-park' ? HOME_WIDTHS : ROOM_TYPES);
 
 // What each brief field is called, and how it reads for a given type.
 export function fieldLabel(field, type) {
@@ -51,12 +60,12 @@ export function fieldLabel(field, type) {
   switch (field) {
     case 'floors': return 'Floors';
     case 'areaM2': return avg ? 'Average home size' : per ? 'Size of each home' : 'Living space';
-    case 'unitCount': return type === 'townhouse' ? 'Townhomes in the row' : type === 'hotel' ? 'Guest rooms' : 'Homes in the building';
+    case 'unitCount': return type === 'townhouse' ? 'Townhomes in the row' : type === 'hotel' ? 'Guest rooms' : type === 'neighborhood' ? 'Homes' : type === 'trailer-park' ? 'Home pads' : 'Homes in the building';
     case 'bedrooms': return avg ? 'Bedrooms in a typical home' : per ? 'Bedrooms per home' : 'Bedrooms';
     case 'bathrooms': return avg ? 'Bathrooms in a typical home' : per ? 'Bathrooms per home' : 'Bathrooms';
     case 'residents': return 'Beds in the building';
-    case 'roomType': return 'Room type';
-    case 'budgetUSD': return isSingleHome(type) ? 'Budget for the build' : 'Budget for the whole building';
+    case 'roomType': return type === 'trailer-park' ? 'Home width' : 'Room type';
+    case 'budgetUSD': return isSingleHome(type) ? 'Budget for the build' : isSiteType(type) ? 'Budget for the whole site' : 'Budget for the whole building';
     default: return field;
   }
 }
@@ -68,7 +77,7 @@ export function fieldHint(field, type) {
     case 'bathrooms': return 'A half bath (toilet and sink) counts as 0.5.';
     case 'bedrooms': return type === 'apartment' || type === 'condo' ? '0 means studios. Set an exact mix under Advanced.' : '';
     case 'residents': return 'Total beds across every room.';
-    case 'unitCount': return type === 'hotel' ? 'Rooms guests stay in, across every floor.' : '';
+    case 'unitCount': return type === 'hotel' ? 'Rooms guests stay in, across every floor.' : isSiteType(type) ? 'Each on its own lot along new streets.' : '';
     default: return '';
   }
 }
@@ -114,7 +123,7 @@ export function briefFor(type, answers) {
 const EMPTY = {
   floors: () => 'Add how many floors.',
   areaM2: (t) => (t === 'apartment' || t === 'condo' ? 'Add the average size of a home.' : isMultiHome(t) ? 'Add the size of each home.' : 'Add the living space.'),
-  unitCount: (t) => (t === 'townhouse' ? 'Add how many townhomes.' : t === 'hotel' ? 'Add how many guest rooms.' : 'Add how many homes.'),
+  unitCount: (t) => (t === 'townhouse' ? 'Add how many townhomes.' : t === 'hotel' ? 'Add how many guest rooms.' : t === 'trailer-park' ? 'Add how many home pads.' : 'Add how many homes.'),
   bedrooms: () => 'Add how many bedrooms.',
   bathrooms: () => 'Add how many bathrooms.',
   residents: () => 'Add how many beds.',
@@ -136,7 +145,7 @@ export function briefProblems(type, answers, fmtArea) {
       continue;
     }
     if (f === 'roomType') {
-      if (!v) problems[f] = type === 'hotel' ? 'Choose king rooms, two-queen rooms or suites.' : 'Choose single rooms, double rooms or suites.';
+      if (!v) problems[f] = type === 'hotel' ? 'Choose king rooms, two-queen rooms or suites.' : type === 'trailer-park' ? 'Choose single-wide or double-wide homes.' : 'Choose single rooms, double rooms or suites.';
       continue;
     }
     if (f === 'areaM2' && answers.areaByAI) continue;
@@ -173,7 +182,9 @@ export const EXTRAS = [['office', 'Home office'], ['porch', 'Porch'], ['deck', '
 export const BATHROOM_SHARING = [['private', 'Private'], ['suite', 'Shared in a suite'], ['hall', 'Shared per floor']];
 export const COMMON_SPACES = [['lobby', 'Lobby'], ['lounge', 'Lounge'], ['study', 'Study rooms'], ['gym', 'Gym'], ['laundry', 'Laundry'], ['kitchen', 'Shared kitchen'], ['bike-storage', 'Bike storage'], ['mail', 'Mail room']];
 const HOTEL_SPACES = [['restaurant', 'Restaurant'], ['lounge', 'Lounge or bar'], ['gym', 'Gym'], ['laundry', 'Housekeeping'], ['study', 'Meeting room'], ['bike-storage', 'Bike storage']];
-export const commonSpaceOptions = (type) => (type === 'hotel' ? HOTEL_SPACES : COMMON_SPACES);
+const SITE_SPACES = [['park', 'Park'], ['playground', 'Playground'], ['pool', 'Pool'], ['clubhouse', 'Clubhouse']];
+export const commonSpaceOptions = (type) => (type === 'hotel' ? HOTEL_SPACES : isSiteType(type)
+  ? [...SITE_SPACES, ...(type === 'trailer-park' ? [['laundry', 'Laundry']] : [])] : COMMON_SPACES);
 export const UNIT_MIX = [['studio', 'Studios'], ['oneBed', '1 bed'], ['twoBed', '2 bed'], ['threeBed', '3 bed']];
 
 export const EMPTY_ADVANCED = {
@@ -188,12 +199,12 @@ export const EMPTY_ADVANCED = {
 // words, in the design prompt.
 export function advancedFields(type) {
   const f = ['quality'];
-  if (['house', 'tiny-home', 'townhouse', 'duplex', 'mansion', 'villa'].includes(type)) f.push('garage');
+  if (['house', 'tiny-home', 'townhouse', 'duplex', 'mansion', 'villa', 'neighborhood'].includes(type)) f.push('garage');
   if (isSharedBuilding(type)) f.push('parkingSpaces');
   f.push('structure', 'cladding', 'roofing', 'priorities', 'extras');
   if (type === 'apartment' || type === 'condo') f.push('unitMix');
   if (type === 'dorm') f.push('bathroomSharing');
-  if (isSharedBuilding(type)) f.push('commonSpaces');
+  if (isSharedBuilding(type) || isSiteType(type)) f.push('commonSpaces');
   return f;
 }
 

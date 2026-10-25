@@ -2,6 +2,8 @@
 // drawing it, and small helpers the renderers share. Nothing here invents or repairs a design; a file
 // that breaks a rule is reported, not fixed.
 
+import { isSite, checkSite } from './site.js';
+
 export const SCHEMA = 'terrasim.design/2';
 
 // ---- curves --------------------------------------------------------------------------------------
@@ -175,6 +177,7 @@ export function checkDesign(d) {
   const err = (rule, message) => errors.push({ rule, message });
   const warn = (rule, message) => warnings.push({ rule, message });
   if (!d || typeof d !== 'object') return { ok: false, errors: [{ rule: 0, message: 'The design file is empty.' }], warnings };
+  if (isSite(d)) return checkSite(d, checkDesign); // a neighborhood or trailer park (lib/site.js)
   if (d.schema !== SCHEMA) err(0, `The design file is “${d.schema ?? 'unknown'}”; this website draws “${SCHEMA}”.`);
 
   // Required structure.

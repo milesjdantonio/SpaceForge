@@ -35,8 +35,8 @@ open `frontend/fixtures/mock-house` from My Builds.
   or landowner: Share (next to My Builds) makes a link that carries the building itself, or a file
   for very large ones, and keeps every link made. The brief no longer asks "who it's for".
 - **One building per land.** Each saved building has its own land.
-- **Trailer park and neighborhood** need a new design format, `terrasim.design/3`: one site holding
-  several buildings and roads (agreed; not started). Mansion, hotel and villa fit the current format.
+- **Trailer park and neighborhood** use `terrasim.design/3`: one site holding several buildings and
+  roads. Mansion, hotel and villa fit the building format.
 - **Shapes**: Gemma picks the footprint, `rectangle`, `round` or `land`; the user's own words win
   ("make it a circle", "follow the shape of the lot"). Rooms are planned as rectangles, then the outer
   rooms grow out to an ellipse through the plan's corners, or to the land's outline pulled in to the
@@ -98,6 +98,11 @@ open `frontend/fixtures/mock-house` from My Builds.
   the top floor across the far end of the yard; a home that can have wings becomes a U for it. Left
   out, with a caution, for one-floor homes and plans without two wings.
 - Fixed: the expanded plan was cut off (a CSS rule left it taller than its box).
+- Neighborhoods and trailer parks (`housecost/sites.go`, `frontend/js/lib/site.js`, format
+  `terrasim.design/3` in FIELDS.md "Sites"): streets, lots both sides, a park, playground, pool or
+  clubhouse near the entrance; one or two home variants designed by the normal pipeline and copied
+  onto every lot; the map draws it all as one site; the panel's Plans tab picks a home design. Trailer
+  parks use a new `manufactured` home (single-wide or double-wide).
 - The description is read by code too (`housecost/describe.go`): a roof, roofing, outside walls,
   extras, a garage size and rooms (library, gym, media room, sunroom, mudroom, pantry, studio…) it
   plainly asks for become the user's choices where the form left them open, so Gemma keeps them and
@@ -164,11 +169,10 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 - Spell and text check across the site. (Sign-in was tested end to end by a teammate.)
 
 **Gemma and backend (`housecost/`)**
-- New types: trailer park and neighborhood on `terrasim.design/3`.
 - Run a full design with real Gemma end to end.
 
 **Needs the user**
-- Whether the grey patch that sometimes followed a building is gone: it was likely the design
-  service's mirrored axes (fixed 2026-10-25). If it's still there, a screenshot.
+- The grey patch that sometimes followed a building: dropped (rare, never reproduced; fine for the
+  hackathon).
 - Overture's building tiles are a beta source not meant for production traffic: host an extract
   (`pmtiles extract`) before launch.

@@ -86,7 +86,7 @@ async function finishJob(res, { onProgress, signal } = {}) {
   }
   // The reply may carry the design whole, nest it under "result", or give only its id.
   const body = res?.result ?? res;
-  let design = body?.design ?? (body?.schema === 'terrasim.design/2' ? body : null);
+  let design = body?.design ?? (body?.schema === 'terrasim.design/2' || body?.schema === 'terrasim.design/3' ? body : null);
   let estimate = body?.estimate ?? null;
   if (!design && body?.designId) {
     design = await call(`/designs/${encodeURIComponent(body.designId)}`, { signal });

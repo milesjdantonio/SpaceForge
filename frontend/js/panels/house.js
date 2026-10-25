@@ -9,10 +9,12 @@ import { typeName } from '../lib/housing.js';
 import { explainSaveError } from '../lib/errors.js';
 import { openPlanViewer } from '../ui/plan-viewer.js';
 import { flatPoly } from '../lib/design.js';
+import { isSite } from '../lib/site.js';
 
 // One line saying what the building holds.
 export function holdsLine(design) {
   const t = design.totals || {};
+  if (isSite(design)) return `${t.unitCount} homes · ${(design.roads || []).length} streets`;
   if (design.housingType === 'dorm') return `${t.residents} beds · ${t.floors} floors`;
   if (design.housingType === 'hotel') return `${t.bedrooms} guest rooms · ${t.floors} floors`;
   if ((t.unitCount ?? 1) > 1) return `${t.unitCount} homes · ${t.floors} floors`;
@@ -28,6 +30,11 @@ const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['
 export function renderHousePanel(el, { design, estimate, preview, onWalk, onPreview, onChangeDesign, onShare, onSave, saved = false, name = null, onRename = null, placement = design.placement, shared = false }) {
   let tab = 'overview';
   let level = 0;
+  // A site's plans are its home designs': which one is shown.
+  const site = isSite(design);
+  let variant = 0;
+  const planDesign = () => (site ? design.variants[variant].design : design);
+  const palette = (site ? design.variants[0]?.design : design)?.exterior?.materials?.palette ?? [];
   // The panel element is shared; drop the listeners an earlier house left on it.
   el.__houseListeners?.abort();
   const listeners = new AbortController();
@@ -56,7 +63,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
       <div><dt>Build estimate</dt><dd>${cost ? `${fmt.money(cost.low, { short: true })}–${fmt.money(cost.high, { short: true })}` : 'Not included'}</dd></div>
       <div><dt>Finished space</dt><dd>${fmt.area(design.totals.finishedAreaM2)}</dd></div>
       <div><dt>Holds</dt><dd>${esc(holdsLine(design))}</dd></div>
-      <div><dt>Front faces</dt><dd>${faces}</dd></div>
+      ${site ? `<div><dt>Land</dt><dd>${fmt.land ? fmt.land(design.totals.landAreaM2 ?? design.site.areaM2) : fmt.area(design.site.areaM2)}</dd></div>` : `<div><dt>Front faces</dt><dd>${faces}</dd></div>`}
     </dl>
     <div class="panel-actions">
       <button type="button" class="btn btn-primary" data-walk>${icon('walk')}<span>Walk through</span></button>
@@ -66,7 +73,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
       ${onSave ? `<button type="button" class="btn" data-save>${saved ? 'Save changes' : 'Save building'}</button>` : ''}
       <button type="button" class="btn" data-share>${icon('share')}<span>${design.sample ? 'Share site' : 'Share'}</span></button>
     </div>
-    <p class="note">To move or turn it, choose Move beside the building on the map.</p>
+    ${site ? '' : '<p class="note">To move or turn it, choose Move beside the building on the map.</p>'}
     ${onChangeDesign ? `<details class="change-design">
       <summary>${icon('edit')}<span>Change this design</span></summary>
       <form data-change novalidate>
@@ -96,20 +103,25 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
         <h3 class="group-title">How it answers the land</h3>
         <ul class="ticks">${design.overview.siteResponse.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
         <h3 class="group-title">Materials</h3>
-        <ul class="swatches">${design.exterior.materials.palette.map((p) => `<li><span class="swatch" style="background:${esc(p.hex)}"></span><span>${esc(p.name)}</span><span class="swatch-use">${esc(p.use)}</span></li>`).join('')}</ul>
+        <ul class="swatches">${palette.map((p) => `<li><span class="swatch" style="background:${esc(p.hex)}"></span><span>${esc(p.name)}</span><span class="swatch-use">${esc(p.use)}</span></li>`).join('')}</ul>
         <h3 class="group-title">Check before building</h3>
         <ul class="ticks ticks-warn">${design.overview.cautions.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>`;
     }
     if (tab === 'plans') {
+      const pd = planDesign();
+      level = Math.min(level, pd.levels.length - 1);
       body.innerHTML = `
+        ${site ? `<div class="seg level-seg" role="group" aria-label="Home design">
+          ${design.variants.map((v, i) => `<button type="button" data-variant="${i}" aria-pressed="${i === variant}">${esc(v.name)} · ${v.count}</button>`).join('')}
+        </div>` : ''}
         <div class="seg level-seg" role="group" aria-label="Floor">
-          ${design.levels.map((l, i) => `<button type="button" data-level="${i}" aria-pressed="${i === level}">${l.name}</button>`).join('')}
+          ${pd.levels.map((l, i) => `<button type="button" data-level="${i}" aria-pressed="${i === level}">${l.name}</button>`).join('')}
         </div>
         <div class="plan-box">
           <button type="button" class="btn btn-small plan-expand" data-expand aria-label="Expand the plan for a close look">${icon('expand')}<span>Expand</span></button>
         </div>
-        ${homesOn(design, level) ?? roomsTable(design.levels[level])}`;
-      const plan = renderPlan(design, { level, className: 'plan plan-panel' });
+        ${homesOn(pd, level) ?? roomsTable(pd.levels[level])}`;
+      const plan = renderPlan(pd, { level, className: 'plan plan-panel' });
       plan.addEventListener('click', () => expandPlan());
       body.querySelector('.plan-box').prepend(plan);
     }
@@ -183,6 +195,8 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
     if (t) { tab = t.dataset.tab; draw(); return; }
     const l = e.target.closest('[data-level]');
     if (l) { level = Number(l.dataset.level); draw(); return; }
+    const vb = e.target.closest('[data-variant]');
+    if (vb) { variant = Number(vb.dataset.variant); level = 0; draw(); return; }
     if (e.target.closest('[data-walk]')) onWalk();
     if (e.target.closest('[data-preview]')) onPreview?.();
     if (e.target.closest('[data-expand]')) expandPlan();
@@ -207,7 +221,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onPrev
   }, { signal });
   // The plan full screen; picking a floor there shows the same floor here afterwards.
   function expandPlan() {
-    openPlanViewer({ design, level, title, onLevel: (i) => { if (i !== level) { level = i; if (tab === 'plans') draw(); } } });
+    openPlanViewer({ design: planDesign(), level, title, onLevel: (i) => { if (i !== level) { level = i; if (tab === 'plans') draw(); } } });
   }
 
   // Renaming in place: the title becomes a box; Enter or Save keeps it, Escape or Cancel doesn't.

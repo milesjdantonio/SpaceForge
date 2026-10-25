@@ -23,6 +23,7 @@ import { buildRequest } from './api/request.js';
 import { renderSending } from './panels/send.js';
 import { renderHousePanel, renderDesignProblems } from './panels/house.js';
 import { checkDesign, pointInPolygon } from './lib/design.js';
+import { isSite, homePlacement, variantOf } from './lib/site.js';
 import { landFit } from './lib/fit.js';
 import { explainSaveError } from './lib/errors.js';
 import { createMover } from './map/mover.js';
@@ -304,7 +305,7 @@ function selectBuilding(hit, { details = false } = {}) {
 const landOf = (design) => (design.previewOn ? app.site?.ring : design.site?.outline) ?? null;
 const mover = createMover(map, {
   house, outliner, landOf,
-  canOffer: () => ['house', 'explore', 'failed'].includes(app.mode) && !outliner.active,
+  canOffer: () => ['house', 'explore', 'failed'].includes(app.mode) && !outliner.active && !isSite(house.design), // a site is its land: it doesn't move
   onDone: (placement) => savePlacement(placement),
   // On phones the details panel covers the map, so moving puts it away.
   onStart: () => { if (!wide() && panel.dataset.view === 'house') closePanel(); },
@@ -1035,8 +1036,8 @@ async function openDesignFile(file) {
   catch { toast(`“${file.name}” isn’t a JSON file, so it can’t be opened. Choose a design file saved from TerraSim or Gemma.`, { kind: 'error', action: another }); return; }
   const design = data?.design ?? data;
   const estimate = data?.estimate ?? null;
-  if (design?.schema !== 'terrasim.design/2') {
-    toast(`“${file.name}” isn’t a TerraSim design (it needs "schema": "terrasim.design/2").`, { kind: 'error', action: another });
+  if (design?.schema !== 'terrasim.design/2' && !isSite(design)) {
+    toast(`“${file.name}” isn’t a TerraSim design (it needs "schema": "terrasim.design/2", or "terrasim.design/3" for a site).`, { kind: 'error', action: another });
     return;
   }
   showDesign(design, estimate);
@@ -1277,7 +1278,14 @@ async function openWalk(design) {
   const { openWalkthrough } = await import('./walk/walk.js');
   if (version !== app.displayVersion) return;
   // The shown building's live placement, so the view outside matches where it stands now.
-  openWalkthrough($('#walk'), design, { map, placement: house.design === design ? house.placement : design.placement });
+  const placement = house.design === design ? house.placement : design.placement;
+  if (isSite(design)) {
+    // A site: walk through its first home, where that home stands.
+    const home = design.homes[0];
+    openWalkthrough($('#walk'), variantOf(design, home).design, { map, placement: homePlacement(design, home, placement) });
+    return;
+  }
+  openWalkthrough($('#walk'), design, { map, placement });
 }
 
 // Top bar: lists and units.

@@ -1,5 +1,5 @@
 // types.riv: one small isometric drawing per housing type, for the brief's type cards. Artboards:
-// House, Tiny, Townhouse, Duplex, Mansion, Villa, Apartment, Condo, Dorm, Hotel. Each draws itself in, lifts on hover and
+// House, Tiny, Townhouse, Duplex, Mansion, Villa, Apartment, Condo, Dorm, Hotel, Neighborhood, Trailer. Each draws itself in, lifts on hover and
 // lights its windows when selected.
 //
 // State machine "Type": bool `hover`, bool `selected`.
@@ -230,6 +230,28 @@ export default function build() {
     d.door(2.0, 1.2, 0.55, 0.75);
     d.box([0.95, 2.0, 0.85], [2.0, 2.45, 0.95]);
     d.box([0.8, 0.9, 4.8], [2.0, 1.05, 5.25]);
+  });
+
+  // Small houses along a street, two on each side.
+  drawing(f, 'Neighborhood', 11, [70, 40], (d) => {
+    d.poly([[-0.3, 1.9, 0.01], [5.3, 1.9, 0.01], [5.3, 2.7, 0.01], [-0.3, 2.7, 0.01]], mix(FACE_T, '#000000', 0.35), { line: false });
+    for (const [x, y] of [[0, 0], [2.8, 0], [0, 3.1], [2.8, 3.1]]) {
+      d.box([x, y, 0], [x + 1.6, y + 1.4, 0.9], { top: false });
+      d.windowsL(y + 1.4, [x + 0.25], [0.3], 0.3, 0.3);
+      d.door(y + 1.4, x + 1.0, 0.26, 0.5);
+      d.gable([x, y], [x + 1.6, y + 1.4], 0.9, 0.6, 0.06);
+    }
+  });
+
+  // Long, low manufactured homes side by side on their pads.
+  drawing(f, 'Trailer', 13, [72, 44], (d) => {
+    for (const y of [0, 1.9]) {
+      d.poly([[-0.2, y - 0.15, 0.01], [4.4, y - 0.15, 0.01], [4.4, y + 1.35, 0.01], [-0.2, y + 1.35, 0.01]], mix(FACE_T, '#000000', 0.3), { line: false });
+      d.box([0, y, 0.15], [4.2, y + 1.2, 0.95], { top: false });
+      d.windowsL(y + 1.2, [0.35, 1.2, 2.6, 3.4], [0.45], 0.36, 0.3);
+      d.door(y + 1.2, 1.9, 0.3, 0.62);
+      d.gable([0, y], [4.2, y + 1.2], 0.95, 0.25, 0.05);
+    }
   });
 
   return f;

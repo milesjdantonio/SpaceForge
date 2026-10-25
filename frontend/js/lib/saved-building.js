@@ -7,7 +7,7 @@ export function savedDocument({ design, estimate = null, site = null, placement 
 
 export function readSavedBuilding(record) {
   const data = record?.data;
-  const design = data?.design ?? (data?.schema === 'terrasim.design/2' ? data : null);
+  const design = data?.design ?? (data?.schema === 'terrasim.design/2' || data?.schema === 'terrasim.design/3' ? data : null);
   assertDesign(design);
   const pair = (point) => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite);
   if (data.site && (!Array.isArray(data.site.ring) || data.site.ring.length < 3 || !data.site.ring.every(pair))) {

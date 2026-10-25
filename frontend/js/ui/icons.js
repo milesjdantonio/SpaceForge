@@ -45,6 +45,8 @@ const P = {
   'type-mansion': '<path d="M2.5 10 7 6.5l4.5 3.5M12.5 10 17 6.5l4.5 3.5"/><path d="M8 7.5 12 4l4 3.5"/><path d="M3.5 9.5V20h17V9.5"/><path d="M10.5 20v-4.5h3V20"/><path d="M6 12.5h2M16 12.5h2M6 16h2M16 16h2"/>',
   'type-villa': '<path d="M2.5 11.5 9 7l6.5 4.5"/><path d="M4 10.5V20h10v-9.5"/><path d="M14 13h7.5"/><path d="M16 13v7M20 13v7"/><path d="M7.5 20v-4h3v4"/><path d="M2 20h20"/>',
   'type-hotel': '<rect x="4.5" y="4" width="15" height="16" rx="1"/><path d="M8 7.5h1.5M11.25 7.5h1.5M14.5 7.5h1.5M8 11h1.5M11.25 11h1.5M14.5 11h1.5"/><path d="M8.5 20v-4.5h7V20"/><path d="M7 15.5h10"/><path d="M2.5 20h19"/>',
+  'type-neighborhood': '<path d="M2 21h20"/><path d="M3 12.5 6.5 9.5l3.5 3"/><path d="M4 12v5h5v-5"/><path d="M14 12.5l3.5-3 3.5 3"/><path d="M15 12v5h5v-5"/><path d="M2 19.2h20" stroke-dasharray="2 2"/>',
+  'type-trailer-park': '<rect x="2.5" y="8" width="11" height="5" rx="0.8"/><rect x="10.5" y="15" width="11" height="5" rx="0.8"/><path d="M5 13v1.5M11 13v1.5M13 20v1.5M19 20v1.5"/><path d="M5 10.5h2M9 10.5h2M13 17.5h2M17 17.5h2"/>',
   'type-dorm': '<rect x="3.5" y="6" width="17" height="14" rx="1"/><path d="M3.5 6 12 2.8 20.5 6"/><path d="M7 9.5h2M11 9.5h2M15 9.5h2M7 13h2M11 13h2M15 13h2"/><path d="M10.5 20v-3.5h3V20"/>',
 };
 

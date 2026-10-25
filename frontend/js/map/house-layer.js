@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { maplibregl } from './map.js';
 import { openingSegment, pointInPolygon, bounds, renderable, centroid, outlineRings, outlineEdges } from '../lib/design.js';
+import { isSite, siteOutline } from '../lib/site.js';
 
 const DEFAULTS = { walls: '#e9e4da', roof: '#4a4f55', trim: '#2b2f33', glass: '#5d7c99', accent: '#8a6a4a' };
 
@@ -24,6 +25,7 @@ function paletteColors(design) {
 // z up. Each level is its outline raised to its height; windows and doors come from the exterior
 // walls' openings; balconies, garage, porch, parking and roof from the file.
 export function buildHouseModel(design) {
+  if (isSite(design)) return buildSiteModel(design);
   design = renderable(design); // curved edges as short straight pieces
   const group = new THREE.Group();
   const colors = paletteColors(design);
@@ -302,6 +304,106 @@ function placementMatrix(placement) {
 // Bright tile colours for the building's rise.
 const GLOW = ['#ff8a2a', '#ffb15c', '#ffd27a', '#ff9d4c'];
 
+// Is this one of the model's glass materials (a site has one per home design)?
+const isGlass = (model, material) => material === model.userData.glassMat || !!model.userData.glassMats?.has(material);
+
+// A site (lib/site.js): its streets, lots and shared spaces on the ground, and every home, each a
+// copy of its home design's model turned and set on its lot.
+function buildSiteModel(site) {
+  const group = new THREE.Group();
+  const mat = (hex, extra = {}) => new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: 0.95, metalness: 0, side: THREE.DoubleSide, ...extra });
+  const flat = (poly, z0, z1, m) => {
+    const shape = new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y)));
+    const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: Math.max(0.01, z1 - z0), bevelEnabled: false }), m);
+    mesh.position.z = z0;
+    group.add(mesh);
+    return mesh;
+  };
+  const box = (x0, y0, x1, y1, z0, z1, m) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), m);
+    mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    group.add(mesh);
+    return mesh;
+  };
+  const edgeLine = (poly, z, w, m) => {
+    for (let i = 0; i < poly.length; i++) {
+      const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
+      const len = Math.hypot(bx - ax, by - ay);
+      if (len < 0.05) continue;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, w, 0.04), m);
+      mesh.position.set((ax + bx) / 2, (ay + by) / 2, z);
+      mesh.rotation.z = Math.atan2(by - ay, bx - ax);
+      group.add(mesh);
+    }
+  };
+  const asphalt = mat('#3d4046'), lawn = mat('#5b7448'), lotLine = mat('#d9d2c2'), stripe = mat('#e9e2cf');
+  for (const lot of site.lots || []) {
+    flat(lot.polygon, 0.0, 0.03, lawn);
+    edgeLine(lot.polygon, 0.05, 0.12, lotLine);
+  }
+  for (const road of site.roads || []) {
+    flat(road.polygon, 0.0, 0.06, asphalt);
+    // A dashed centre line.
+    const [[ax, ay], [bx, by]] = road.line;
+    const len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / (len || 1), uy = (by - ay) / (len || 1);
+    for (let t = 1; t + 2 < len; t += 5) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.15, 0.02), stripe);
+      mesh.position.set(ax + ux * (t + 1.25), ay + uy * (t + 1.25), 0.075);
+      mesh.rotation.z = Math.atan2(uy, ux);
+      group.add(mesh);
+    }
+  }
+  for (const a of site.amenities || []) {
+    const b = bounds(a.polygon);
+    if (a.kind === 'park') {
+      flat(a.polygon, 0.03, 0.08, mat('#4e8a3e'));
+      // A few trees.
+      const trunk = mat('#6b4f36'), leaves = mat('#3f7a35');
+      for (const [fx, fy] of [[0.25, 0.3], [0.7, 0.25], [0.45, 0.7], [0.8, 0.75]]) {
+        const x = b.x0 + (b.x1 - b.x0) * fx, y = b.y0 + (b.y1 - b.y0) * fy;
+        box(x - 0.15, y - 0.15, x + 0.15, y + 0.15, 0.08, 2.2, trunk);
+        const crown = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 8), leaves);
+        crown.position.set(x, y, 3.2);
+        group.add(crown);
+      }
+    } else if (a.kind === 'playground') {
+      flat(a.polygon, 0.03, 0.08, mat('#b98a5e'));
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+      box(cx - 2, cy - 1.5, cx + 2, cy + 1.5, 0.08, 1.6, mat('#e0573b'));
+      box(cx - 1.6, cy - 1.1, cx + 1.6, cy + 1.1, 1.6, 2.4, mat('#f2b134'));
+    } else if (a.kind === 'pool') {
+      flat(a.polygon, 0.03, 0.12, mat('#d9d4c7'));
+      flat([[b.x0 + 1.5, b.y0 + 1.5], [b.x1 - 1.5, b.y0 + 1.5], [b.x1 - 1.5, b.y1 - 1.5], [b.x0 + 1.5, b.y1 - 1.5]], 0.12, 0.14, mat('#3aa0d8', { roughness: 0.2 }));
+    } else {
+      // A clubhouse: walls, a band of windows and a flat roof.
+      const h = a.heightM || 4.5;
+      flat(a.polygon, 0, h, mat('#e7e1d6'));
+      flat(a.polygon, h, h + 0.3, mat('#4a4d52'));
+      edgeLine(a.polygon, h * 0.55, 0.05, mat('#2a3f55'));
+    }
+  }
+  // The homes: one model per design, copied.
+  const glassMats = new Set();
+  let height = 0;
+  const byVariant = new Map();
+  for (const v of site.variants || []) {
+    const m = buildHouseModel(v.design);
+    byVariant.set(v.id, m);
+    if (m.userData.glassMat) glassMats.add(m.userData.glassMat);
+    height = Math.max(height, m.userData.height ?? 0);
+  }
+  for (const h of site.homes || []) {
+    const m = byVariant.get(h.variant);
+    if (!m) continue;
+    const copy = m.clone();
+    copy.position.set(h.x, h.y, 0);
+    copy.rotation.z = (h.rotationDeg * Math.PI) / 180;
+    group.add(copy);
+  }
+  group.userData = { glassMats, glassMat: [...glassMats][0] ?? null, glassPanes: [], W: site.size.widthM, D: site.size.depthM, height: Math.max(height, 3), lift: 0 };
+  return group;
+}
+
 export function createHouseLayer(map) {
   const empty = () => ({ id: null, design: null, model: null, placement: null, rise: 1 });
   let state = empty();
@@ -328,7 +430,7 @@ export function createHouseLayer(map) {
     for (const [material, original] of entry.materials) {
       material.color.copy(original.color);
       material.emissive.copy(original.emissive);
-      material.emissiveIntensity = material === entry.model.userData.glassMat ? (night ? 1.1 : 0) : original.intensity;
+      material.emissiveIntensity = isGlass(entry.model, material) ? (night ? 1.1 : 0) : original.intensity;
     }
     // A selected building keeps its own colours; a thin line round it on the ground shows it's chosen.
     if (entry.ring) entry.ring.visible = entry === selection;
@@ -361,7 +463,7 @@ export function createHouseLayer(map) {
     });
     scene.add(sun, sky, model);
     // The selection line: the ground floor's outline, just outside the walls.
-    const ground = renderable(design).levels.find((l) => l.elevationM >= 0)?.outline;
+    const ground = isSite(design) ? siteOutline(design, design.placement) : renderable(design).levels.find((l) => l.elevationM >= 0)?.outline;
     let ring = null;
     if (ground?.length >= 3) {
       const [gx, gy] = centroid(ground);
@@ -431,6 +533,7 @@ export function createHouseLayer(map) {
   const UP = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // keeps z >= 0: nothing shows below ground
 
   function riseTimeline(design, height) {
+    if (isSite(design)) design = design.variants[0].design; // the homes rise together, floor by floor
     const levels = design.levels.filter((l) => l.elevationM >= 0);
     // Where each floor line sits as a share of the full height, so the rise pauses at each one.
     const stops = levels.slice(0, -1).map((l) => (l.elevationM + l.heightM + 0.3) / height).filter((x) => x > 0.05 && x < 0.95);
@@ -503,7 +606,8 @@ export function createHouseLayer(map) {
 
     // The seam: a glowing band round the ground floor's outline, brightest at the ground, that the
     // building rises through.
-    const outline = renderable(design).levels.find((l) => l.elevationM >= 0)?.outline ?? [[0, 0], [W, 0], [W, D], [0, D]];
+    const outline = isSite(design) ? siteOutline(design, design.placement)
+      : renderable(design).levels.find((l) => l.elevationM >= 0)?.outline ?? [[0, 0], [W, 0], [W, D], [0, D]];
     const SEAM = 2.4;
     // Pushed a little outside the walls, so the building doesn't hide it as it comes up.
     const ccw = outline.reduce((a, [x1, y1], i) => { const [x2, y2] = outline[(i + 1) % outline.length]; return a + x1 * y2 - x2 * y1; }, 0) > 0;
@@ -601,7 +705,7 @@ export function createHouseLayer(map) {
     // A warm glow on the building itself, fading as it lands.
     const warm = em.e > 0 ? 0.32 * (1 - clamp((s - tl.buildEnd) / RISE.land)) + flare * 0.15 : 0;
     for (const [material, original] of entry.materials) {
-      if (material === model.userData.glassMat) continue;
+      if (isGlass(model, material)) continue;
       material.emissive.copy(original.emissive).lerp(AMBER, Math.min(1, warm * 2));
       material.emissiveIntensity = original.intensity + warm * 0.7;
     }
