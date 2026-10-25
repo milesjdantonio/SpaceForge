@@ -88,6 +88,7 @@ type job struct {
 	Started  time.Time
 	DesignID string
 	Error    string
+	Advice   *Advice
 	ctx      context.Context
 	cancel   context.CancelFunc
 }
@@ -246,6 +247,9 @@ func (j *job) view(since int) map[string]any {
 	if j.Error != "" {
 		v["error"] = j.Error
 	}
+	if j.Advice != nil {
+		v["advice"] = j.Advice
+	}
 	return v
 }
 
@@ -315,6 +319,9 @@ func serve(addr, siteDir, model, keyFile string, newGemma func() (*Gemma, error)
 		}
 		d := LiveDeps(g.Ask, log, ov)
 		d.Ctx = ctx
+		quick := *g
+		quick.Timeout, quick.NoRetry = 45*time.Second, true
+		d.Advise = quick.Ask
 		return d, nil
 	}
 	return s.listen(addr, siteDir)
@@ -472,6 +479,7 @@ func (s *server) run(j *job, raw []byte) {
 		} else if runErr != nil {
 			msg = runErr.Error()
 		}
+		s.advise(j, raw, msg, deps)
 		fail(msg)
 		return
 	}
@@ -486,6 +494,36 @@ func (s *server) run(j *job, raw []byte) {
 	j.finish(true)
 	j.set(func(j *job) { j.Status, j.DesignID, j.Message, j.Partial = "done", id, "Design ready.", "" })
 	fmt.Printf("[%s] done: %s\n", j.ID, id)
+}
+
+// advise asks Gemma what to change after a failed design. It's skipped when the user cancelled
+// and when Gemma itself can't be reached (the website explains those without it).
+func (s *server) advise(j *job, raw []byte, failure string, deps Deps) {
+	if deps.Advise == nil || j.ctx.Err() != nil {
+		return
+	}
+	low := strings.ToLower(failure)
+	if strings.Contains(low, "api key") || strings.Contains(low, "http 4") || strings.Contains(low, "http 5") {
+		return
+	}
+	var r Request
+	if json.Unmarshal(raw, &r) != nil {
+		return
+	}
+	j.mu.Lock()
+	var tail []string
+	for _, l := range j.Log[max(0, len(j.Log)-12):] {
+		tail = append(tail, l.Text)
+	}
+	j.mu.Unlock()
+	fmt.Fprintln(deps.Log, "Gemma: recommendation (what to change)")
+	j.set(func(j *job) { j.Message = "Working out what to change…" })
+	a, err := AdviseFailure(r, failure, tail, deps.Advise)
+	if err != nil {
+		fmt.Fprintf(deps.Log, "  no recommendation (%s)\n", truncate(err.Error(), 120))
+		return
+	}
+	j.set(func(j *job) { j.Advice = &a })
 }
 
 // cancelJob stops a design the user no longer wants. A queued one is skipped; a running one stops

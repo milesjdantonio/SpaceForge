@@ -487,6 +487,8 @@ type Gemma struct {
 	Thinking string
 	// Ctx stops a call when the design is cancelled; nil means it runs to the end.
 	Ctx      context.Context
+	// NoRetry gives up on the first busy or slow answer instead of waiting to try again.
+	NoRetry  bool
 	jsonMode bool
 	n        int
 }
@@ -545,7 +547,7 @@ func (g *Gemma) Ask(msgs []Msg, maxTokens int) (string, error) {
 			attempt--
 			continue
 		}
-		if attempt < 3 && containsAny(msg, retryable) {
+		if attempt < 3 && !g.NoRetry && containsAny(msg, retryable) {
 			wait := time.Duration(15<<attempt) * time.Second
 			fmt.Fprintf(g.Out, "  Gemma API busy/slow (%s). Retrying in %s...\n", truncate(msg, 90), wait)
 			if g.Ctx != nil {

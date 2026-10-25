@@ -685,3 +685,17 @@ tfoot td { font-weight: 600; }
 .send-cancel { flex: none; }
 .send-cancel.is-confirming { color: var(--negative); border-color: color-mix(in srgb, var(--negative) 60%, transparent); }
 .fit-source { margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+/* Gemma's recommendation after a failed design: the first thing in the panel. */
+.advice-card { display: grid; gap: 10px; padding: 16px; border-radius: var(--radius); border: 1px solid var(--amber); background: linear-gradient(180deg, rgba(255, 138, 42, 0.12), rgba(255, 138, 42, 0.04)); animation: advice-in 420ms cubic-bezier(.2, .8, .2, 1) both; }
+.advice-kicker { display: flex; align-items: center; gap: 6px; color: var(--amber); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.advice-kicker svg { width: 16px; height: 16px; }
+.advice-summary { color: var(--muted); }
+.advice-text { font-size: 1.0625rem; font-weight: 600; color: var(--ink); line-height: 1.4; }
+.advice-change { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 10px 12px; border-radius: var(--radius-small); background: var(--panel-2); }
+.advice-change div { display: grid; gap: 1px; min-width: 0; }
+.advice-change dt { font-size: 12px; color: var(--muted); }
+.advice-change dd { font-weight: 600; overflow-wrap: anywhere; }
+.advice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@keyframes advice-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .advice-card { animation: none; } }

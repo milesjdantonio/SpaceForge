@@ -197,8 +197,34 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
             <button type="button" class="btn btn-small" data-a="copy">${icon('copy')}<span>Copy the request</span></button>
           </details>
         </div>`;
-      // What to do comes before the log, where it's seen first.
+      // What to do comes before the log, where it's seen first; Gemma's recommendation, when there
+      // is one, comes before everything else.
       el.querySelector('.terminal').before(result);
+      const advice = err.advice?.recommendation ? err.advice : null;
+      if (advice) {
+        const card = document.createElement('section');
+        card.className = 'advice-card';
+        card.setAttribute('role', 'alert');
+        card.innerHTML = `
+          <p class="advice-kicker">${icon('spark')}<span>Gemma’s recommendation</span></p>
+          ${advice.summary ? `<p class="advice-summary">${esc(advice.summary)}</p>` : ''}
+          <p class="advice-text">${esc(advice.recommendation)}</p>
+          ${changeList(advice.change)}
+          <div class="advice-actions">
+            ${advice.change && Object.keys(advice.change).length
+              ? `<button type="button" class="btn btn-primary" data-advice="apply">${icon('check')}<span>${esc(advice.changeLabel || 'Apply this change')}</span></button>
+                 <button type="button" class="btn btn-quiet" data-advice="retry">Try again as it is</button>`
+              : '<button type="button" class="btn btn-primary" data-advice="retry">Try again</button>'}
+          </div>`;
+        el.querySelector('.panel-head').after(card);
+        card.addEventListener('click', (e) => {
+          const a = e.target.closest('[data-advice]')?.dataset.advice;
+          if (a === 'apply') onFix?.(advice.change);
+          if (a === 'retry') onRetry();
+        });
+        // The fail card's own main button steps back, so there's one main action on screen.
+        result.querySelector('.fail-actions .btn-primary')?.classList.remove('btn-primary');
+      }
       result.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       result.addEventListener('click', async (e) => {
         const fix = e.target.closest('[data-fix]');
@@ -214,6 +240,20 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
       });
     }
   })();
+}
+
+// The brief changes a recommendation makes, as "Floors: 3" rows.
+const CHANGE_NAMES = {
+  floors: 'Floors', areaM2: 'Size (m²)', unitCount: 'Homes', bedrooms: 'Bedrooms', bathrooms: 'Bathrooms',
+  residents: 'Residents', budgetUSD: 'Budget', noBudgetLimit: 'Budget', areaByAI: 'Size', designPrompt: 'Description',
+};
+function changeList(change) {
+  const rows = Object.entries(change || {}).map(([k, v]) => {
+    const val = k === 'noBudgetLimit' ? 'No limit' : k === 'areaByAI' ? 'Gemma chooses'
+      : k === 'budgetUSD' ? `$${Number(v).toLocaleString('en-US')}` : String(v);
+    return `<div><dt>${esc(CHANGE_NAMES[k] ?? k)}</dt><dd>${esc(val)}</dd></div>`;
+  });
+  return rows.length ? `<dl class="advice-change">${rows.join('')}</dl>` : '';
 }
 
 // Colours for the terminal: Gemma's own lines, problems its answers had, and notes.

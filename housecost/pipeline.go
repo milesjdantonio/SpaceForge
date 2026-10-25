@@ -35,6 +35,9 @@ type Deps struct {
 	Overrides map[string]Override
 	// Ctx is cancelled when the user stops the design; nil runs to the end.
 	Ctx context.Context
+	// Advise is a quick Gemma call (no retries, short timeout) for the recommendation shown when
+	// a design fails; nil skips it.
+	Advise AskFunc
 }
 
 // stopped is true once the user has cancelled this design.

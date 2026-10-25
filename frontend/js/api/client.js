@@ -79,6 +79,8 @@ export const api = {
         if (job.status === 'failed') {
           const err = new Error(job.error || 'The design service couldn’t finish this design.');
           err.code = 'job-failed';
+          // Gemma's recommendation for this failure: { summary, recommendation, change, changeLabel }.
+          err.advice = job.advice ?? null;
           throw err;
         }
         if (Date.now() - started > 15 * 60 * 1000) {
