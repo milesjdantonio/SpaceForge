@@ -125,17 +125,4 @@ export const api = {
     if (local) return local.estimate;
     return call(`/designs/${encodeURIComponent(id)}/estimate`);
   },
-
-  // Published listings. Without a backend, only the sample (when enabled).
-  async listings() {
-    if (!config.apiBaseUrl) return config.showSample ? [{ design: await sample('design'), estimate: await sample('estimate'), builder: { name: 'Sample builder', company: 'Sample listing' } }] : [];
-    try { return await call('/listings'); } catch { return []; }
-  },
-
-  sendInquiry(designId, message) {
-    return call(`/designs/${encodeURIComponent(designId)}/inquiries`, { method: 'POST', body: message });
-  },
-  publish(designId, attestation) {
-    return call(`/designs/${encodeURIComponent(designId)}/publish`, { method: 'POST', body: attestation });
-  },
 };

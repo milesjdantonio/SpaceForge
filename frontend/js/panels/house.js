@@ -7,6 +7,7 @@ import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
 import { typeName } from '../lib/housing.js';
 import { explainSaveError } from '../lib/errors.js';
+import { openPlanViewer } from '../ui/plan-viewer.js';
 
 // One line saying what the building holds.
 export function holdsLine(design) {
@@ -20,7 +21,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 
 const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['materials', 'Materials'], ['time', 'Over time']];
 
-export function renderHousePanel(el, { design, estimate, preview, onWalk, shareUrl, onSave, saved = false }) {
+// `name` is the person's own name for the building (onRename changes it); `placement` is where it
+// stands now; `onShare` shares it (a building link, or the land for the sample).
+export function renderHousePanel(el, { design, estimate, preview, onWalk, onShare, onSave, saved = false, name = null, onRename = null, placement = design.placement, shared = false }) {
   let tab = 'overview';
   let level = 0;
   // The panel element is shared; drop the listeners an earlier house left on it.
@@ -29,13 +32,17 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
   el.__houseListeners = listeners;
   const signal = listeners.signal;
   const cost = estimate?.buildCost ?? null;
-  const faces = fmt.bearing((design.placement.xAxisBearingDeg + 90) % 360);
+  const faces = fmt.bearing((placement.xAxisBearingDeg + 90) % 360);
+  let title = name || design.overview.title;
+  const sub = design.sample ? (preview ? 'Sample house placed on your land' : 'Sample listing')
+    : shared ? `${typeName(design.housingType)} shared with you` : `${typeName(design.housingType)} designed for this land`;
 
   el.innerHTML = `
     <header class="panel-head">
-      <div>
-        <h2 class="panel-title">${esc(design.overview.title)}</h2>
-        <p class="panel-sub">${design.sample ? (preview ? 'Sample house placed on your land' : 'Sample listing') : `${esc(typeName(design.housingType))} designed for this land`}</p>
+      <div class="panel-title-row" data-title-row>
+        <h2 class="panel-title" data-title>${esc(title)}</h2>
+        ${onRename ? `<button type="button" class="btn btn-quiet btn-icon btn-rename" data-rename aria-label="Rename this building" title="Rename">${icon('edit')}</button>` : ''}
+        <p class="panel-sub">${esc(sub)}${name && name !== design.overview.title ? ` · ${esc(design.overview.title)}` : ''}</p>
       </div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
@@ -51,9 +58,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
     <div class="panel-actions">
       <button type="button" class="btn btn-primary" data-walk>${icon('walk')}<span>Walk through</span></button>
       ${onSave ? `<button type="button" class="btn" data-save>${saved ? 'Save changes' : 'Save building'}</button>` : ''}
-      <button type="button" class="btn" data-share>${icon('share')}<span>Share site</span></button>
-      ${design.sample && !preview ? `<button type="button" class="btn" data-contact>${icon('mail')}<span>Contact builder</span></button>` : ''}
-    </div>
+      <button type="button" class="btn" data-share>${icon('share')}<span>${design.sample ? 'Share site' : 'Share'}</span></button>    </div>
     <p class="note">To move or turn it, choose Move beside the building on the map.</p>
     <div class="tabs" role="tablist" aria-label="Details">
       ${TABS.map(([id, name]) => `<button type="button" role="tab" id="tab-${id}" aria-controls="tabpanel" aria-selected="${id === tab}" data-tab="${id}">${name}</button>`).join('')}
@@ -83,9 +88,13 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
         <div class="seg level-seg" role="group" aria-label="Floor">
           ${design.levels.map((l, i) => `<button type="button" data-level="${i}" aria-pressed="${i === level}">${l.name}</button>`).join('')}
         </div>
-        <div class="plan-box"></div>
+        <div class="plan-box">
+          <button type="button" class="btn btn-small plan-expand" data-expand aria-label="Expand the plan for a close look">${icon('expand')}<span>Expand</span></button>
+        </div>
         ${homesOn(design, level) ?? roomsTable(design.levels[level])}`;
-      body.querySelector('.plan-box').append(renderPlan(design, { level, className: 'plan plan-panel' }));
+      const plan = renderPlan(design, { level, className: 'plan plan-panel' });
+      plan.addEventListener('click', () => expandPlan());
+      body.querySelector('.plan-box').prepend(plan);
     }
     if (!estimate && ['cost', 'materials', 'time'].includes(tab)) {
       body.innerHTML = '<p class="empty">No cost came with this design. The design service puts it in the design file as “cost”.</p>';
@@ -158,13 +167,55 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
     const l = e.target.closest('[data-level]');
     if (l) { level = Number(l.dataset.level); draw(); return; }
     if (e.target.closest('[data-walk]')) onWalk();
-    if (e.target.closest('[data-share]')) {
-      const url = shareUrl ? shareUrl() : location.href;
-      try { await navigator.clipboard.writeText(url); toast('Site link copied. Your saved building stays private.'); }
-      catch { prompt('Your browser blocked copying. Copy this link:', url); }
-    }
-    if (e.target.closest('[data-contact]')) toast('Messages to builders arrive once the TerraSim API is connected.');
-  }, { signal });
+    if (e.target.closest('[data-expand]')) expandPlan();
+    if (e.target.closest('[data-share]')) onShare?.();
+    if (e.target.closest('[data-rename]')) startRename();  }, { signal });
+  // The plan full screen; picking a floor there shows the same floor here afterwards.
+  function expandPlan() {
+    openPlanViewer({ design, level, title, onLevel: (i) => { if (i !== level) { level = i; if (tab === 'plans') draw(); } } });
+  }
+
+  // Renaming in place: the title becomes a box; Enter or Save keeps it, Escape or Cancel doesn't.
+  function startRename() {
+    const row = el.querySelector('[data-title-row]');
+    const h = row.querySelector('[data-title]');
+    if (row.querySelector('[data-rename-form]')) return;
+    const form = document.createElement('form');
+    form.className = 'rename';
+    form.dataset.renameForm = '';
+    form.innerHTML = `<label class="sr-only" for="rename-input">Building name</label>
+      <input class="input" id="rename-input" maxlength="120" autocomplete="off">
+      <button type="submit" class="btn btn-small btn-primary">Save</button>
+      <button type="button" class="btn btn-small btn-quiet" data-cancel>Cancel</button>
+      <p class="qerror" role="alert"></p>`;
+    const input = form.querySelector('input');
+    input.value = title;
+    h.hidden = true;
+    row.querySelector('[data-rename]').hidden = true;
+    h.after(form);
+    input.focus(); input.select();
+    const end = () => { form.remove(); h.hidden = false; row.querySelector('[data-rename]').hidden = false; };
+    form.querySelector('[data-cancel]').onclick = end;
+    input.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { ev.stopPropagation(); end(); } });
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      const next = input.value.trim();
+      const err = form.querySelector('.qerror');
+      if (!next) { err.innerHTML = `${icon('alert')}<span>Give it a name, or press Cancel.</span>`; return; }
+      if (next === title) { end(); return; }
+      form.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+      try {
+        await onRename(next);
+        title = next;
+        h.textContent = next;
+        end();
+      } catch (e2) {
+        form.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+        err.innerHTML = `${icon('alert')}<span>${esc(`The name wasn’t saved. ${explainSaveError(e2).text}`)}</span>`;
+      }
+    };
+  }
+
   el.addEventListener('keydown', (e) => {
     if (!e.target.matches('[role="tab"]') || !['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
     const ids = TABS.map((x) => x[0]);

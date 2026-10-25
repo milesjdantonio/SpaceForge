@@ -18,7 +18,7 @@ export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry
     <header class="panel-head">
       <div>
         <h2 class="panel-title" data-title>Generating Build</h2>
-        <p class="panel-sub">${request.mode === 'build' ? 'As a listing' : 'Privately'} · ${typeName(request.housingType)} · ${request.brief.floors} ${request.brief.floors === 1 ? 'floor' : 'floors'}</p>
+        <p class="panel-sub">${typeName(request.housingType)} · ${request.brief.floors} ${request.brief.floors === 1 ? 'floor' : 'floors'}</p>
       </div>
     </header>
     <p class="note send-wait" data-wait>This may take a while. You can keep looking around the map; the design appears on your land when it’s ready.</p>

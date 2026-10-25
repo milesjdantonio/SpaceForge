@@ -7,7 +7,7 @@ related_targets: []
 
 ## Scope
 
-The TerraSim web interface: the globe home screen, the map where users outline land and send a brief, the house shown on its lot, the side panel, the catalog, My Builds, and the walkthrough. Generation is done by the Gemma system (GEMMA.md); the interface only sends and renders.
+The TerraSim web interface: the globe home screen, the map where users outline land and send a brief, the house shown on its lot, the side panel, My Builds, Share, and the walkthrough. Generation is done by the Gemma system (contracts/FIELDS.md); the interface only sends and renders.
 
 ## Audience and job
 

@@ -53,7 +53,7 @@ Update the vendored copies with `npm install` then `npm run vendor` inside `fron
 |---|---|---|
 | [Playwright CLI](https://github.com/microsoft/playwright-cli) | Agent-driven browsing of the running app | Optional; the library above covers current checks. |
 | [Claude Code Security Review action](https://github.com/anthropics/claude-code-security-review) | Automated security review on GitHub PRs | Needs an API key secret and Actions permissions; ask first. Until then, use `/security-review` locally. |
-| The Gemma design system | Generating designs | Owned by the backend; the interface contract is [GEMMA.md](GEMMA.md). Never commit a key. |
+| The Gemma design system | Generating designs | Owned by the backend; the interface contract is [contracts/FIELDS.md](contracts/FIELDS.md). Never commit a key. |
 | A production map provider | Guaranteed imagery and place search | Open decision in AGENT.md. |
 
 ## Reference only

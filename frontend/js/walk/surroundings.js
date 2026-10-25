@@ -7,14 +7,14 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { config } from '../config.js';
 import { projection, pointInPolygon } from '../lib/geo.js';
+import { buildingLayers } from '../map/map.js';
+import { tileXY, mosaic, heightSampler } from '../lib/terrain.js';
 
 const RADIUS = 180;      // metres of real ground round the building
 const IMAGERY_Z = 18;    // satellite tiles, about 0.5 m a pixel
-const TERRAIN_Z = 15;    // elevation tiles, about 4 m a pixel
 const GRID = 96;         // ground mesh cells per side
 const PAD_M = 4;         // the ground is flat this far round the building (its pad)
 const BLEND_M = 16;      // and eases back to its real height over this distance
-const MAX_TILES = 36;
 
 // Converters between [lng, lat] and building metres: x along the width, y along the depth.
 export function buildingFrame(placement) {
@@ -24,63 +24,6 @@ export function buildingFrame(placement) {
   return {
     toLocal(ll) { const [e, n] = proj.toLocal(ll); return [e * ux[0] + n * ux[1], e * uy[0] + n * uy[1]]; },
     toGeo([x, y]) { return proj.toGeo([x * ux[0] + y * uy[0], x * ux[1] + y * uy[1]]); },
-  };
-}
-
-// Web Mercator tile coordinates (fractional) of a point at a zoom.
-function tileXY([lng, lat], z) {
-  const n = 2 ** z, s = Math.sin((lat * Math.PI) / 180);
-  return [((lng + 180) / 360) * n, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n];
-}
-
-function loadImage(url, signal) {
-  return new Promise((ok, fail) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => ok(img);
-    img.onerror = () => fail(new Error(`Couldn't load ${url}`));
-    signal?.addEventListener('abort', () => { img.src = ''; fail(new DOMException('Aborted', 'AbortError')); }, { once: true });
-    img.src = url;
-  });
-}
-
-// Draws the tiles covering [lng, lat] corners into one canvas. Returns the canvas and its pixel
-// origin at that zoom, or null if nothing loaded.
-async function mosaic(corners, z, urlFor, signal) {
-  const xy = corners.map((c) => tileXY(c, z));
-  const tx0 = Math.floor(Math.min(...xy.map((p) => p[0]))), tx1 = Math.floor(Math.max(...xy.map((p) => p[0])));
-  const ty0 = Math.floor(Math.min(...xy.map((p) => p[1]))), ty1 = Math.floor(Math.max(...xy.map((p) => p[1])));
-  if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > MAX_TILES) return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = (tx1 - tx0 + 1) * 256;
-  canvas.height = (ty1 - ty0 + 1) * 256;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  const jobs = [];
-  let loaded = 0;
-  for (let x = tx0; x <= tx1; x++) {
-    for (let y = ty0; y <= ty1; y++) {
-      jobs.push(loadImage(urlFor(z, x, y), signal).then((img) => { ctx.drawImage(img, (x - tx0) * 256, (y - ty0) * 256); loaded++; }).catch((e) => { if (e.name === 'AbortError') throw e; }));
-    }
-  }
-  await Promise.all(jobs);
-  return loaded ? { canvas, ctx, px0: tx0 * 256, py0: ty0 * 256, z } : null;
-}
-
-// Ground height (metres above sea level) from Terrarium elevation tiles, sampled bilinearly.
-async function terrain(corners, signal) {
-  const m = await mosaic(corners, TERRAIN_Z, (z, x, y) => `${config.map.terrain}/${z}/${x}/${y}.png`, signal);
-  if (!m) return null;
-  const { width: w, height: h } = m.canvas;
-  const px = m.ctx.getImageData(0, 0, w, h).data;
-  const at = (i, j) => {
-    const k = (Math.max(0, Math.min(h - 1, j)) * w + Math.max(0, Math.min(w - 1, i))) * 4;
-    return px[k] * 256 + px[k + 1] + px[k + 2] / 256 - 32768;
-  };
-  return (ll) => {
-    const [tx, ty] = tileXY(ll, TERRAIN_Z);
-    const fx = tx * 256 - m.px0 - 0.5, fy = ty * 256 - m.py0 - 0.5;
-    const i = Math.floor(fx), j = Math.floor(fy), a = fx - i, b = fy - j;
-    return (at(i, j) * (1 - a) + at(i + 1, j) * a) * (1 - b) + (at(i, j + 1) * (1 - a) + at(i + 1, j + 1) * a) * b;
   };
 }
 
@@ -96,7 +39,7 @@ export async function buildSurroundings({ map, placement, W, D, signal }) {
   const cx = W / 2, cy = D / 2;
   const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => frame.toGeo([cx + a * RADIUS, cy + b * RADIUS]));
   const [heightAt, imagery] = await Promise.all([
-    terrain(corners, signal).catch((e) => { if (e.name === 'AbortError') throw e; return null; }),
+    heightSampler(corners, signal).catch((e) => { if (e.name === 'AbortError') throw e; return null; }),
     mosaic(corners, IMAGERY_Z, (z, x, y) => config.map.satellite.url.replace('{z}/{y}/{x}', `${z}/${y}/${x}`), signal)
       .catch((e) => { if (e.name === 'AbortError') throw e; return null; }),
   ]);
@@ -161,19 +104,33 @@ export async function buildSurroundings({ map, placement, W, D, signal }) {
   return group;
 }
 
+// A building's top and base in metres, from Overture (height, floors) or OpenFreeMap (render_height).
+function heights(p) {
+  const top = p.height ?? (p.num_floors != null ? p.num_floors * STOREY_M : null) ?? p.render_height ?? 5;
+  const base = p.min_height ?? (p.min_floor != null ? p.min_floor * STOREY_M : null) ?? p.render_min_height ?? 0;
+  return [Number(top), Number(base)];
+}
+const STOREY_M = 3.2;
+
 function buildNeighbours(map, frame, { W, D, groundAt }) {
-  const layer = map?.getStyle()?.layers.find((l) => l.type === 'fill-extrusion');
-  if (!layer) return null;
-  let features;
-  try { features = map.querySourceFeatures(layer.source, { sourceLayer: layer['source-layer'] }); } catch { return null; }
+  if (!map) return null;
+  // The same buildings the map draws: Overture's (whole buildings without parts, and parts), or the
+  // OpenFreeMap fallback.
+  let features = [];
+  try {
+    for (const id of buildingLayers(map)) {
+      const layer = map.getLayer(id);
+      const own = id === 'buildings-world' ? (f) => f.properties.has_parts !== true : () => true;
+      features.push(...map.querySourceFeatures(layer.source, { sourceLayer: layer.sourceLayer }).filter((f) => f.properties.is_underground !== true && own(f)));
+    }
+  } catch { return null; }
   const site = [[-1, -1], [W + 1, -1], [W + 1, D + 1], [-1, D + 1]];
   const seen = new Set();
   const geos = [];
   for (const f of features) {
     const g = f.geometry;
     const polys = g.type === 'Polygon' ? [g.coordinates] : g.type === 'MultiPolygon' ? g.coordinates : [];
-    const p = f.properties || {};
-    const top = Number(p.render_height ?? p.height ?? 6), base = Number(p.render_min_height ?? p.min_height ?? 0);
+    const [top, base] = heights(f.properties || {});
     if (!(top > base)) continue;
     for (const rings of polys) {
       const outer = rings[0].slice(0, -1).map((ll) => frame.toLocal(ll));

@@ -422,7 +422,10 @@ export function createHouseLayer(map) {
   // Rise from the ground in a ring from the middle; then waves of light and height roll across the
   // lot; when the design arrives (or fails) the tiles sink back into the ground.
   const GEN_COLORS = ['#ff8a2a', '#ffb15c', '#ffd27a', '#ff6a1a', '#fff1d0'].map((h) => new THREE.Color(h));
+  const FAIL = new THREE.Color('#ff5a4f'), FAIL_DIM = new THREE.Color('#5a2a2a');
+  const FAIL_MS = 3400;
   function animateGen() {
+    if (gen.failed) { animateFail(); return; }
     const now = performance.now();
     const t = (now - gen.start) / 1000;
     const ending = gen.end ? Math.min(1, (now - gen.end) / 1400) : 0;
@@ -448,6 +451,42 @@ export function createHouseLayer(map) {
       genScene.remove(gen.mesh);
       gen.mesh.geometry.dispose();
       gen.mesh = null;
+    }
+  }
+  // When the design fails: the tiles flash red together, shudder, then crumble down one by one
+  // from the middle outward, darkening as they go, and are gone.
+  function animateFail() {
+    const now = performance.now();
+    const k = Math.min(1, (now - gen.failed) / FAIL_MS);
+    const s = (now - gen.failed) / 1000;
+    const dummy = new THREE.Object3D();
+    const col = new THREE.Color();
+    const flash = Math.max(0, 1 - s / 0.5);
+    gen.cells.forEach((c, i) => {
+      const h0 = c.failH ?? 0.4;
+      // Shudder in the first 0.9 s, then each tile drops in turn by its distance from the middle.
+      const shake = s < 0.9 ? Math.sin(s * 60 + c.phase * 6) * 0.08 * (1 - s / 0.9) : 0;
+      const drop = Math.max(0, Math.min(1, (k - 0.25 - c.d * 0.45) / 0.3));
+      const ease = drop * drop;
+      const h = Math.max(0.02, h0 * (1 - ease) + 0.02);
+      dummy.position.set(c.x + shake, c.y - shake * 0.6, h / 2 - ease * 0.6);
+      dummy.rotation.set(ease * (c.phase - Math.PI) * 0.35, ease * (Math.PI - c.phase) * 0.25, 0);
+      dummy.scale.set(1 - ease * 0.4, 1 - ease * 0.4, h);
+      dummy.updateMatrix();
+      gen.mesh.setMatrixAt(i, dummy.matrix);
+      gen.mesh.setColorAt(i, col.copy(FAIL).lerp(FAIL_DIM, Math.min(1, drop * 1.2)).lerp(GEN_COLORS[4], flash * 0.6));
+    });
+    gen.mesh.instanceMatrix.needsUpdate = true;
+    if (gen.mesh.instanceColor) gen.mesh.instanceColor.needsUpdate = true;
+    gen.mesh.material.emissive.copy(FAIL);
+    gen.mesh.material.emissiveIntensity = 0.35 + flash * 0.9;
+    gen.mesh.material.opacity = 0.88 * (1 - Math.max(0, (k - 0.8) / 0.2));
+    if (k >= 1) {
+      genScene.remove(gen.mesh);
+      gen.mesh.geometry.dispose();
+      gen.mesh.material.dispose();
+      gen.mesh = null;
+      gen.failed = 0;
     }
   }
 
@@ -550,12 +589,23 @@ export function createHouseLayer(map) {
       gen.mesh = makeGenGrid(ring);
       gen.start = performance.now();
       gen.end = 0;
+      gen.failed = 0;
       genScene.add(gen.mesh);
       map.triggerRepaint();
     },
-    // The design arrived or failed: the grid sinks back into the ground.
+    // The design arrived: the grid sinks back into the ground.
     stopGenerating() {
-      if (gen.mesh && !gen.end) gen.end = performance.now();
+      if (gen.mesh && !gen.end && !gen.failed) gen.end = performance.now();
+      map.triggerRepaint();
+    },
+    // The design failed: the grid flashes red and crumbles away (animateFail).
+    failGenerating() {
+      if (!gen.mesh || gen.failed) return;
+      // Each tile falls from the height it had when the failure came.
+      const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+      gen.cells.forEach((c, i) => { gen.mesh.getMatrixAt(i, m); m.decompose(p, q, sc); c.failH = Math.max(0.1, sc.z); });
+      gen.failed = performance.now();
+      gen.end = 0;
       map.triggerRepaint();
     },
     // Moves the building to a new placement without replaying its rise.

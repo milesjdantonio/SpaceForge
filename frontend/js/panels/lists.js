@@ -1,37 +1,9 @@
-// Catalog of published listings, and the visitor's own saved sites.
+// My Builds: the visitor's saved buildings and site drafts.
 
 import { fmt } from '../format.js';
 import { measure } from '../lib/place.js';
 import { icon } from '../ui/icons.js';
-import { renderPlan } from '../render/plan.js';
 import { typeName } from '../lib/housing.js';
-import { holdsLine } from './house.js';
-
-export function renderCatalog(el, { listings, onOpen }) {
-  el.innerHTML = `
-    <header class="panel-head">
-      <div><h2 class="panel-title">Catalog</h2><p class="panel-sub">Designs builders have published</p></div>
-      <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
-    </header>
-    ${listings.length ? '' : '<p class="empty">No listings yet. When builders publish designs, they appear here.</p>'}
-    <ul class="cards"></ul>
-    <p class="note">Only the sample is listed until the TerraSim API is connected.</p>`;
-  const ul = el.querySelector('.cards');
-  for (const l of listings) {
-    const li = document.createElement('li');
-    li.innerHTML = `<button type="button" class="card">
-      <span class="card-plan"></span>
-      <span class="card-body">
-        <span class="card-title">${l.design.overview.title}</span>
-        <span class="card-meta num">${typeName(l.design.housingType)} · ${holdsLine(l.design)} · ${fmt.area(l.design.totals.finishedAreaM2)}</span>
-        <span class="card-price num">${fmt.money(l.estimate.buildCost.low, { short: true })}–${fmt.money(l.estimate.buildCost.high, { short: true })} to build</span>
-        <span class="card-by">${l.builder.company}</span>
-      </span></button>`;
-    li.querySelector('.card-plan').append(renderPlan(l.design, { labels: false, dims: false, className: 'plan plan-thumb', pad: 0.6 }));
-    li.querySelector('button').addEventListener('click', () => onOpen(l));
-    ul.append(li);
-  }
-}
 
 export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore, onRetry }) {
   const statusText = { draft: 'Draft', 'not-sent': 'Not sent yet', sent: 'Sent' };

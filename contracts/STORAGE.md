@@ -2,7 +2,7 @@
 
 The Go backend stores rendered buildings in PostgreSQL JSONB. Firebase login is
 connected in the frontend. Generation remains a separate service using
-[GEMMA.md](../GEMMA.md) and [FIELDS.md](FIELDS.md).
+[FIELDS.md](FIELDS.md).
 
 ## Saved document
 
@@ -74,4 +74,5 @@ The separate housecost Go service provides generation at POST /api/designs,
 with job polling and design/cost retrieval on port 8000. Its jobs/results are local
 to that service; private account persistence uses the SQL routes above.
 The Go storage API does not implement generation jobs, publishing, public listings,
-or inquiries. Share site copies the outline/brief, not access to the private record.
+or inquiries. Share packs a copy of the building (design, placement, land) into the link itself
+(#b=..., terrasim.shared-building/1); it never grants access to the private record.

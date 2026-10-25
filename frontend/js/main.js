@@ -1,7 +1,7 @@
 // TerraSim: the globe, the fly-down, outlining land, the brief, sending, and the house on its lot.
 
 import { settings, store } from './store.js';
-import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setEvening } from './map/map.js';
+import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setEvening, clearLand } from './map/map.js';
 import { createOutliner } from './map/draw.js';
 import { createHouseLayer } from './map/house-layer.js';
 import { measure, problemsFor, placeOnLot } from './lib/place.js';
@@ -26,7 +26,10 @@ import { checkDesign } from './lib/design.js';
 import { landFit } from './lib/fit.js';
 import { explainSaveError } from './lib/errors.js';
 import { createMover } from './map/mover.js';
-import { renderCatalog, renderSites } from './panels/lists.js';
+import { createTopo } from './map/topo.js';
+import { shareDocument, packShare, unpackShare } from './lib/share.js';
+import { renderSites } from './panels/lists.js';
+import { renderShare } from './panels/share.js';
 import { mountRive } from './rive.js';
 import { createStarfield } from './map/stars.js';
 import { searchPlaces, suggestPlaces, placeName } from './map/places.js';
@@ -62,6 +65,8 @@ const app = {
   sceneReady: false,
   sceneVersion: 0,
   navigationVersion: 0,
+  names: new Map(),  // design id -> the person's own name for it
+  shared: new Set(), // design ids opened from someone's link
 };
 
 // Declared early: a share link opens the brief (and the hint) before the rest of this file runs.
@@ -70,6 +75,10 @@ const hintPin = { el: null, rive: null, replay: false }; // the drawing hint's R
 function setMode(mode) {
   app.mode = mode;
   body.dataset.mode = mode;
+  const compass = document.querySelector('[data-ctl="north"]');
+  const label = mode === 'globe' ? 'Centre the Earth on your location' : 'Face north, look straight down (hold Ctrl and drag the map to turn and tilt)';
+  compass?.setAttribute('aria-label', label);
+  compass?.setAttribute('title', label);
   renderToolbar();
 }
 
@@ -102,6 +111,26 @@ const outliner = createOutliner(map, {
 });
 const house = createHouseLayer(map);
 map.addLayer(house.layer);
+// Contour lines over the land being built on, and its lie (slope, fall) for the brief.
+const topo = createTopo(map);
+let survey = { ring: null, promise: Promise.resolve(null) };
+function surveyFor(ring) {
+  if (!ring) { topo.hide(); survey = { ring: null, promise: Promise.resolve(null) }; clearLands(); return survey.promise; }
+  if (survey.ring !== ring) { survey = { ring, promise: topo.show(ring) }; clearLands(); }
+  return survey.promise;
+}
+// The map's own buildings give way on the land being designed for and under every saved building.
+function clearLands() {
+  const rings = [survey.ring, ...house.entries.map((e) => e.design.site?.outline)].filter(Boolean);
+  clearLand(map, rings);
+}
+// Contours follow the outline: shown with land, cleared with it, hidden while drawing new land.
+{
+  const { load, clear, start } = outliner;
+  outliner.load = (ring) => { load(ring); surveyFor(ring); };
+  outliner.clear = () => { clear(); surveyFor(null); };
+  outliner.start = () => { start(); surveyFor(null); };
+}
 window.__terrasim = { map, app, house, stopSpin };
 
 // The globe sits beside the intro: to its right on wide screens, above it on phones.
@@ -130,10 +159,8 @@ function globeHint() {
   home.classList.toggle('is-loading', !located);
   home.setAttribute('aria-busy', String(!located));
   home.classList.toggle('is-unavailable', located && !app.you);
-  // Once it can be used, a Rive pointer hovers over it and presses, to show it's clickable.
-  const tap = home.querySelector('[data-start-tap]');
-  if (app.you && !tap.__rive) tap.__rive = mountRive(tap, { src: 'assets/rive/tap.riv' }) ?? true;
-  tap.hidden = !app.you;
+  // Once it can be used, a neon line travels round its edge to show it can be clicked.
+  home.classList.toggle('is-ready', !!app.you);
   option('anywhere').querySelector('[data-start-title]').textContent = `${verb()} anywhere`;
   option('zoom').querySelector('[data-start-title]').textContent = touch() ? 'Pinch to zoom in' : 'Scroll on the world';
 }
@@ -142,9 +169,6 @@ globeHint();
 
 const marker = { current: null };
 if (location.hash.startsWith('#s=')) await openShared(location.hash);
-else if (location.hash.startsWith('#l=')) {
-  setTimeout(() => document.querySelector('[data-open="catalog"]').click(), 300);
-}
 getLocation().then((you) => {
   app.you = you;
   located = true;
@@ -186,7 +210,7 @@ map.on('mousemove', (e) => {
     (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]));
   map.getCanvas().style.cursor = hit ? (mover.active && house.isSelected(hit) ? 'grab' : 'pointer') : app.mode === 'globe' ? 'crosshair' : '';
   // Say what a click will open before it's clicked.
-  const show = !!hit && !mover.active;
+  const show = !!hit && !mover.active && !e.originalEvent?.ctrlKey;
   hoverTip.hidden = !show;
   if (show) {
     hoverTip.textContent = panel.dataset.view === 'house' && house.isSelected(hit) ? 'Showing its details' : 'Click for details: cost, plans, materials';
@@ -199,6 +223,46 @@ hoverTip.hidden = true;
 map.getContainer().append(hoverTip);
 map.getCanvas().addEventListener('mouseleave', () => { hoverTip.hidden = true; });
 map.on('movestart', () => { hoverTip.hidden = true; });
+
+// Teaching Ctrl + drag (the only way to turn and tilt with a mouse): a tip at street level until it's
+// dismissed or used, and a cue beside the pointer while Ctrl is held over the map.
+const finePointer = matchMedia('(pointer: fine)').matches;
+const tiltTip = document.createElement('div');
+tiltTip.className = 'tilt-tip';
+tiltTip.hidden = true;
+tiltTip.innerHTML = `<span class="tilt-keys"><kbd>Ctrl</kbd><span aria-hidden="true">+</span>${icon('move')}</span><span>Hold <strong>Ctrl</strong> and drag to turn and tilt the view</span><button type="button" class="tilt-tip-close" aria-label="Got it, hide this tip">${icon('close')}</button>`;
+$('#main').append(tiltTip);
+let tiltLearned = store.get('tiltLearned', false);
+const learnTilt = () => { if (tiltLearned) return; tiltLearned = true; store.set('tiltLearned', true); syncTiltTip(); };
+function syncTiltTip() {
+  tiltTip.hidden = !finePointer || tiltLearned || ['globe', 'flying', 'drawing', 'sending'].includes(app.mode) || map.getZoom() < 14 || mover.active;
+}
+tiltTip.querySelector('button').addEventListener('click', learnTilt);
+map.on('moveend', syncTiltTip);
+for (const ev of ['rotatestart', 'pitchstart']) map.on(ev, (e) => { if (e.originalEvent) learnTilt(); });
+
+const ctrlCue = document.createElement('div');
+ctrlCue.className = 'hover-tip ctrl-cue';
+ctrlCue.hidden = true;
+ctrlCue.textContent = 'Drag to turn and tilt';
+map.getContainer().append(ctrlCue);
+let pointer = null;
+map.getCanvas().addEventListener('mousemove', (e) => {
+  const r = map.getCanvas().getBoundingClientRect();
+  pointer = { x: e.clientX - r.left, y: e.clientY - r.top };
+  if (!ctrlCue.hidden) ctrlCue.style.transform = `translate(${pointer.x + 16}px, ${pointer.y + 18}px)`;
+  if (e.ctrlKey !== !ctrlCue.hidden) setCtrlCue(e.ctrlKey);
+});
+map.getCanvas().addEventListener('mouseleave', () => { pointer = null; setCtrlCue(false); });
+function setCtrlCue(on) {
+  const show = on && !!pointer && finePointer && app.mode !== 'globe' && !outliner.active && !mover.active;
+  ctrlCue.hidden = !show;
+  map.getCanvas().classList.toggle('is-ctrl', show);
+  if (show) { hoverTip.hidden = true; ctrlCue.style.transform = `translate(${pointer.x + 16}px, ${pointer.y + 18}px)`; }
+}
+addEventListener('keydown', (e) => { if (e.key === 'Control' && !e.repeat) setCtrlCue(true); });
+addEventListener('keyup', (e) => { if (e.key === 'Control') setCtrlCue(false); });
+addEventListener('blur', () => setCtrlCue(false));
 map.on('dblclick', (e) => {
   if (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat])) e.preventDefault();
 });
@@ -341,7 +405,11 @@ controls.addEventListener('click', (e) => {
   const c = e.target.closest('[data-ctl]')?.dataset.ctl;
   if (c === 'in') map.zoomIn({ duration: 300 });
   if (c === 'out') map.zoomOut({ duration: 300 });
-  if (c === 'north') map.easeTo({ bearing: 0, pitch: map.getBearing() === 0 ? 0 : map.getPitch(), duration: 700 });
+  // On the globe, the compass turns the Earth upright with you in the middle; on the map, it faces north.
+  if (c === 'north' && app.mode === 'globe') {
+    stopSpin();
+    map.easeTo({ center: app.you ?? HOME_VIEW.center, zoom: HOME_VIEW.zoom, bearing: 0, pitch: 0, duration: 1400, padding: globePadding() });
+  } else if (c === 'north') map.easeTo({ bearing: 0, pitch: map.getBearing() === 0 ? 0 : map.getPitch(), duration: 700 });
   if (c === 'globe') toWorld();
 });
 const syncCompass = () => {
@@ -467,6 +535,9 @@ searchInput.addEventListener('keydown', (e) => {
 document.addEventListener('pointerdown', (e) => { if (!search.contains(e.target)) closeResults(); });
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// The page's own address for share links, without this browser's ?api= or other settings.
+const shareBase = () => location.origin + location.pathname;
+
 // ---- share links ------------------------------------------------------------------------------
 // A shared link carries the outline and brief (never builder details) in the URL hash, so a dreamer's
 // design can be shown to someone else without being stored anywhere.
@@ -481,9 +552,9 @@ function decodeShare(str) {
   } catch { return null; }
 }
 function shareLink({ preview = false } = {}) {
-  if (!app.site) return location.href.split('#')[0];
+  if (!app.site) return shareBase();
   const data = { v: 2, r: app.site.ring.map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]), f: app.site.form ?? null, p: preview ? 1 : 0 };
-  return `${location.href.split('#')[0]}#s=${encodeShare(data)}`;
+  return `${shareBase()}#s=${encodeShare(data)}`;
 }
 async function openShared(hash) {
   const data = decodeShare(hash.slice(3));
@@ -657,6 +728,7 @@ function onOutlineDone(ring, edited) {
   hint.hidden = true;
   const m = measure(ring);
   const problems = problemsFor(m);
+  surveyFor(ring);
   if (edited && app.site) {
     app.site.ring = ring;
     saveSite();
@@ -668,7 +740,7 @@ function onOutlineDone(ring, edited) {
     ring,
     form: store.get(scopeKey('lastForm'), null),
     mode: 'dream',
-    builder: store.get(scopeKey('builder'), null),
+    builder: null,
     status: 'draft',
     createdAt: new Date().toISOString(),
   };
@@ -704,8 +776,9 @@ function openBrief() {
     site: app.site,
     measure: measure(app.site.ring),
     coverage: api.coverage(measure(app.site.ring).centroid),
+    terrain: surveyFor(app.site.ring),
     onEditOutline: () => { closePanel(); outliner.load(app.site.ring); toast('Drag the corners to adjust the outline.'); setMode('explore'); },
-    onChange: (patch) => { Object.assign(app.site, patch); if (patch.form) store.set(scopeKey('lastForm'), patch.form); if (patch.builder) store.set(scopeKey('builder'), patch.builder); saveSite(); },
+    onChange: (patch) => { Object.assign(app.site, patch); if (patch.form) store.set(scopeKey('lastForm'), patch.form); saveSite(); },
     onSend: () => send(),
   }));
 }
@@ -753,7 +826,7 @@ async function send() {
       app.site.status = 'not-sent';
       app.site.lastError = err.code ?? 'error';
       saveSite();
-      house.stopGenerating();
+      house.failGenerating();
       setMode('failed');
     },
     onRetry: () => send(),
@@ -781,7 +854,7 @@ function drawable(design, { fresh = false } = {}) {
   catch { result = { ok: false, errors: [{ rule: 0, message: 'The design file has an incomplete structure.' }], warnings: [] }; }
   for (const w of result.warnings) console.warn(`[design ${design?.id}] ${w.message}`);
   if (result.ok) return true;
-  if (fresh) house.stopGenerating();
+  if (fresh) house.failGenerating();
   setMode(house.design ? 'house' : 'explore');
   const actions = fresh
     ? [{ label: 'Generate again', primary: true, run: () => send() }, { label: 'Edit the brief', run: () => openBrief() }]
@@ -891,9 +964,95 @@ async function openHouse() {
       await persistBuilding(design, estimate, app.site, house.placement);
       return true;
     },
-    shareUrl: () => shareLink({ preview: !!design.previewOn }),
+    placement: house.placement,
+    shared: app.shared.has(design.id),
+    name: buildingName(design),
+    // Renaming keeps Gemma's design as it is; the name is the saved record's own.
+    onRename: design.sample ? null : async (name) => {
+      app.names.set(design.id, name);
+      const saved = app.savedBuilding?.uid === auth.user?.uid && app.savedBuilding?.designID === design.id;
+      if (saved) await persistBuilding(design, estimate, app.site, house.placement);
+      toast(saved ? 'Renamed.' : 'Renamed. Choose Save building to keep the name in your account.');
+    },
+    onShare: () => shareBuilding(design),
     onNight: (on) => { app.night = on; house.setNight(on); setEvening(map, on); renderToolbar(); },
   }), 'house');
+}
+
+// The person's own name for a building: what they renamed it to, or its saved record's name.
+function buildingName(design) {
+  if (app.names.has(design.id)) return app.names.get(design.id);
+  const id = app.savedBuilding?.designID === design.id ? app.savedBuilding.id : null;
+  return (id && app.records.get(id)?.record.name) || null;
+}
+
+// Share: a real building goes into the link whole (design, where it stands, its land); the sample
+// preview shares its land and brief. The link is made, kept in "Your share links", and shown in
+// the Share panel to copy, open or download.
+async function shareBuilding(design) {
+  const name = buildingName(design) ?? design.overview.title;
+  let url;
+  if (design.sample) url = shareLink({ preview: !!design.previewOn });
+  else {
+    try {
+      const doc = shareDocument({ design, placement: house.design === design ? house.placement : design.placement, ring: landOf(design) ?? design.site.outline, name, estimate: app.estimates.get(design.id) ?? null });
+      url = `${shareBase()}#b=${await packShare(doc)}`;
+    } catch {
+      toast('This browser can’t pack the building into a link. Download it as a file to share instead.', { kind: 'error', action: { label: 'Download file', run: () => downloadBuilding(design) } });
+      return;
+    }
+  }
+  const link = { id: `${design.id}:${Date.now().toString(36)}`, designId: design.id, name, url, sample: !!design.sample, createdAt: new Date().toISOString() };
+  // One entry per building: a newer link replaces the older one.
+  store.update(scopeKey('shares'), [], (list) => [link, ...list.filter((l) => l.designId !== design.id)].slice(0, 50));
+  openShare({ link, design });
+}
+
+// The Share panel: the link for the building being shared (if any), and all links made before.
+function openShare({ link = null, design = null } = {}) {
+  leaveGlobe();
+  const render = () => renderShare(panel, {
+    current: link,
+    links: store.get(scopeKey('shares'), []),
+    onCopy: (url) => copyLink(url, url === link?.url ? `Link copied. Send it to a builder, a landowner or anyone.` : 'Link copied.'),
+    onOpen: (url) => window.open(url, '_blank', 'noopener'),
+    onDownload: () => design && downloadBuilding(design),
+    onRemove: (l) => store.update(scopeKey('shares'), [], (list) => list.filter((x) => x.id !== l.id)),
+    onPickBuilding: () => openSites(),
+  });
+  openPanel(render, 'share');
+}
+async function copyLink(url, done) {
+  try { await navigator.clipboard.writeText(url); toast(done); }
+  catch { prompt('Your browser blocked copying. Copy this link:', url); }
+}
+// The building as a design file, opened with My Builds → Open a design file.
+function downloadBuilding(design) {
+  const placement = house.design === design ? house.placement : design.placement;
+  const file = { design: { ...design, placement }, estimate: app.estimates.get(design.id) ?? null };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(file)], { type: 'application/json' }));
+  a.download = `${(buildingName(design) ?? design.overview.title).replace(/[^\w -]+/g, '').trim() || 'building'}.terrasim.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast('Downloaded. The person you send it to opens it from My Builds → Open a design file.');
+}
+
+// Opening a building someone shared (#b=...): drawn where it stands, as theirs, ready to save.
+async function openSharedBuilding(hash) {
+  let doc;
+  try { doc = await unpackShare(hash.slice(3)); }
+  catch {
+    toast('That building link is incomplete or damaged, often because an app cut it short. Ask for the link again, or for the building as a file.', { kind: 'error', action: { label: 'Outline land', run: () => { leaveGlobe(); startOutline(); } } });
+    return;
+  }
+  if (!drawable(doc.design)) return;
+  stopSpin(); intro.hidden = true;
+  app.shared.add(doc.design.id);
+  if (doc.name) app.names.set(doc.design.id, doc.name);
+  const site = { id: `site-${Date.now().toString(36)}`, ring: doc.ring ?? doc.design.site.outline, form: null, mode: 'dream', builder: null, status: 'shared', createdAt: new Date().toISOString() };
+  showDesign(doc.design, doc.estimate ?? null, { site, placement: doc.placement });
+  toast('A building shared with you. Sign in and choose Save building to keep a copy.');
 }
 
 async function persistBuilding(design, estimate, site, placement) {
@@ -925,7 +1084,7 @@ async function persistBuilding(design, estimate, site, placement) {
     }) };
   }
   app.saving = writer;
-  return writer.save({ name: design.overview.title.slice(0, 120),
+  return writer.save({ name: (buildingName(design) ?? design.overview.title).slice(0, 120),
     data: savedDocument({ design, estimate, site, placement }) });
 }
 
@@ -946,13 +1105,10 @@ function leaveGlobe() {
   map.easeTo({ padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: 600 });
 }
 
-document.querySelector('[data-open="catalog"]').addEventListener('click', async () => {
-  const listings = await api.listings();
-  leaveGlobe();
-  openPanel((el) => renderCatalog(el, {
-    listings,
-    onOpen: (l) => showDesign(l.design, l.estimate),
-  }));
+// The top bar's Share: the building on show (if any) gets its link; otherwise the links made before.
+document.querySelector('[data-open="share"]').addEventListener('click', () => {
+  if (house.design) shareBuilding(house.design);
+  else openShare();
 });
 async function openSites() {
   await auth.ready;
@@ -993,7 +1149,7 @@ async function openSites() {
       if (auth.user?.uid !== uid) return;
       items = items.filter((item) => item.id !== record.id);
       app.savers.delete(record.id);
-      house.remove(record.id); app.records.delete(record.id);
+      house.remove(record.id); app.records.delete(record.id); clearLands();
       if (app.savedBuilding?.id === record.id) {
         app.savedBuilding = null; app.currentDesignID = null; ++app.displayVersion;
         outliner.clear(); setMode('explore');
@@ -1026,6 +1182,8 @@ function syncUnits() {
 }
 document.querySelectorAll('[data-units]').forEach((b) => b.addEventListener('click', () => {
   settings.units = b.dataset.units;
+  // Contour intervals are round in the chosen units, so the land is measured again.
+  if (survey.ring) { const ring = survey.ring; survey = { ring: null, promise: Promise.resolve(null) }; surveyFor(ring); }
   syncUnits();
   if (app.mode === 'brief') openBrief();
   if (app.mode === 'house' && !panel.hidden) openHouse();
@@ -1088,6 +1246,7 @@ async function restoreScene(uid) {
     });
     if (!current()) return;
     app.sceneReady = true;
+    clearLands();
     if (app.displayVersion === displayVersion && app.navigationVersion === navigationVersion && app.mode === 'globe' && !location.hash) {
       const camera = sceneCamera(previous);
       const newest = records.filter(({ record }) => app.records.has(record.id))
@@ -1122,7 +1281,7 @@ function accountChanged(user) {
     ++app.displayVersion; ++app.sceneVersion;
     $('#walk [data-exit]')?.click();
     house.clear(); outliner.clear(); closePanel();
-    app.site = null; app.estimates.clear(); app.savedBuilding = null; app.currentDesignID = null;
+    app.site = null; app.estimates.clear(); app.savedBuilding = null; app.currentDesignID = null; app.names.clear();
     app.records.clear(); app.removedRecords.clear(); app.savers.clear(); app.saving = null; app.sceneReady = false;
     intro.hidden = false; intro.classList.remove('is-leaving');
     setMode('globe');
@@ -1137,3 +1296,5 @@ map.on('moveend', rememberScene);
 addEventListener('pagehide', rememberScene);
 auth.onChange(accountChanged);
 auth.ready.then(() => accountChanged(auth.user));
+// A shared building opens once everything above is ready (share links keep priority over the saved scene).
+if (location.hash.startsWith('#b=')) openSharedBuilding(location.hash);

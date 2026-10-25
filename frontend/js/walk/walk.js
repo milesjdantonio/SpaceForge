@@ -78,6 +78,25 @@ function buildBuilding(design) {
     return m;
   };
 
+  // A door leaf hinged at the opening's start, swung 90° to lie along the wall's inward side.
+  const openLeaf = (w, t0, t1, y0, y1, mat, level) => {
+    const ax = w.x1 + (w.x2 - w.x1) * t0, az = w.y1 + (w.y2 - w.y1) * t0;
+    const bx = w.x1 + (w.x2 - w.x1) * t1, bz = w.y1 + (w.y2 - w.y1) * t1;
+    const len = Math.hypot(bx - ax, bz - az);
+    if (len < 0.2) return null;
+    const ux = (bx - ax) / len, uz = (bz - az) / len;
+    let nx = -uz, nz = ux;
+    if (!pointInPolygon((ax + bx) / 2 + nx * 0.3, (az + bz) / 2 + nz * 0.3, level.outline)) { nx = -nx; nz = -nz; }
+    const leafLen = len - 0.04, thick = 0.045;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(leafLen, y1 - y0, thick), mat);
+    const t = (w.thicknessM ?? 0.12) / 2 + thick / 2;
+    m.position.set(ax + ux * 0.02 + nx * (leafLen / 2 + t) + ux * thick / 2, (y0 + y1) / 2, az + uz * 0.02 + nz * (leafLen / 2 + t) + uz * thick / 2);
+    m.rotation.y = -Math.atan2(nz, nx);
+    m.userData.door = true;
+    group.add(m);
+    return m;
+  };
+
   levels.forEach((level, li) => {
     const base = level.elevationM;
     const ceilY = base + (level.ceilingHeightM ?? level.heightM - 0.3);
@@ -122,10 +141,9 @@ function buildBuilding(design) {
             piece(w, t0, t1, base, head, M.glass, 0.03);
             piece(w, t0 + (t1 - t0) * 0.495, t0 + (t1 - t0) * 0.505, base, head, M.frame, 0.06);
           }
-          if (o.kind === 'entry' || o.kind === 'garage') {
-            const leaf = piece(w, t0 + 0.02 / len, t1 - 0.02 / len, base, head - 0.02, o.kind === 'garage' ? M.exterior : M.door, 0.05);
-            if (leaf) leaf.userData.door = true;
-          }
+          // Doors stand open so you can walk in: the front door swung into the room on its hinge,
+          // the garage door rolled up out of the way.
+          if (o.kind === 'entry') openLeaf(w, t0, t1, base, head - 0.02, M.door, level);
           if (o.kind === 'door' || o.kind === 'entry') piece(w, t0, t1, head, head + 0.05, M.frame, thick + 0.02);
         }
         t = Math.max(t, t1);

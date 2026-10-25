@@ -79,10 +79,20 @@ button.start-option:disabled { cursor: default; }
 .start-text strong { font-weight: 600; }
 .start-text span { font-size: 0.875rem; color: var(--muted); }
 .start-option.is-unavailable .start-icon { color: var(--faint); }
-button.start-option { position: relative; }
-.start-tap { position: absolute; right: 4px; top: 50%; width: 60px; height: 60px; margin-top: -30px; pointer-events: none; }
-.start-tap[hidden] { display: none; }
-.start-tap canvas { width: 100%; height: 100%; }
+/* The marker option, once usable: a neon line travels round its edge, brighter on hover. */
+@property --neon { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+button.start-option { position: relative; isolation: isolate; }
+.start-option.is-ready::before, .start-option.is-ready::after {
+  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--neon), transparent 0 64%, rgba(255, 138, 42, 0.5) 76%, var(--ember) 86%, #fff3dc 91%, var(--amber) 95%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: neon-travel 3.2s linear infinite;
+}
+.start-option.is-ready::after { inset: -4px; padding: 5px; filter: blur(7px); opacity: 0.75; z-index: -1; }
+.start-option.is-ready:hover::before, .start-option.is-ready:focus-visible::before { animation-duration: 1.6s; }
+.start-option.is-ready:hover::after, .start-option.is-ready:focus-visible::after { animation-duration: 1.6s; opacity: 1; }
+@keyframes neon-travel { to { --neon: 360deg; } }
 /* While the location is being found: greyed out, with a spinner in place of the icon. */
 .start-option.is-loading { opacity: 0.6; }
 .start-option.is-loading strong { color: var(--muted); }
@@ -162,9 +172,32 @@ body[data-mode='globe'] .place-chip { display: none; }
 .tool-group { display: flex; gap: 2px; }
 .tool-group .btn[aria-pressed='true'] { color: var(--ink); }
 body:has(.panel.is-open) .toolbar { left: calc((100vw - var(--panel-w) - var(--margin)) / 2); }
+@media (min-width: 761px) {
+  body:has(.panel.is-open) .toasts { left: calc((100vw - var(--panel-w) - var(--margin)) / 2); max-width: calc(100vw - var(--panel-w) - 4 * var(--margin)); }
+}
 
+.panel-title-row { display: grid; grid-template-columns: minmax(0, auto) auto; justify-content: start; align-items: center; column-gap: 2px; min-width: 0; }
+.panel-title-row .panel-sub, .panel-title-row .rename { grid-column: 1 / -1; }
+.btn-rename { width: 34px; min-height: 34px; color: var(--faint); }
+.btn-rename:hover { color: var(--ink); }
+.rename { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+.rename .input { flex: 1 1 200px; min-width: 0; font-size: 1.0625rem; }
+.rename .qerror { flex-basis: 100%; }
 .hover-tip { position: absolute; left: 0; top: 0; z-index: 3; padding: 5px 10px; border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); color: var(--ink); font-size: 0.8125rem; font-weight: 500; white-space: nowrap; pointer-events: none; }
 .hover-tip[hidden] { display: none; }
+.ctrl-cue { background: var(--amber); color: var(--amber-ink); }
+.maplibregl-canvas.is-ctrl { cursor: all-scroll !important; }
+/* The Ctrl + drag tip, bottom left at street level. */
+.tilt-tip { position: fixed; z-index: 34; left: var(--margin); bottom: calc(var(--margin) + 6px); display: flex; align-items: center; gap: 10px; max-width: min(380px, calc(100vw - 2 * var(--margin))); padding: 8px 8px 8px 12px; border-radius: 12px; background: var(--panel); box-shadow: var(--shadow); font-size: 0.875rem; color: var(--muted); }
+.tilt-tip[hidden] { display: none; }
+.tilt-tip strong { color: var(--ink); }
+.tilt-keys { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--ember); }
+.tilt-keys svg { width: 18px; height: 18px; }
+.tilt-tip kbd { padding: 2px 6px; border: 1px solid var(--control); border-bottom-width: 2px; border-radius: 5px; background: var(--panel-3); color: var(--ink); font: 600 0.75rem var(--text); }
+.tilt-tip-close { display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--faint); cursor: pointer; }
+.tilt-tip-close:hover { background: var(--panel-3); color: var(--ink); }
+.tilt-tip-close svg { width: 16px; height: 16px; }
+body.is-moving .tilt-tip, body:has(.draw-hint:not([hidden])) .tilt-tip { display: none; }
 /* Moving and turning a building: the Move button, the grips on the map, and the bar */
 .mover-offer, .mover-grip { position: absolute; left: 0; top: 0; z-index: 3; will-change: transform; }
 .mover-offer[hidden], .mover-grip[hidden], .mover-bar[hidden] { display: none; }
@@ -418,7 +451,21 @@ tfoot td { font-weight: 600; }
 
 /* Floor plans in panels */
 .level-seg { align-self: flex-start; }
-.plan-box { border-radius: var(--radius); background: var(--panel-2); padding: 10px; }
+.plan-box { position: relative; border-radius: var(--radius); background: var(--panel-2); padding: 10px; }
+.plan-panel { cursor: zoom-in; }
+.plan-expand { position: absolute; top: 8px; right: 8px; }
+/* The plan full screen. Its stage is panel-2, the colour the plan draws door gaps in. */
+.plan-viewer { position: fixed; inset: 0; z-index: 80; display: grid; grid-template-rows: auto 1fr auto; background: rgba(4, 7, 12, 0.94); }
+.pv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px var(--margin); background: var(--panel); box-shadow: var(--shadow); }
+.pv-title { display: grid; margin-right: auto; }
+.pv-title span { font-size: 0.875rem; color: var(--muted); }
+.pv-zoom { display: flex; align-items: center; gap: 2px; }
+.pv-pct { min-width: 4.5ch; text-align: center; font-size: 0.875rem; color: var(--muted); }
+.pv-stage { position: relative; overflow: hidden; margin: var(--margin); border-radius: var(--radius); background: var(--panel-2); cursor: grab; touch-action: none; }
+.pv-stage.is-dragging { cursor: grabbing; }
+.pv-stage:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.plan-full { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pv-hint { padding: 0 var(--margin) var(--margin); text-align: center; font-size: 0.8125rem; color: var(--faint); }
 .plan { overflow: visible; width: 100%; height: auto; }
 .plan-room { fill: rgba(255, 255, 255, 0.03); }
 .plan-room-living, .plan-room-kitchen, .plan-room-dining, .plan-room-family { fill: rgba(255, 177, 92, 0.07); }
@@ -446,7 +493,15 @@ tfoot td { font-weight: 600; }
 .plan-thumb .plan-exterior { stroke-width: 0.3; }
 .plan-thumb .plan-gap { stroke: var(--panel-2); }
 
-/* Catalog and sites */
+/* Share */
+.share-now { display: grid; gap: 10px; margin-bottom: 24px; padding: 14px; border-radius: var(--radius); background: var(--panel-2); }
+.share-now .group-title { margin: 0; overflow-wrap: anywhere; }
+.share-link { display: flex; gap: 6px; }
+.share-link .input { flex: 1; min-width: 0; font-size: 0.875rem; color: var(--muted); }
+.share-row { cursor: pointer; }
+.share-long { color: var(--warning); }
+
+/* My Builds */
 .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .card { width: 100%; display: grid; grid-template-columns: 112px 1fr; gap: 14px; padding: 12px; border: 1px solid transparent; border-radius: var(--radius); background: var(--panel-2); color: var(--ink); text-align: left; cursor: pointer; }
 .card:hover { border-color: var(--control); }
@@ -603,6 +658,9 @@ tfoot td { font-weight: 600; }
 .fit-bar { height: 6px; margin-top: 10px; border-radius: 999px; background: var(--panel-3); overflow: hidden; }
 .fit-bar span { display: block; height: 100%; border-radius: inherit; background: var(--positive); }
 .fit-check[data-level='tight'] .fit-bar span, .fit-check[data-level='over'] .fit-bar span { background: var(--warning); }
+.coverage-alert.is-note { background: rgba(255, 196, 107, 0.08); border-color: rgba(255, 196, 107, 0.5); }
+.coverage-alert.is-note svg { color: var(--warning); }
+.lie { display: grid; gap: 8px; }
 .coverage-alert { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--radius); background: rgba(255, 143, 143, 0.1); border: 1px solid rgba(255, 143, 143, 0.5); color: var(--ink); }
 .coverage-alert svg { width: 20px; height: 20px; flex: none; color: var(--negative); margin-top: 2px; }
 .coverage-alert p { color: var(--muted); font-size: 0.9375rem; margin-top: 2px; }

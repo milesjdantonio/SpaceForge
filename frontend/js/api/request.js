@@ -26,8 +26,9 @@ export function buildRequest(site) {
     brief: briefFor(type, form.answers),
     advanced: advancedFor(type, form.advanced),
     aiDecides: [...(form.answers.areaByAI && type !== 'dorm' ? ['areaM2'] : []), ...aiDecides(type, form.advanced)],
-    mode: site.mode,
-    builder: site.mode === 'build' ? { ...site.builder, permission: !!site.builder?.permission } : null,
+    // Every design is private to whoever made it and shared by link; there are no public listings.
+    mode: 'dream',
+    builder: null,
     client: { displayUnits: settings.units, createdAt: new Date().toISOString() },
   };
 }

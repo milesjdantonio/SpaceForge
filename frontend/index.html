@@ -18,7 +18,9 @@
       "imports": {
         "three": "./vendor/three/three.module.js",
         "three/addons/": "./vendor/three/addons/",
-        "maplibre-gl": "./vendor/maplibre/maplibre-gl.mjs"
+        "maplibre-gl": "./vendor/maplibre/maplibre-gl.mjs",
+        "pmtiles": "./vendor/pmtiles/pmtiles.mjs",
+        "fflate": "./vendor/fflate/fflate.mjs"
       }
     }
   </script>
@@ -41,7 +43,7 @@
     </form>
     <nav class="bar-nav" aria-label="Main">
       <button type="button" class="bar-link" data-open="sites">My Builds</button>
-      <button type="button" class="bar-link" data-open="catalog">Catalog</button>
+      <button type="button" class="bar-link" data-open="share">Share</button>
       <button type="button" class="bar-link" id="account-button">Sign in</button>
     </nav>
     <button type="button" class="bar-help" id="help-button" aria-haspopup="dialog">How to</button>
@@ -59,9 +61,7 @@
         <ul class="start-options" aria-labelledby="start-label">
           <li><button type="button" class="start-option" data-start="marker" disabled>
             <span class="start-icon" data-icon="locate"></span>
-            <span class="start-text"><strong data-start-title>Click your marker</strong><span data-start-note aria-live="polite">Finding your location…</span></span>
-            <span class="start-tap" data-start-tap aria-hidden="true"></span>
-          </button></li>
+            <span class="start-text"><strong data-start-title>Click your marker</strong><span data-start-note aria-live="polite">Finding your location…</span></span>          </button></li>
           <li class="start-or" aria-hidden="true">or</li>
           <li><div class="start-option" data-start="anywhere">
             <span class="start-icon" data-icon="pointer"></span>
@@ -80,7 +80,7 @@
     <div class="map-controls" id="map-controls" role="group" aria-label="Map view">
       <button type="button" class="ctl" data-ctl="in" aria-label="Zoom in" title="Zoom in"></button>
       <button type="button" class="ctl" data-ctl="out" aria-label="Zoom out" title="Zoom out"></button>
-      <button type="button" class="ctl ctl-compass" data-ctl="north" aria-label="Face north" title="Face north, look straight down"><span class="compass-needle" aria-hidden="true"></span></button>
+      <button type="button" class="ctl ctl-compass" data-ctl="north" aria-label="Centre the Earth on your location" title="Centre the Earth on your location"><span class="compass-needle" aria-hidden="true"></span></button>
       <button type="button" class="ctl" data-ctl="globe" aria-label="Back to the globe" title="Back to the globe"></button>
     </div>
 

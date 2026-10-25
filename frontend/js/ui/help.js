@@ -16,13 +16,13 @@ function steps() {
     { title: 'Send it', text: 'The design service draws a building for your land. This may take a while.', rive: { src: 'assets/rive/forge.riv', stateMachine: 'Forge', inputs: { state: 1 } } },
     { title: 'Move or turn it', text: `${tap} the building, choose Move, then drag the top grip to move it or the ring grip to turn it.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Move' } },
     { title: 'Look inside', text: `${tap} it again for plans and costs, then Walk through to explore the rooms.`, rive: { src: 'assets/rive/guide.riv', artboard: 'Inside' } },
-    { title: 'Save and share', text: 'Sign in to keep it in My Builds, and copy a link to share it.', rive: { src: 'assets/rive/guide.riv', artboard: 'Save' } },
+    { title: 'Save and share', text: 'Sign in to keep it in My Builds. Then choose Share to send it to a builder or landowner; your links stay under Share.', rive: { src: 'assets/rive/guide.riv', artboard: 'Save' } },
   ];
 }
 
 function mapControls() {
   if (touch()) return 'Map: drag to pan, pinch to zoom, twist or drag two fingers to turn and tilt.';
-  return 'Map: hold either mouse button and drag to move it, scroll to zoom, Ctrl-drag to turn and tilt.';
+  return 'Map: drag to move it, scroll to zoom, hold Ctrl and drag to turn and tilt the view.';
 }
 
 export function mountHelp(button, dialog) {
