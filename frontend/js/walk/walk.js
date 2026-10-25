@@ -370,7 +370,7 @@ function levelAtHeight(design, y) {
 function startSpot(design) {
   const g = design.levels.find((l) => l.elevationM === 0) ?? design.levels[0];
   let room = null;
-  if (design.housingType === 'house' || design.housingType === 'tiny-home') {
+  if (['house', 'tiny-home', 'mansion', 'villa'].includes(design.housingType)) {
     const living = g.rooms.filter((r) => ['living', 'family'].includes(r.type));
     room = (living.length ? living : g.rooms).reduce((a, b) => (b.areaM2 > a.areaM2 ? b : a));
   } else {

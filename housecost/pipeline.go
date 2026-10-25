@@ -202,10 +202,16 @@ func describe(p Program, l *Layout) string {
 	switch p.HousingType {
 	case "dorm":
 		return fmt.Sprintf("a %d-floor dorm for %d residents (%s rooms)", p.Floors, p.Residents, p.RoomType)
+	case "hotel":
+		kind := map[string]string{"single": "king", "double": "two-queen", "suite": "suite"}[p.RoomType]
+		return fmt.Sprintf("a %d-floor hotel with %d guest rooms (%s rooms)", p.Floors, p.UnitCount, kind)
 	case "apartment", "condo":
 		return fmt.Sprintf("a %d-floor %s building with %d homes (average %.0f m²)", p.Floors, p.HousingType, p.UnitCount, p.AreaM2)
 	}
 	s := fmt.Sprintf("a %d-floor %s", p.Floors, p.HousingType)
+	if p.HousingType == "mansion" || p.HousingType == "villa" {
+		s = fmt.Sprintf("a %d-floor %s (one large home)", p.Floors, p.HousingType)
+	}
 	if p.HousingType == "townhouse" {
 		s = fmt.Sprintf("a row of %d %d-floor townhomes", p.UnitCount, p.Floors)
 	}

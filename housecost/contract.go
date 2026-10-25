@@ -109,7 +109,7 @@ type ClientInfo struct {
 }
 
 var (
-	HousingTypes    = []string{"house", "tiny-home", "townhouse", "duplex", "apartment", "condo", "dorm"}
+	HousingTypes    = []string{"house", "tiny-home", "townhouse", "duplex", "mansion", "villa", "apartment", "condo", "dorm", "hotel"}
 	Styles          = []string{"modern", "farmhouse", "craftsman", "cabin", "mediterranean", "prairie", "contemporary", "brick-traditional"}
 	Qualities       = []string{"essential", "standard", "premium"}
 	Structures      = []string{"wood-frame", "steel-frame", "concrete", "mass-timber", "masonry"}
@@ -118,14 +118,54 @@ var (
 	PriorityValues  = []string{"efficiency", "maintenance", "light", "privacy", "accessible", "quiet"}
 	ExtraValues     = []string{"office", "porch", "deck", "basement", "balconies", "roof-terrace"}
 	SharingValues   = []string{"private", "suite", "hall"}
-	CommonValues    = []string{"lobby", "lounge", "study", "gym", "laundry", "kitchen", "bike-storage", "mail"}
+	CommonValues    = []string{"lobby", "lounge", "study", "gym", "laundry", "kitchen", "bike-storage", "mail", "restaurant"}
 	RoomTypeValues  = []string{"single", "double", "suite"}
 	PaletteUses     = []string{"walls", "roof", "trim", "windows", "doors", "accent", "interior-walls", "floors"}
-	singleHomeTypes = []string{"house", "tiny-home", "townhouse", "duplex"}
-	multiTypes      = []string{"apartment", "condo", "dorm"}
+	singleHomeTypes = []string{"house", "tiny-home", "townhouse", "duplex", "mansion", "villa"}
+	multiTypes      = []string{"apartment", "condo", "dorm", "hotel"}
+	// FloorRanges is how many storeys each type may have.
+	FloorRanges = map[string][2]int{"house": {1, 3}, "tiny-home": {1, 2}, "townhouse": {2, 4}, "duplex": {1, 3},
+		"mansion": {1, 4}, "villa": {1, 3}, "apartment": {2, 12}, "condo": {2, 12}, "dorm": {2, 12}, "hotel": {2, 12}}
 )
 
 func isMulti(t string) bool { return contains(multiTypes, t) }
+
+// roomsNotHomes is true for buildings of rooms rather than homes (dorms and hotels): no units, no
+// living area per home, and their rooms are counted from the plan.
+func roomsNotHomes(t string) bool { return t == "dorm" || t == "hotel" }
+
+// bedBathRange is how many bedrooms and bathrooms a home of this type may have.
+func bedBathRange(t string) (bedLo, bedHi int, bathLo, bathHi float64) {
+	switch t {
+	case "mansion":
+		return 3, 12, 2, 14
+	case "villa":
+		return 1, 10, 1, 10
+	}
+	return 0, 8, 1, 6
+}
+
+// garageMax is the most garage spaces a home of this type may have.
+func garageMax(t string) int {
+	if t == "mansion" {
+		return 4
+	}
+	return 3
+}
+
+// unitCountRange is how many homes (or a hotel's guest rooms) a type may have; ok is false when the
+// type doesn't ask.
+func unitCountRange(t string) (lo, hi int, ok bool) {
+	switch t {
+	case "townhouse":
+		return 2, 12, true
+	case "apartment", "condo":
+		return 4, 200, true
+	case "hotel":
+		return 8, 400, true
+	}
+	return 0, 0, false
+}
 
 func sv(p *string) string {
 	if p == nil {
@@ -201,8 +241,7 @@ func ValidateRequest(r Request) []string {
 		}
 	}
 	b := r.Brief
-	floorRange := map[string][2]int{"house": {1, 3}, "tiny-home": {1, 2}, "townhouse": {2, 4}, "duplex": {1, 3},
-		"apartment": {2, 12}, "condo": {2, 12}, "dorm": {2, 12}}[ht]
+	floorRange := FloorRanges[ht]
 	if b.Floors == nil || *b.Floors < floorRange[0] || *b.Floors > floorRange[1] {
 		add("brief.floors must be %d–%d for %s", floorRange[0], floorRange[1], ht)
 	}
@@ -213,16 +252,24 @@ func ValidateRequest(r Request) []string {
 		if !contains(RoomTypeValues, sv(b.RoomType)) {
 			add("brief.roomType must be single, double or suite for a dorm")
 		}
+	} else if ht == "hotel" {
+		if b.UnitCount == nil || *b.UnitCount < 8 || *b.UnitCount > 400 {
+			add("brief.unitCount (guest rooms) must be 8–400 for a hotel")
+		}
+		if !contains(RoomTypeValues, sv(b.RoomType)) {
+			add("brief.roomType must be single (king rooms), double (two-queen rooms) or suite for a hotel")
+		}
 	} else {
 		// null = the user left the size to Gemma (it chooses areaM2 in the design program).
 		if b.AreaM2 != nil && *b.AreaM2 < 12 {
 			add("brief.areaM2 must be at least 12 m² (or null to let the design system choose)")
 		}
-		if b.Bedrooms == nil || *b.Bedrooms < 0 || *b.Bedrooms > 8 {
-			add("brief.bedrooms is required (0–8)")
+		bedLo, bedHi, bathLo, bathHi := bedBathRange(ht)
+		if b.Bedrooms == nil || *b.Bedrooms < bedLo || *b.Bedrooms > bedHi {
+			add("brief.bedrooms is required (%d–%d for %s)", bedLo, bedHi, ht)
 		}
-		if b.Bathrooms == nil || *b.Bathrooms < 1 || *b.Bathrooms > 6 || math.Mod(*b.Bathrooms*2, 1) != 0 {
-			add("brief.bathrooms is required (1–6, in steps of 0.5)")
+		if b.Bathrooms == nil || *b.Bathrooms < bathLo || *b.Bathrooms > bathHi || math.Mod(*b.Bathrooms*2, 1) != 0 {
+			add("brief.bathrooms is required (%g–%g for %s, in steps of 0.5)", bathLo, bathHi, ht)
 		}
 		switch ht {
 		case "townhouse":

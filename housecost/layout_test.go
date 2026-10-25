@@ -35,6 +35,14 @@ func testRequest(ht string) Request {
 		r.Brief.Floors, r.Brief.AreaM2, r.Brief.Bedrooms, r.Brief.Bathrooms, r.Brief.UnitCount = ptr(4), ptr(70.0), ptr(2), ptr(1.0), ptr(24)
 	case "dorm":
 		r.Brief.Floors, r.Brief.Residents, r.Brief.RoomType = ptr(3), ptr(60), ptr("double")
+	case "mansion":
+		r.Brief.Floors, r.Brief.AreaM2, r.Brief.Bedrooms, r.Brief.Bathrooms = ptr(2), ptr(800.0), ptr(6), ptr(7.5)
+		r.Brief.BudgetUSD = ptr(4000000.0)
+	case "villa":
+		r.Brief.Floors, r.Brief.AreaM2, r.Brief.Bedrooms, r.Brief.Bathrooms = ptr(1), ptr(320.0), ptr(4), ptr(4.0)
+	case "hotel":
+		r.Brief.Floors, r.Brief.UnitCount, r.Brief.RoomType = ptr(4), ptr(60), ptr("double")
+		r.Brief.BudgetUSD = ptr(12000000.0)
 	}
 	return r
 }

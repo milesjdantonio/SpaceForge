@@ -46,7 +46,7 @@ Conventions:
 |---|---|---|
 | `schema` | string | Always `"terrasim.design-request/2"`. |
 | `id` | string | Request id made by the website. Gemma copies it into `design.requestId`. |
-| `housingType` | string | `house`, `tiny-home`, `townhouse`, `duplex`, `apartment`, `condo` or `dorm`. Gemma designs the **whole building** for every type. |
+| `housingType` | string | `house`, `tiny-home`, `townhouse`, `duplex`, `mansion`, `villa`, `apartment`, `condo`, `dorm` or `hotel`. Gemma designs the **whole building** for every type. |
 | `site` | GeoJSON Feature | The land the user outlined. |
 | `brief` | object | The required questions (main form). Each one is its own box; the website won't send until every box that applies is filled. |
 | `advanced` | object | The optional questions (Advanced menu at the bottom of the form). `null` or `[]` means Gemma decides. |
@@ -71,17 +71,23 @@ Conventions:
 
 ✓ = required box. – = doesn't apply, sent as `null`. A number = fixed by the type, filled in by the website.
 
-| Field | house | tiny-home | townhouse | duplex | apartment | condo | dorm |
-|---|---|---|---|---|---|---|---|
-| `designPrompt` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `floors` | ✓ 1–3 | ✓ 1–2 | ✓ 2–4 | ✓ 1–3 | ✓ 2–12 | ✓ 2–12 | ✓ 2–12 |
-| `areaM2` | ✓ living area | ✓ living area | ✓ per home | ✓ per home | ✓ average per home | ✓ average per home | – |
-| `unitCount` | 1 | 1 | ✓ 2–12 | 2 | ✓ 4–200 | ✓ 4–200 | – |
-| `bedrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ typical per home | ✓ typical per home | – |
-| `bathrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ typical per home | ✓ typical per home | – |
-| `residents` | – | – | – | – | – | – | ✓ beds in the building |
-| `roomType` | – | – | – | – | – | – | ✓ `single`, `double` or `suite` |
-| `budgetUSD` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Field | house | tiny-home | townhouse | duplex | mansion | villa | apartment | condo | dorm | hotel |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `designPrompt` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `floors` | ✓ 1–3 | ✓ 1–2 | ✓ 2–4 | ✓ 1–3 | ✓ 1–4 | ✓ 1–3 | ✓ 2–12 | ✓ 2–12 | ✓ 2–12 | ✓ 2–12 |
+| `areaM2` | ✓ living area | ✓ living area | ✓ per home | ✓ per home | ✓ living area | ✓ living area | ✓ average per home | ✓ average per home | – | – |
+| `unitCount` | 1 | 1 | ✓ 2–12 | 2 | 1 | 1 | ✓ 4–200 | ✓ 4–200 | – | ✓ guest rooms, 8–400 |
+| `bedrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ 3–12 | ✓ 1–10 | ✓ typical per home | ✓ typical per home | – | – |
+| `bathrooms` | ✓ | ✓ | ✓ per home | ✓ per home | ✓ 2–14 | ✓ 1–10 | ✓ typical per home | ✓ typical per home | – | – |
+| `residents` | – | – | – | – | – | – | – | – | ✓ beds in the building | – |
+| `roomType` | – | – | – | – | – | – | – | – | ✓ `single`, `double` or `suite` | ✓ `single` (king rooms), `double` (two-queen rooms) or `suite` |
+| `budgetUSD` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+A mansion gets a formal living room, family room, library, mudroom and pantry, and a media room and
+gym from about 550 m² (in the basement if there is one, with a wine cellar). A villa gets one big
+living room opening onto its terrace, a study, a pantry, and a family room from about 250 m². A hotel
+is guest rooms (each an entry, its own bath and a bedroom; a suite adds a sitting room) along
+corridors, over a ground floor with the lobby and its common spaces.
 
 - `designPrompt` is the user's own description of the building and its style, 15 to 1,000
   characters, for example "A bright modern farmhouse that opens to the view, with a big kitchen at
@@ -98,8 +104,8 @@ Conventions:
 | Field | Values | Applies to |
 |---|---|---|
 | `quality` | `essential`, `standard`, `premium` | all |
-| `garage` | cars: `0`–`3` | house, tiny-home, townhouse (per home), duplex (per home) |
-| `parkingSpaces` | number, for the whole site | apartment, condo, dorm |
+| `garage` | cars: `0`–`3` (`0`–`4` for a mansion) | house, tiny-home, townhouse (per home), duplex (per home), mansion, villa |
+| `parkingSpaces` | number, for the whole site | apartment, condo, dorm, hotel |
 | `structure` | `wood-frame`, `steel-frame`, `concrete`, `mass-timber`, `masonry` | all |
 | `cladding` | `board-batten`, `lap-siding`, `brick`, `stucco`, `stone`, `fiber-cement`, `metal-panel`, `timber` | all |
 | `roofing` | `asphalt-shingle`, `metal`, `tile`, `slate`, `membrane` | all |
@@ -107,7 +113,7 @@ Conventions:
 | `extras` | any of `office`, `porch`, `deck`, `basement`, `balconies`, `roof-terrace` | all |
 | `unitMix` | counts of `studio`, `oneBed`, `twoBed`, `threeBed`; they add up to `unitCount` | apartment, condo |
 | `bathroomSharing` | `private`, `suite` (shared by a few rooms), `hall` (shared per floor) | dorm |
-| `commonSpaces` | any of `lobby`, `lounge`, `study`, `gym`, `laundry`, `kitchen`, `bike-storage`, `mail` | apartment, condo, dorm |
+| `commonSpaces` | any of `lobby`, `lounge`, `study`, `gym`, `laundry`, `kitchen`, `bike-storage`, `mail`, `restaurant` (a hotel's comes with its kitchen) | apartment, condo, dorm, hotel |
 
 Style isn't a choice from a list: the user writes it in `designPrompt`.
 
@@ -159,10 +165,10 @@ The roof, garage, porch, parking and materials are in `exterior`.
 |---|---|
 | `floors` | Storeys above ground. |
 | `levelsBelowGround` | Basement levels (usually 0). |
-| `unitCount` | Homes in the building (1 for a house; 0 for a dorm). |
-| `bedrooms`, `bathrooms` | Totals for the whole building. A half bath (toilet and sink) counts 0.5. |
+| `unitCount` | Homes in the building (1 for a house; 0 for a dorm or hotel). |
+| `bedrooms`, `bathrooms` | Totals for the whole building. A half bath (toilet and sink) counts 0.5. For a hotel, its guest rooms and their baths. |
 | `residents` | Beds, for dorms. `null` for other types. |
-| `finishedAreaM2` | Total finished area of all homes (or all dorm rooms and suites). |
+| `finishedAreaM2` | Total finished area of all homes (or all dorm rooms and suites, or all hotel guest rooms). |
 | `grossAreaM2` | Total floor area including corridors, stairs, lobbies, walls and common rooms. |
 | `parkingSpaces` | Garage spaces plus parking spaces. |
 
@@ -187,7 +193,7 @@ own copy.
 
 ### `units`: the homes in the building
 
-One item per home. A house has one. A dorm has none (`[]`); its rooms use `unitId: null`.
+One item per home. A house has one. A dorm or hotel has none (`[]`); its rooms use `unitId: null`.
 
 | Field | Meaning |
 |---|---|

@@ -386,7 +386,7 @@ func BuildMaterialsPlanPrompt(p Program, a Assessment, d *Design, s Site) string
 		hz = append(hz, h.desc)
 	}
 	units := ""
-	if p.HousingType != "dorm" {
+	if !roomsNotHomes(p.HousingType) {
 		units = fmt.Sprintf("%d home(s), ", len(d.Units))
 	}
 	var shellCat []string

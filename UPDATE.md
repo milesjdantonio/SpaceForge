@@ -81,6 +81,9 @@ open `frontend/fixtures/mock-house` from My Builds.
   meets the ground (piers, stepped footing or walkout, from the land's fitted slope); the map raises
   the building onto it and the walkthrough draws it down to the real terrain.
 - `-fake` test mode for the design service.
+- New building types: mansion, villa and hotel (brief, fit check, rooms, plans, Gemma prompts).
+  Mansion and villa use the house plan with their own rooms; a hotel is numbered guest rooms with
+  their own baths over a lobby, restaurant and kitchen. No Rive pictures for them yet (icons show).
 
 **2026-10-25 (on `FrontEnd-Refresh`, pushed, not merged into main):**
 - Cancel while generating (asks once more; the service stops the job and any Gemma call).
@@ -144,8 +147,8 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 - Gemma following the description more strongly, and using the land better.
 - More building tools: pillars, bridges, roof terraces; L, U and courtyard plans; curved walls
   inside a building.
-- New types: mansion, hotel, villa; then trailer park and neighborhood on `terrasim.design/3`.
-- Rooms that suit each building type.
+- New types: trailer park and neighborhood on `terrasim.design/3`.
+- Rive pictures for the mansion, villa and hotel cards in `types.riv`.
 - Run a full design with real Gemma end to end.
 
 **Needs the user**

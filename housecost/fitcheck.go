@@ -31,9 +31,6 @@ type FitReply struct {
 	Reason       string   `json:"reason,omitempty"`       // why nothing fits
 }
 
-var floorRanges = map[string][2]int{"house": {1, 3}, "tiny-home": {1, 2}, "townhouse": {2, 4}, "duplex": {1, 3},
-	"apartment": {2, 12}, "condo": {2, 12}, "dorm": {2, 12}}
-
 // FitCheck sizes a first version of the building and tries to place it on the land.
 func FitCheck(r Request) (FitReply, error) {
 	ht := sv(r.HousingType)
@@ -67,7 +64,7 @@ func FitCheck(r Request) (FitReply, error) {
 		out.Level, out.Reason = "over", err.Error()
 	}
 	// What would make it fit: more floors (within the type's range), or a smaller size.
-	rng := floorRanges[ht]
+	rng := FloorRanges[ht]
 	for n := out.Floors + 1; n <= rng[1]; n++ {
 		m := q
 		m.Floors = n
@@ -76,7 +73,7 @@ func FitCheck(r Request) (FitReply, error) {
 			break
 		}
 	}
-	if ht != "dorm" && p.AreaM2 > 0 && !p.AreaFromGemma {
+	if !roomsNotHomes(ht) && p.AreaM2 > 0 && !p.AreaFromGemma {
 		lo, hi := areaMin(ht), p.AreaM2
 		m := q
 		m.AreaM2 = lo

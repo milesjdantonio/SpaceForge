@@ -14,6 +14,7 @@ import { flatPoly } from '../lib/design.js';
 export function holdsLine(design) {
   const t = design.totals || {};
   if (design.housingType === 'dorm') return `${t.residents} beds · ${t.floors} floors`;
+  if (design.housingType === 'hotel') return `${t.bedrooms} guest rooms · ${t.floors} floors`;
   if ((t.unitCount ?? 1) > 1) return `${t.unitCount} homes · ${t.floors} floors`;
   return `${t.bedrooms} bed · ${t.bathrooms} bath`;
 }

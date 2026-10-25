@@ -42,6 +42,9 @@ const P = {
   'type-duplex': '<path d="M3 10 12 4l9 6"/><path d="M5 9v11h14V9"/><path d="M12 7v13"/><path d="M7.5 20v-4h2v4M14.5 20v-4h2v4"/>',
   'type-apartment': '<rect x="5" y="3.5" width="14" height="16.5" rx="1"/><path d="M8.5 7h1.5M14 7h1.5M8.5 10.5h1.5M14 10.5h1.5M8.5 14h1.5M14 14h1.5"/><path d="M10.5 20v-3h3v3"/><path d="M3 20h18"/>',
   'type-condo': '<path d="M4 20V8l8-4.5L20 8v12"/><path d="M8 10h2M14 10h2M8 13.5h2M14 13.5h2"/><path d="M10.5 20v-3h3v3"/><path d="M2.5 20h19"/>',
+  'type-mansion': '<path d="M2.5 10 7 6.5l4.5 3.5M12.5 10 17 6.5l4.5 3.5"/><path d="M8 7.5 12 4l4 3.5"/><path d="M3.5 9.5V20h17V9.5"/><path d="M10.5 20v-4.5h3V20"/><path d="M6 12.5h2M16 12.5h2M6 16h2M16 16h2"/>',
+  'type-villa': '<path d="M2.5 11.5 9 7l6.5 4.5"/><path d="M4 10.5V20h10v-9.5"/><path d="M14 13h7.5"/><path d="M16 13v7M20 13v7"/><path d="M7.5 20v-4h3v4"/><path d="M2 20h20"/>',
+  'type-hotel': '<rect x="4.5" y="4" width="15" height="16" rx="1"/><path d="M8 7.5h1.5M11.25 7.5h1.5M14.5 7.5h1.5M8 11h1.5M11.25 11h1.5M14.5 11h1.5"/><path d="M8.5 20v-4.5h7V20"/><path d="M7 15.5h10"/><path d="M2.5 20h19"/>',
   'type-dorm': '<rect x="3.5" y="6" width="17" height="14" rx="1"/><path d="M3.5 6 12 2.8 20.5 6"/><path d="M7 9.5h2M11 9.5h2M15 9.5h2M7 13h2M11 13h2M15 13h2"/><path d="M10.5 20v-3.5h3V20"/>',
 };
 

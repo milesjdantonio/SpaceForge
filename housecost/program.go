@@ -67,7 +67,7 @@ func DefaultProgram(r Request) Program {
 		Roofing: or(sv(a.Roofing), "asphalt-shingle"), RoofType: "gable", RoofPitch: 0.5,
 		Priorities: a.Priorities, Extras: a.Extras, CommonSpaces: a.CommonSpaces,
 		BathroomSharing: or(sv(a.BathroomSharing), "hall")}
-	if b.AreaM2 == nil && ht != "dorm" {
+	if b.AreaM2 == nil && !roomsNotHomes(ht) {
 		// A first guess for sizing; Gemma chooses the real figure in the design program.
 		p.AreaM2, p.AreaFromGemma = defaultArea(ht, iv(b.Bedrooms), fv(b.Bathrooms)), true
 	}
@@ -84,7 +84,23 @@ func DefaultProgram(r Request) Program {
 		p.GarageCars = 1
 	case "duplex":
 		p.UnitCount = 2
-	case "apartment", "condo", "dorm":
+	case "mansion":
+		p.UnitCount = 1
+		p.GarageCars = 3
+		p.Quality = or(sv(a.Quality), "premium")
+		p.RoofType = "hip"
+		if len(a.Extras) == 0 {
+			p.Extras = []string{"porch", "office", "deck"}
+		}
+	case "villa":
+		p.UnitCount = 1
+		p.GarageCars = 2
+		p.Style, p.Cladding = or(sv(a.Style), "mediterranean"), or(sv(a.Cladding), "stucco")
+		p.Roofing, p.RoofType, p.RoofPitch = or(sv(a.Roofing), "tile"), "hip", 0.4
+		if len(a.Extras) == 0 {
+			p.Extras = []string{"deck"}
+		}
+	case "apartment", "condo", "dorm", "hotel":
 		p.RoofType, p.RoofPitch, p.Roofing = "flat", 0, or(sv(a.Roofing), "membrane")
 		if a.Structure == nil && p.Floors > 5 {
 			p.Structure = "concrete"
@@ -95,6 +111,12 @@ func DefaultProgram(r Request) Program {
 		p.ParkingSpaces = int(math.Round(float64(p.UnitCount) * 1.0))
 		if ht == "dorm" {
 			p.ParkingSpaces = p.Residents / 6
+		}
+		if ht == "hotel" {
+			p.ParkingSpaces = int(math.Round(float64(p.UnitCount) * 0.8))
+			if len(a.CommonSpaces) == 0 {
+				p.CommonSpaces = []string{"restaurant", "lounge", "gym", "laundry"}
+			}
 		}
 	}
 	if a.Garage != nil && !isMulti(ht) {
@@ -289,7 +311,7 @@ func ValidateProgram(pr ProgramReply, r Request, s Site, a Assessment) []string 
 	if pr.Shape != "" && !contains([]string{ShapeRect, ShapeRound, ShapeLand}, pr.Shape) {
 		add("footprintShape must be rectangle, round or land.")
 	}
-	if r.Brief.AreaM2 == nil && ht != "dorm" {
+	if r.Brief.AreaM2 == nil && !roomsNotHomes(ht) {
 		lo, hi := areaRange(ht)
 		if pr.AreaM2 == nil {
 			add("areaM2: the user left the living area to you; give it in m² (%.0f–%.0f for %s).", lo, hi, ht)
@@ -352,8 +374,8 @@ func ValidateProgram(pr ProgramReply, r Request, s Site, a Assessment) []string 
 		add("extras includes basement but the foundation is %s; remove basement (the site assessment ruled it out).", a.FoundationType)
 	}
 	if !isMulti(ht) {
-		if pr.GarageCars == nil || *pr.GarageCars < 0 || *pr.GarageCars > 3 {
-			add("garageCars must be 0–3 for a %s.", ht)
+		if pr.GarageCars == nil || *pr.GarageCars < 0 || *pr.GarageCars > garageMax(ht) {
+			add("garageCars must be 0–%d for a %s.", garageMax(ht), ht)
 		} else if adv.Garage != nil && *pr.GarageCars != *adv.Garage {
 			add("garageCars: the user chose %d; keep it.", *adv.Garage)
 		}
@@ -470,12 +492,12 @@ const programExample = `{
  "structure": "<structure value>", "cladding": "<cladding value>", "roofing": "<roofing value>",
  "roofType": "<gable | hip | flat>", "roofPitch": 0.5,
  "footprintShape": "<rectangle | round | land>",
- "areaM2": "<only if brief.areaM2 is null: the living area per home in m² you choose (the whole home for house/tiny-home, the average for apartment/condo); otherwise null>",
- "garageCars": "<0-3 for house/tiny-home/townhouse/duplex (per home), else null>",
- "parkingSpaces": "<whole site, for apartment/condo/dorm, else null>",
+ "areaM2": "<only if brief.areaM2 is null: the living area per home in m² you choose (the whole home for house/tiny-home/mansion/villa, the average for apartment/condo); otherwise null>",
+ "garageCars": "<0-3 for house/tiny-home/townhouse/duplex/villa (per home), 0-4 for a mansion, else null>",
+ "parkingSpaces": "<whole site, for apartment/condo/dorm/hotel, else null>",
  "extras": ["<any of: office porch deck basement balconies roof-terrace>"],
  "priorities": ["<any of: efficiency maintenance light privacy accessible quiet>"],
- "commonSpaces": ["<apartment/condo/dorm: any of lobby lounge study gym laundry kitchen bike-storage mail>"],
+ "commonSpaces": ["<apartment/condo/dorm/hotel: any of lobby lounge study gym laundry kitchen bike-storage mail restaurant>"],
  "unitMix": {"studio": 0, "oneBed": 0, "twoBed": 0, "threeBed": 0},
  "bathroomSharing": "<dorm only: private | suite | hall>",
  "palette": [{"name": "Warm white", "hex": "#EDE8DF", "use": "walls"}, {"name": "...", "hex": "#...", "use": "roof"}, {"name": "...", "hex": "#...", "use": "windows"}],
@@ -516,7 +538,16 @@ the building does about it.
 
 LIVING AREA: if brief.areaM2 is null, the user left the size to you. Choose areaM2 from the bedrooms,
 bathrooms, housing type, budget and lot; use roughly these ranges: house 70–400, tiny-home 15–40,
-townhouse and duplex 60–250 per home, apartment and condo 35–150 average per home.
+townhouse and duplex 60–250 per home, apartment and condo 35–150 average per home, villa 150–700,
+mansion 450–2000.
+
+BUILDING TYPES: a mansion is a large, formal home: code gives it a formal living room, family room,
+library, mudroom and pantry, and a media room and gym when it's big enough; a wine cellar with a
+basement. Lean premium. A villa is a relaxed, open home that lives outdoors: terraces, deep shade,
+low hip or tile roofs, an open living room onto a terrace (keep "deck" in extras). A hotel is guest
+rooms off corridors (brief.unitCount rooms; brief.roomType single = king rooms, double = two-queen
+rooms, suite = suites) over a ground floor with a lobby and the common spaces you choose; a
+restaurant is the usual one. Hotels are usually flat-roofed.
 
 Decide:
 - style, quality, structure, cladding, roofing (keep the user's non-null choices; choose the rest
@@ -531,8 +562,8 @@ Decide:
   A round or land-shaped building has no porch, deck or balconies, and a pitched roof on it
   becomes a cone. Say in the description how the shape follows the request.
 - more than 5 floors can't be wood-frame; more than 4 can't be masonry.
-- garageCars (per home) for house/tiny-home/townhouse/duplex; parkingSpaces for the whole site
-  for apartment/condo/dorm.
+- garageCars (per home) for house/tiny-home/townhouse/duplex/villa/mansion; parkingSpaces for the
+  whole site for apartment/condo/dorm/hotel (a hotel needs about 0.8 per guest room).
 - extras (must include every extra the user listed; add others only if they suit the site):
   basement only if the foundation is a basement.
 - unitMix for apartment/condo (adds up to unitCount; keep the user's mix if given).
@@ -565,6 +596,10 @@ func areaRange(ht string) (float64, float64) {
 		return 50, 350
 	case "apartment", "condo":
 		return 30, 250
+	case "villa":
+		return 120, 1200
+	case "mansion":
+		return 350, 3000
 	default:
 		return 50, 900
 	}
@@ -579,6 +614,10 @@ func defaultArea(ht string, bedrooms int, baths float64) float64 {
 		return 55 + 25*float64(bedrooms) + 6*baths
 	case "apartment", "condo":
 		return 35 + 22*float64(bedrooms)
+	case "villa":
+		return 90 + 45*float64(bedrooms) + 10*baths
+	case "mansion":
+		return 200 + 60*float64(bedrooms) + 15*baths
 	default:
 		return 60 + 30*float64(bedrooms) + 8*baths
 	}

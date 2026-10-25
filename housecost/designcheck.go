@@ -253,7 +253,7 @@ func CheckDesign(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 		bath += u.Bathrooms
 		area += u.AreaM2
 	}
-	if d.HousingType != "dorm" {
+	if !roomsNotHomes(d.HousingType) {
 		if bed != d.Totals.Bedrooms || math.Abs(bath-d.Totals.Bathrooms) > 1e-9 || math.Abs(area-d.Totals.FinishedAreaM2) > 0.5 {
 			add("totals don't match the units (bedrooms %d/%d, bathrooms %g/%g, area %.1f/%.1f)",
 				d.Totals.Bedrooms, bed, d.Totals.Bathrooms, bath, d.Totals.FinishedAreaM2, area)

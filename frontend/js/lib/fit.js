@@ -1,10 +1,14 @@
 // Does the brief suit the land? A rough footprint from the brief's numbers, compared with the land's
 // buildable area, so the user knows before sending. It only warns; Gemma has the final say.
 
-import { BRIEF_RULES } from './housing.js';
+import { BRIEF_RULES, isSingleHome } from './housing.js';
 
 // Gross floor area per bed in a dorm, including its share of corridors and common rooms.
 const DORM_M2_PER_BED = { single: 20, double: 14, suite: 22 };
+// Gross floor area per hotel room (with its share of corridors and stairs), plus the ground floor's
+// lobby, restaurant and back of house.
+const HOTEL_M2_PER_ROOM = { single: 42, double: 46, suite: 76 };
+const HOTEL_GROUND_M2 = 260;
 const SHARED_EXTRA = 1.25;   // corridors, stairs, lobby in apartment and condo buildings
 const GARAGE_M2_PER_CAR = 18;
 const PARKING_M2_PER_SPACE = 25; // a surface space with its share of the aisle
@@ -16,11 +20,12 @@ const BIG_LAND_M2 = 2000;
 export function briefFloorArea(type, a) {
   const per = a.areaM2;
   switch (type) {
-    case 'house': case 'tiny-home': return per ?? null;
+    case 'house': case 'tiny-home': case 'mansion': case 'villa': return per ?? null;
     case 'duplex': return per == null ? null : per * 2;
     case 'townhouse': return per == null || !a.unitCount ? null : per * a.unitCount;
     case 'apartment': case 'condo': return per == null || !a.unitCount ? null : per * a.unitCount * SHARED_EXTRA;
     case 'dorm': return !a.residents ? null : a.residents * (DORM_M2_PER_BED[a.roomType] ?? DORM_M2_PER_BED.double);
+    case 'hotel': return !a.unitCount ? null : a.unitCount * (HOTEL_M2_PER_ROOM[a.roomType] ?? HOTEL_M2_PER_ROOM.single) + HOTEL_GROUND_M2;
     default: return null;
   }
 }
@@ -39,14 +44,14 @@ export function landFit(type, answers, advanced, m) {
   if (!type || !m) return null;
   const buildableM2 = m.buildableM2 ?? 0;
   if (buildableM2 <= 0) return { level: 'none', buildableM2: 0 };
-  if (answers.areaByAI && type !== 'dorm') return { level: 'ai', buildableM2 };
+  if (answers.areaByAI && type !== 'dorm' && type !== 'hotel') return { level: 'ai', buildableM2 };
   const total = briefFloorArea(type, answers);
   const floors = answers.floors;
   if (total == null || !floors || floors < 1) return null;
   const extras = groundExtras(type, answers, advanced);
   const footprintM2 = total / floors + extras;
   const share = footprintM2 / buildableM2;
-  const base = { footprintM2, buildableM2, share, floors, single: type === 'house' || type === 'tiny-home' };
+  const base = { footprintM2, buildableM2, share, floors, single: isSingleHome(type) };
   if (share > 1) {
     // Floors that would make it fit, if the type allows that many.
     const room = buildableM2 - extras;
@@ -76,7 +81,7 @@ export function serviceFit(res, type, m) {
     floorsNeeded: res.floorsNeeded || null,
     maxAreaM2: res.maxAreaM2 || null,
     dropped: res.dropped ?? [],
-    single: type === 'house' || type === 'tiny-home',
+    single: isSingleHome(type),
   };
   if (fit.level === 'ok' && m?.areaM2 >= BIG_LAND_M2 && fit.footprintM2 / m.areaM2 < SMALL_SHARE) {
     return { ...fit, level: 'small', landShare: fit.footprintM2 / m.areaM2 };

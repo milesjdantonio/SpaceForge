@@ -8,8 +8,8 @@ import { landFit, fitMessage, serviceFit } from '../lib/fit.js';
 import { icon } from '../ui/icons.js';
 import { mountRive } from '../rive.js';
 import {
-  HOUSING_TYPES, BRIEF_RULES, ROOM_TYPES, requiredFields, fieldLabel, fieldHint, briefProblems,
-  STYLE_IDEAS, PROMPT_MAX, QUALITY, STRUCTURE, CLADDING, ROOFING, PRIORITIES, EXTRAS, BATHROOM_SHARING, COMMON_SPACES, UNIT_MIX,
+  HOUSING_TYPES, BRIEF_RULES, roomTypeOptions, requiredFields, fieldLabel, fieldHint, briefProblems,
+  STYLE_IDEAS, PROMPT_MAX, QUALITY, STRUCTURE, CLADDING, ROOFING, PRIORITIES, EXTRAS, BATHROOM_SHARING, commonSpaceOptions, UNIT_MIX,
   EMPTY_ADVANCED, advancedFields, advancedProblems, aiDecides, typeName,
 } from '../lib/housing.js';
 
@@ -119,6 +119,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   // Housing type pictures: Rive when it loads, the icon otherwise.
   for (const slot of el.querySelectorAll('[data-type-art]')) {
     const id = slot.dataset.typeArt;
+    if (!typeArtboard(id)) continue; // no Rive picture for this type yet: the icon stays
     const card = slot.closest('.type-option');
     const h = mountRive(slot, { src: 'assets/rive/types.riv', artboard: typeArtboard(id), stateMachine: 'Type', hoverInput: 'hover', hoverTarget: card });
     if (h) slot.__rive = h;
@@ -150,7 +151,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       return `<div class="qbox qbox-wide" data-field="roomType">
         <span class="qlabel" id="l-roomType">${label}</span>
         <div class="seg" role="radiogroup" aria-labelledby="l-roomType" aria-describedby="err-roomType">
-          ${ROOM_TYPES.map(([v, t]) => `<label><input type="radio" name="roomType" value="${v}" ${a.roomType === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
+          ${roomTypeOptions(type).map(([v, t]) => `<label><input type="radio" name="roomType" value="${v}" ${a.roomType === v ? 'checked' : ''}><span>${t}</span></label>`).join('')}
         </div>${err}</div>`;
     }
     if (f === 'budgetUSD') {
@@ -203,7 +204,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
 
     const parts = [];
     if (show.has('quality')) parts.push(seg('quality', QUALITY, adv.quality, 'Finishes'));
-    if (show.has('garage')) parts.push(seg('garage', [[0, 'None'], [1, '1 car'], [2, '2 cars'], [3, '3 cars']], adv.garage, type === 'townhouse' || type === 'duplex' ? 'Garage for each home' : 'Garage'));
+    if (show.has('garage')) parts.push(seg('garage', [[0, 'None'], [1, '1 car'], [2, '2 cars'], [3, '3 cars'], ...(type === 'mansion' ? [[4, '4 cars']] : [])], adv.garage, type === 'townhouse' || type === 'duplex' ? 'Garage for each home' : 'Garage'));
     if (show.has('parkingSpaces')) {
       parts.push(`<div class="qbox" data-field="parkingSpaces">
         <label class="qlabel" for="a-parkingSpaces">Parking spaces</label>
@@ -227,7 +228,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
         <p class="qerror" id="err-unitMix" role="alert"></p></fieldset>`);
     }
     if (show.has('bathroomSharing')) parts.push(seg('bathroomSharing', BATHROOM_SHARING, adv.bathroomSharing, 'Bathrooms'));
-    if (show.has('commonSpaces')) parts.push(chips('commonSpaces', COMMON_SPACES, adv.commonSpaces, 'Shared spaces'));
+    if (show.has('commonSpaces')) parts.push(chips('commonSpaces', commonSpaceOptions(type), adv.commonSpaces, type === 'hotel' ? 'Guest spaces' : 'Shared spaces'));
     advBody.innerHTML = parts.join('');
   }
 

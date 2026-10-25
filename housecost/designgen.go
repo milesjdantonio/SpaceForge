@@ -341,6 +341,23 @@ func BuildDesign(l *Layout, p Program) (*Design, error) {
 	}
 	t.Floors = len(l.Levels) - t.LevelsBelowGround
 	t.GrossAreaM2 = r1(l.W * l.D * float64(len(l.Levels)))
+	if p.HousingType == "hotel" {
+		// A hotel's totals count its guest rooms and their baths.
+		for _, lv := range l.Levels {
+			for _, r := range lv.Rooms {
+				switch {
+				case r.Type == "bedroom":
+					t.Bedrooms++
+					t.FinishedAreaM2 += r.R.Area()
+				case r.Type == "bath":
+					t.Bathrooms++
+					t.FinishedAreaM2 += r.R.Area()
+				case r.Type == "living" || (r.Type == "entry" && r.Unit == ""):
+					t.FinishedAreaM2 += r.R.Area()
+				}
+			}
+		}
+	}
 	if p.HousingType == "dorm" {
 		res := l.Residents
 		t.Residents = &res

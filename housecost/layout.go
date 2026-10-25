@@ -4,9 +4,9 @@ package main
 // rectangles that exactly tile each level, plus the links between rooms (doors,
 // openings), stairs, elevators, balconies, porch and units.
 //
-// Homes (house, tiny-home, townhouse, duplex) use a hall spine: a front band of
+// Homes (house, tiny-home, townhouse, duplex, mansion, villa) use a hall spine: a front band of
 // rooms, a hall, and a back band, so every room touches the hall.
-// Apartments, condos and dorms use a double-loaded corridor with stair/elevator
+// Apartments, condos, dorms and hotels use a double-loaded corridor with stair/elevator
 // cores, and units laid out as entry/kitchen/baths → unit hall → living/bedrooms.
 
 import (
@@ -156,9 +156,14 @@ type homePreset struct{ df, hall, db float64 }
 
 func homePresets(p Program) []homePreset {
 	var ps []homePreset
-	if p.HousingType == "tiny-home" {
+	switch p.HousingType {
+	case "tiny-home":
 		ps = []homePreset{{3.6, 1.0, 3.4}, {3.2, 1.0, 3.0}, {4.2, 1.0, 3.8}}
-	} else {
+	case "mansion":
+		ps = []homePreset{{6.0, 1.6, 5.6}, {5.4, 1.6, 5.0}, {7.0, 1.8, 6.4}}
+	case "villa":
+		ps = []homePreset{{5.6, 1.4, 5.2}, {5.0, 1.4, 4.6}, {6.4, 1.4, 5.8}}
+	default:
 		ps = []homePreset{{5.0, 1.2, 4.6}, {4.4, 1.2, 4.0}, {6.0, 1.2, 5.4}}
 	}
 	for i := range ps {
@@ -179,6 +184,7 @@ func homePresets(p Program) []homePreset {
 func homeLevels(p Program) ([][]slot, []string) {
 	A, F, B := p.AreaM2, p.Floors, p.Bedrooms
 	tiny := p.HousingType == "tiny-home"
+	mansion, villa := p.HousingType == "mansion", p.HousingType == "villa"
 	full := int(math.Floor(p.Bathrooms))
 	half := int(math.Round((p.Bathrooms - float64(full)) * 2))
 	mx := math.Max
@@ -194,6 +200,10 @@ func homeLevels(p Program) ([][]slot, []string) {
 	}
 	if F == 1 && deck && !tiny {
 		liv.pin = 2 // the deck goes behind the living room
+	}
+	if villa {
+		// A villa lives round one big living room that opens onto the terrace behind it.
+		liv.area, liv.pin = mx(20, 0.24*A), 2
 	}
 	bedroom := func(i int) slot {
 		s := slot{name: fmt.Sprintf("Bedroom %d", i+1), typ: "bedroom", area: mx(9, 0.10*A), minW: 2.8, link: "door",
@@ -242,7 +252,44 @@ func homeLevels(p Program) ([][]slot, []string) {
 	var names []string
 
 	multi := F > 1 || p.Basement
-	elevator := p.Accessible && F >= 3
+	elevator := (p.Accessible || mansion) && F >= 3
+
+	// The rooms that make a mansion or villa what it is, by level: the public floor, the ground
+	// floor, the basement, and the top floor (or wherever there's room).
+	var extraPublic, extraGround, extraBasement, extraUpper []slot
+	if mansion {
+		extraGround = append(extraGround, slot{name: "Mudroom", typ: "mudroom", area: mx(5, 0.008*A), minW: 2.0, link: "door", share: 0.4, pin: 1})
+		extraPublic = append(extraPublic,
+			slot{name: "Formal living room", typ: "living", area: mx(20, 0.06*A), minW: 3.8, link: "cased", share: 1},
+			slot{name: "Family room", typ: "family", area: mx(20, 0.07*A), minW: 3.8, link: "cased", share: 1},
+			slot{name: "Library", typ: "office", area: mx(14, 0.04*A), minW: 3.2, link: "door", share: 0.8},
+			slot{name: "Pantry", typ: "pantry", area: 5, minW: 1.8, link: "door", share: 0.3})
+		big := []slot{
+			{name: "Media room", typ: "family", area: mx(20, 0.035*A), minW: 3.8, link: "door", share: 0.8},
+			{name: "Gym", typ: "gym", area: mx(16, 0.03*A), minW: 3.4, link: "door", share: 0.6}}
+		if A >= 550 {
+			switch {
+			case p.Basement:
+				extraBasement = append(extraBasement, big...)
+			case F > 1:
+				extraUpper = append(extraUpper, big...)
+			default:
+				extraPublic = append(extraPublic, big...)
+			}
+		}
+		if p.Basement {
+			extraBasement = append(extraBasement, slot{name: "Wine cellar", typ: "storage", area: 8, minW: 2.2, link: "door", share: 0.3})
+		}
+	}
+	if villa {
+		extraPublic = append(extraPublic, slot{name: "Pantry", typ: "pantry", area: 4, minW: 1.6, link: "door", share: 0.3})
+		if !contains(p.Extras, "office") {
+			extraPublic = append(extraPublic, slot{name: "Study", typ: "office", area: mx(9, 0.04*A), minW: 2.8, link: "door", share: 0.6})
+		}
+		if A >= 250 {
+			extraPublic = append(extraPublic, slot{name: "Family room", typ: "family", area: mx(16, 0.06*A), minW: 3.4, link: "cased", share: 1})
+		}
+	}
 	if p.Basement {
 		lv := []slot{
 			{name: "Family room", typ: "family", area: mx(16, 0.15*A), minW: 3.0, link: "cased", share: 1, tag: "family"},
@@ -252,6 +299,7 @@ func homeLevels(p Program) ([][]slot, []string) {
 		if elevator {
 			lv = append(lv, elev)
 		}
+		lv = append(lv, extraBasement...)
 		levels = append(levels, lv)
 		names = append(names, "Basement")
 	}
@@ -299,6 +347,20 @@ func homeLevels(p Program) ([][]slot, []string) {
 			bathsAt[bedLevels[0]] = append([]slot{nextBath(true)}, bathsAt[bedLevels[0]]...)
 			remaining--
 		}
+		// A mansion or villa gives its bedrooms their own baths before the public floor gets more.
+		for (mansion || villa) && remaining > 0 {
+			placed := false
+			for _, lvl := range bedLevels {
+				if remaining > 0 && len(bathsAt[lvl]) < len(bedsAt[lvl]) {
+					bathsAt[lvl] = append(bathsAt[lvl], nextBath(false))
+					remaining--
+					placed = true
+				}
+			}
+			if !placed {
+				break
+			}
+		}
 		for remaining > 0 {
 			bathsAt[publicLvl] = append(bathsAt[publicLvl], nextBath(false))
 			remaining--
@@ -328,6 +390,12 @@ func homeLevels(p Program) ([][]slot, []string) {
 			if contains(p.Extras, "office") {
 				lv = append(lv, office)
 			}
+			lv = append(lv, extraGround...)
+		}
+		if lvl == F-1 && lvl != publicLvl {
+			lv = append(lv, extraUpper...)
+		} else if lvl == publicLvl && F == 1 {
+			lv = append(lv, extraUpper...)
 		}
 		if lvl == publicLvl {
 			if tiny {
@@ -338,6 +406,7 @@ func homeLevels(p Program) ([][]slot, []string) {
 			for i := 0; i < half; i++ {
 				lv = append(lv, powder(i+1))
 			}
+			lv = append(lv, extraPublic...)
 		}
 		if lvl != 0 && lvl != publicLvl && len(bedsAt[lvl]) == 0 {
 			name := "Family room"
@@ -710,6 +779,8 @@ type aptUnit struct {
 
 func corridorDepths(p Program) []float64 {
 	switch {
+	case p.HousingType == "hotel":
+		return []float64{8.0, 8.8, 7.4}
 	case p.HousingType != "dorm":
 		return []float64{8.4, 9.4, 7.8}
 	case p.BathroomSharing == "suite":
@@ -738,6 +809,8 @@ func layoutCorridor(p Program, variant int) (*Layout, error) {
 	switch p.HousingType {
 	case "dorm":
 		mods = dormModules(p, du)
+	case "hotel":
+		mods = hotelModules(p)
 	default:
 		mods = aptModules(p, du)
 	}
@@ -751,18 +824,30 @@ func layoutCorridor(p Program, variant int) (*Layout, error) {
 		"kitchen":      {kind: "common", width: 6, name: "Shared kitchen", typ: "shared-kitchen"},
 		"bike-storage": {kind: "common", width: 4, name: "Bike storage", typ: "bike-storage"},
 		"mail":         {kind: "common", width: 2.6, name: "Mail room", typ: "mail"},
+		"restaurant":   {kind: "common", width: 9, name: "Restaurant", typ: "dining"},
+	}
+	if p.HousingType == "hotel" {
+		cmap["laundry"] = module{kind: "common", width: 4, name: "Housekeeping", typ: "shared-laundry"}
+		cmap["kitchen"] = module{kind: "common", width: 6, name: "Kitchen", typ: "shared-kitchen"}
+		commons[0].name = "Lobby and front desk"
 	}
 	for _, c := range p.CommonSpaces {
 		if m, ok := cmap[c]; ok {
 			m.stretch = true
 			commons = append(commons, m)
+			// A hotel restaurant has its own kitchen beside it.
+			if c == "restaurant" && p.HousingType == "hotel" && !contains(p.CommonSpaces, "kitchen") {
+				k := cmap["kitchen"]
+				k.stretch = true
+				commons = append(commons, k)
+			}
 		}
 	}
 	coreW := 2.8
 	if elevator {
 		coreW += 2.6
 	}
-	stairB := F >= 4 || p.HousingType == "dorm" || len(mods)/F > 8
+	stairB := F >= 4 || roomsNotHomes(p.HousingType) || len(mods)/F > 8
 	endW := 0.0
 	if stairB {
 		endW = 2.8
@@ -1006,6 +1091,19 @@ func aptMinWidth(u *aptUnit) float64 {
 	return math.Max(segA, segC)
 }
 
+// hotelModules is one module per guest room: a king room, a two-queen room or a suite.
+func hotelModules(p Program) []module {
+	w := map[string]float64{"single": 3.8, "double": 4.2, "suite": 7.0}[p.RoomType]
+	if w == 0 {
+		w = 3.8
+	}
+	var mods []module
+	for i := 0; i < p.UnitCount; i++ {
+		mods = append(mods, module{kind: "guest", width: w, stretch: true})
+	}
+	return mods
+}
+
 func dormModules(p Program, du float64) []module {
 	var mods []module
 	r := p.Residents
@@ -1087,6 +1185,41 @@ func placeModule(l *Layout, p Program, f int, m module, r Rect, front bool, corr
 		rm.Links = append(rm.Links, Link{To: corr.Key, Kind: kind, Width: math.Min(w, r.W()-0.4)})
 		if m.typ == "shared-laundry" {
 			rm.Washers = 2
+		}
+	case "guest":
+		// A hotel room: an entry with the bath beside it on the corridor side, then the bedroom
+		// (with a sitting room beside it in a suite). Numbered by floor: 101, 102...
+		unitN[f]++
+		num := fmt.Sprintf("%d%02d", f+1, unitN[f])
+		segA, segC := seg(0, 2.6), seg(2.6, d)
+		bw := math.Min(2.4, segA.W()-1.2)
+		as := split(segA, []float64{segA.W() - bw, bw})
+		ent := l.add(f, "Room "+num+" entry", "entry", "", as[0])
+		ent.Links = append(ent.Links, Link{To: corr.Key, Kind: "door", Width: math.Min(entryWidth(p.Accessible), as[0].W()-0.3)})
+		b := l.add(f, "Room "+num+" bath", "bath", "", as[1])
+		b.Tub = p.RoomType != "single"
+		b.Links = append(b.Links, Link{To: ent.Key, Kind: "door", Width: openingWidth("door", as[1].W(), p.Accessible)})
+		bedR := segC
+		var sit *LRoom
+		if p.RoomType == "suite" {
+			cs := split(segC, share(segC.W(), []float64{3.0, 3.4}, []float64{1, 1}))
+			sit = l.add(f, "Suite "+num+" sitting room", "living", "", cs[0])
+			sit.Links = append(sit.Links, Link{To: ent.Key, Kind: "cased", Width: math.Min(1.2, cs[0].W()-0.4)})
+			bedR = cs[1]
+		}
+		name := "Room " + num
+		if p.RoomType == "suite" {
+			name = "Suite " + num
+		}
+		room := l.add(f, name, "bedroom", "", bedR)
+		room.Beds, room.BedSize = 1, "king"
+		if p.RoomType == "double" {
+			room.Beds, room.BedSize = 2, "queen"
+		}
+		room.Links = append(room.Links, Link{To: ent.Key, Kind: "cased", Width: math.Min(1.0, bedR.W()-0.4)})
+		if sit != nil {
+			// The bedroom also opens from the sitting room.
+			room.Links = append(room.Links, Link{To: sit.Key, Kind: "door", Width: 0.9})
 		}
 	case "sharedbath":
 		rm := l.add(f, "Shared bath", "shared-bath", "", r)

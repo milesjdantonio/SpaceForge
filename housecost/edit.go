@@ -40,6 +40,11 @@ func requestFromDesign(d *Design) Request {
 	floors := t.Floors
 	r.Brief.Floors = &floors
 	switch ht {
+	case "hotel":
+		rooms := t.Bedrooms
+		r.Brief.UnitCount = &rooms
+		rt := "single"
+		r.Brief.RoomType = &rt
 	case "dorm":
 		if t.Residents != nil {
 			n := *t.Residents
@@ -53,7 +58,7 @@ func requestFromDesign(d *Design) Request {
 		beds := t.Bedrooms / units
 		baths := math.Round(t.Bathrooms/float64(units)*2) / 2
 		r.Brief.AreaM2, r.Brief.Bedrooms, r.Brief.Bathrooms = &area, &beds, &baths
-		if ht != "house" && ht != "tiny-home" {
+		if _, _, asks := unitCountRange(ht); asks {
 			r.Brief.UnitCount = &units
 		}
 	}
@@ -74,8 +79,9 @@ func requestFromDesign(d *Design) Request {
 func BuildEditPrompt(r Request, change string) string {
 	b, _ := json.MarshalIndent(map[string]any{"housingType": sv(r.HousingType), "brief": r.Brief, "advanced": r.Advanced}, "", "  ")
 	ht := sv(r.HousingType)
-	fr := floorRanges[ht]
+	fr := FloorRanges[ht]
 	lo, hi := areaRange(ht)
+	bedLo, bedHi, bathLo, bathHi := bedBathRange(ht)
 	return fmt.Sprintf(`A building has been designed from the brief below. The user wants it changed:
 
 "%s"
@@ -85,17 +91,17 @@ object with only the fields that change:
 
 {
   "designPrompt": "the full description, rewritten to include the change (15 to 1000 characters)",
-  "floors": %d to %d, "areaM2": %.0f to %.0f (living space per home), "bedrooms": 0 to 8,
-  "bathrooms": 1 to 6 in steps of 0.5, "unitCount": homes (townhouse 2-12, apartment or condo 4-200),
-  "residents": dorm beds, "budgetUSD": dollars or null for no limit,
+  "floors": %d to %d, "areaM2": %.0f to %.0f (living space per home), "bedrooms": %d to %d,
+  "bathrooms": %g to %g in steps of 0.5, "unitCount": homes (townhouse 2-12, apartment or condo 4-200)
+  or a hotel's guest rooms (8-400), "residents": dorm beds, "budgetUSD": dollars or null for no limit,
   "style": one of %v, "cladding": one of %v, "roofing": one of %v, "quality": one of %v,
-  "garage": cars 0-3, "extras": list from %v
+  "garage": cars 0-%d, "extras": list from %v
 }
 
 Always include designPrompt. Leave out a field to keep it as it is.
 
 Current brief (%s):
-%s`, strings.TrimSpace(change), fr[0], fr[1], lo, hi, Styles, Claddings, Roofings, Qualities, ExtraValues, ht, b)
+%s`, strings.TrimSpace(change), fr[0], fr[1], lo, hi, bedLo, bedHi, bathLo, bathHi, Styles, Claddings, Roofings, Qualities, garageMax(ht), ExtraValues, ht, b)
 }
 
 // ApplyEdit reads Gemma's reply and applies the changes the brief can hold. It returns the new
@@ -121,28 +127,26 @@ func ApplyEdit(text string, r Request) (Request, []string, error) {
 			notes = append(notes, fmt.Sprintf("%s %d", k, n))
 		}
 	}
-	fr := floorRanges[ht]
+	fr := FloorRanges[ht]
 	intIn("floors", fr[0], fr[1], &r.Brief.Floors)
-	if ht != "dorm" {
+	if ht == "dorm" {
+		intIn("residents", 1, 2000, &r.Brief.Residents)
+	} else if ht != "hotel" {
 		lo, hi := areaRange(ht)
 		if v, ok := asFloat(m["areaM2"]); ok && v >= lo && v <= hi {
 			a := math.Round(v)
 			r.Brief.AreaM2 = &a
 			notes = append(notes, fmt.Sprintf("areaM2 %.0f", a))
 		}
-		intIn("bedrooms", 0, 8, &r.Brief.Bedrooms)
-		if v, ok := asFloat(m["bathrooms"]); ok && v >= 1 && v <= 6 && math.Mod(v*2, 1) == 0 {
+		bedLo, bedHi, bathLo, bathHi := bedBathRange(ht)
+		intIn("bedrooms", bedLo, bedHi, &r.Brief.Bedrooms)
+		if v, ok := asFloat(m["bathrooms"]); ok && v >= bathLo && v <= bathHi && math.Mod(v*2, 1) == 0 {
 			r.Brief.Bathrooms = &v
 			notes = append(notes, fmt.Sprintf("bathrooms %g", v))
 		}
-	} else {
-		intIn("residents", 1, 2000, &r.Brief.Residents)
 	}
-	switch ht {
-	case "townhouse":
-		intIn("unitCount", 2, 12, &r.Brief.UnitCount)
-	case "apartment", "condo":
-		intIn("unitCount", 4, 200, &r.Brief.UnitCount)
+	if lo, hi, ok := unitCountRange(ht); ok {
+		intIn("unitCount", lo, hi, &r.Brief.UnitCount)
 	}
 	if v, ok := m["budgetUSD"]; ok {
 		if v == nil {
@@ -167,7 +171,7 @@ func ApplyEdit(text string, r Request) (Request, []string, error) {
 	choice("roofing", Roofings, &r.Advanced.Roofing)
 	choice("quality", Qualities, &r.Advanced.Quality)
 	if !isMulti(ht) {
-		intIn("garage", 0, 3, &r.Advanced.Garage)
+		intIn("garage", 0, garageMax(ht), &r.Advanced.Garage)
 	}
 	if v, ok := m["extras"]; ok {
 		if list, ok := asStrings(v); ok {

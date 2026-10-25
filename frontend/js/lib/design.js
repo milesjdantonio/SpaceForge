@@ -280,7 +280,7 @@ export function checkDesign(d) {
   const rooms = d.levels.flatMap((l) => l.rooms || []);
   const beds = rooms.filter((r) => r.type === 'bedroom').length;
   const baths = rooms.filter((r) => r.type === 'bath' || r.type === 'shared-bath').length + rooms.filter((r) => r.type === 'powder').length * 0.5;
-  if (t.bedrooms != null && d.housingType !== 'dorm' && t.bedrooms !== beds) warn(7, `totals.bedrooms says ${t.bedrooms}; the plans have ${beds} bedrooms.`);
+  if (t.bedrooms != null && d.housingType !== 'dorm' && d.housingType !== 'hotel' && t.bedrooms !== beds) warn(7, `totals.bedrooms says ${t.bedrooms}; the plans have ${beds} bedrooms.`);
   if (t.bathrooms != null && t.bathrooms !== baths) warn(7, `totals.bathrooms says ${t.bathrooms}; the plans have ${baths}.`);
   if (t.unitCount != null && t.unitCount !== (d.units || []).length) warn(7, `totals.unitCount says ${t.unitCount}; units lists ${(d.units || []).length}.`);
 

@@ -27,8 +27,9 @@ var adviceFields = []string{"floors", "areaM2", "unitCount", "bedrooms", "bathro
 func BuildAdvicePrompt(r Request, failure string, logTail []string) string {
 	ht := sv(r.HousingType)
 	b, _ := json.MarshalIndent(r.Brief, "", "  ")
-	fr := floorRanges[ht]
+	fr := FloorRanges[ht]
 	lo, hi := areaRange(ht)
+	bedLo, bedHi, bathLo, bathHi := bedBathRange(ht)
 	ring, _ := r.SiteRing()
 	site := "unknown size"
 	if len(ring) >= 3 {
@@ -50,8 +51,8 @@ Read what went wrong and their brief, then reply with ONE JSON object:
 Fields "change" may hold, with their limits for a %s:
 - floors: whole number %d to %d
 - areaM2: living space per home in m², %.0f to %.0f (house, tiny home) or per home (other types)
-- unitCount: number of homes (townhouse 2-12, apartment or condo 4-200)
-- bedrooms: 0 to 8; bathrooms: 1 to 6 in steps of 0.5; residents: dorm beds
+- unitCount: number of homes (townhouse 2-12, apartment or condo 4-200), or a hotel's guest rooms (8-400)
+- bedrooms: %d to %d; bathrooms: %g to %g in steps of 0.5; residents: dorm beds
 - budgetUSD: whole dollars; noBudgetLimit: true to remove the budget
 - areaByAI: true to let the design system choose the size
 - designPrompt: a rewritten description, 15 to 300 characters, keeping what they asked for
@@ -65,7 +66,7 @@ Brief:
 
 What went wrong:
 %s
-`, ht, fr[0], fr[1], lo, hi, site, ht, b, truncate(failure, 1500))
+`, ht, fr[0], fr[1], lo, hi, bedLo, bedHi, bathLo, bathHi, site, ht, b, truncate(failure, 1500))
 	if len(logTail) > 0 {
 		fmt.Fprintf(&sb, "\nThe last lines of the design log:\n%s\n", truncate(strings.Join(logTail, "\n"), 1500))
 	}
@@ -104,23 +105,21 @@ func cleanChange(ch map[string]any, r Request) map[string]any {
 			out[k] = int(v)
 		}
 	}
-	fr := floorRanges[ht]
+	fr := FloorRanges[ht]
 	intIn("floors", fr[0], fr[1])
 	lo, hi := areaRange(ht)
-	if v, ok := asFloat(ch["areaM2"]); ok && v >= lo && v <= hi && ht != "dorm" {
+	if v, ok := asFloat(ch["areaM2"]); ok && v >= lo && v <= hi && !roomsNotHomes(ht) {
 		out["areaM2"] = math.Round(v)
 	}
-	switch ht {
-	case "townhouse":
-		intIn("unitCount", 2, 12)
-	case "apartment", "condo":
-		intIn("unitCount", 4, 200)
+	if ulo, uhi, ok := unitCountRange(ht); ok {
+		intIn("unitCount", ulo, uhi)
 	}
 	if ht == "dorm" {
 		intIn("residents", 1, 2000)
-	} else {
-		intIn("bedrooms", 0, 8)
-		if v, ok := asFloat(ch["bathrooms"]); ok && v >= 1 && v <= 6 && math.Mod(v*2, 1) == 0 {
+	} else if ht != "hotel" {
+		bedLo, bedHi, bathLo, bathHi := bedBathRange(ht)
+		intIn("bedrooms", bedLo, bedHi)
+		if v, ok := asFloat(ch["bathrooms"]); ok && v >= bathLo && v <= bathHi && math.Mod(v*2, 1) == 0 {
 			out["bathrooms"] = v
 		}
 	}
@@ -132,7 +131,7 @@ func cleanChange(ch map[string]any, r Request) map[string]any {
 			out[k] = true
 		}
 	}
-	if ht == "dorm" {
+	if roomsNotHomes(ht) {
 		delete(out, "areaByAI")
 	}
 	if v, ok := asString(ch["designPrompt"]); ok {

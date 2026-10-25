@@ -1025,7 +1025,8 @@ func recountAreas(d *Design) {
 			if r.UnitID != nil && r.Type != "garage" {
 				unitArea[*r.UnitID] += r.AreaM2
 			}
-			if r.Type == "dorm-room" || r.Type == "suite-common" || (r.Type == "bath" && d.HousingType == "dorm") {
+			if r.Type == "dorm-room" || r.Type == "suite-common" || (r.Type == "bath" && d.HousingType == "dorm") ||
+				(d.HousingType == "hotel" && (r.Type == "bedroom" || r.Type == "bath" || r.Type == "living" || r.Type == "entry")) {
 				dormFinished += r.AreaM2
 			}
 			if r.Type == "garage" && d.Exterior.Garage != nil {
@@ -1038,7 +1039,7 @@ func recountAreas(d *Design) {
 		d.Units[i].AreaM2 = r1(unitArea[d.Units[i].ID])
 		total += unitArea[d.Units[i].ID]
 	}
-	if d.HousingType == "dorm" {
+	if roomsNotHomes(d.HousingType) {
 		total = dormFinished
 	}
 	d.Totals.FinishedAreaM2 = r1(total)
