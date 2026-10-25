@@ -1,0 +1,20 @@
+# Render Blueprint (https://render.com/docs/blueprint-spec).
+#
+# One web service: the design service (design-service/) runs the design API and serves the website
+# (website/) from the same address, so the site finds the API by itself. Sign-in and saved buildings
+# (storage-service/) aren't deployed here; without them the site works and says sign-in isn't
+# available.
+services:
+  - type: web
+    name: terrasim
+    runtime: go
+    plan: free
+    buildCommand: cd design-service && go build -o ../bin/design-service .
+    # Render sets PORT; the service listens on it.
+    startCommand: ./bin/design-service -serve -site website
+    healthCheckPath: /api/health
+    envVars:
+      # Your Gemini API key. Render asks for it when the Blueprint is created (sync: false keeps it
+      # out of this file).
+      - key: GEMINI_API_KEY
+        sync: false

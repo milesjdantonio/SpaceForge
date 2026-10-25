@@ -7,7 +7,7 @@
         "rule": "side-tab",
         "value": "*",
         "files": [
-          "frontend/css/app.css"
+          "website/css/app.css"
         ],
         "createdAt": "2026-10-24T21:39:27.473Z",
         "reason": "Claude: L255 is the Advanced menu's disclosure chevron (two borders of an 8px square rotated 45deg), not a side accent border"
@@ -16,7 +16,7 @@
         "rule": "pulsing-dot",
         "value": "*",
         "files": [
-          "frontend/index.html"
+          "website/index.html"
         ],
         "createdAt": "2026-10-24T21:39:28.990Z",
         "reason": "Claude: the pulses are the visitor's live location marker and the currently running pipeline step, both tied to live state"
@@ -25,7 +25,7 @@
         "rule": "marquee",
         "value": "*",
         "files": [
-          "frontend/index.html"
+          "website/index.html"
         ],
         "createdAt": "2026-10-25T02:08:55.626Z",
         "reason": "Claude: false positive - the only match is the static 'Scroll on the world' start option (data-icon=scroll); nothing in index.html auto-scrolls"

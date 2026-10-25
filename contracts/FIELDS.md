@@ -18,7 +18,7 @@ gaps: anything it needs is a field in the file. If the file breaks a rule in thi
 shows an error instead of a broken building.
 
 The instructions Gemma itself gets (what each user answer should mean for the design, and the order
-to work in) are built in code by the design service, in `housecost/` (for example `BuildProgramPrompt`
+to work in) are built in code by the design service, in `design-service/` (for example `BuildProgramPrompt`
 in program.go).
 
 Conventions:
@@ -95,7 +95,7 @@ corridors, over a ground floor with the lobby and its common spaces.
   style, feel, and anything to keep or avoid all come from here. The numbers in the other boxes
   are firm requirements; where the text and a box disagree, the box wins.
 - `areaM2` never includes garages or parking. `null` means the user ticked "Let Gemma choose the size": Gemma
-  chooses it (see the program prompt in housecost/program.go), and `aiDecides` includes `"areaM2"`.
+  chooses it (see the program prompt in design-service/program.go), and `aiDecides` includes `"areaM2"`.
 - `budgetUSD` is for the whole building. `null` here means the user ticked "No limit"; the website
   never sends an empty budget otherwise.
 
@@ -121,7 +121,7 @@ Style isn't a choice from a list: the user writes it in `designPrompt`.
 
 ## Part 2: `design` (Gemma → database → renderer)
 
-A complete example, the sample house, is [frontend/fixtures/mock-house/design.json](../frontend/fixtures/mock-house/design.json).
+A complete example, the sample house, is [website/fixtures/mock-house/design.json](../website/fixtures/mock-house/design.json).
 On the website, **My Builds → Open a design file** loads any design file, checks it against the rules
 below and draws it where it stands, so Gemma's output can be checked before the API exists.
 

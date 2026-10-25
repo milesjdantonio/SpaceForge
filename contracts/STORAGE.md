@@ -43,7 +43,7 @@ All storage API routes below require Authorization: Bearer <Firebase ID token>.
 | DELETE /api/buildings/{uuid} | Delete the owner's building; return 204 |
 
 Missing/other-user records return 404. Errors use {error: {code, message, request_id}}.
-Requests are limited to 1 MiB. See [API reference](../docs/api.md).
+Requests are limited to 1 MiB. See [API reference](../docs/storage-service-api.md).
 
 ## Frontend flow
 
@@ -70,7 +70,7 @@ Requests are limited to 1 MiB. See [API reference](../docs/api.md).
 
 The frontend uses storageBaseUrl for Go storage and apiBaseUrl for the external
 Gemma service. Firebase tokens are never sent to a ?api= design-service URL.
-The separate housecost Go service provides generation at POST /api/designs,
+The separate design service (design-service/) provides generation at POST /api/designs,
 with job polling and design/cost retrieval on port 8000. Its jobs/results are local
 to that service; private account persistence uses the SQL routes above.
 The Go storage API does not implement generation jobs, publishing, public listings,
