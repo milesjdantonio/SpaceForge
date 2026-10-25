@@ -44,6 +44,7 @@ var shapeWords = []struct {
 
 // shapeFromPrompt reads a shape the user asked for in their own words; "" when they didn't.
 func shapeFromPrompt(text string) string {
+	text = withoutCurvedInside(text) // "curved interior walls" isn't a round building
 	for _, w := range shapeWords {
 		if w.re.MatchString(text) {
 			return w.shape

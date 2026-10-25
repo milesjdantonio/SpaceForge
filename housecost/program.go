@@ -42,6 +42,8 @@ type Program struct {
 	// user's own description asked for it, which Gemma's choice doesn't override.
 	Shape         string
 	ShapeFromUser bool
+	// CurvedInside: one wall per floor curves (interiorcurve.go), when the description asks for it.
+	CurvedInside bool
 	Palette         []PaletteColor
 	Text            ProgramText
 }
@@ -141,6 +143,7 @@ func DefaultProgram(r Request) Program {
 	if s := shapeFromPrompt(sv(b.DesignPrompt)); s != "" {
 		p.Shape, p.ShapeFromUser = shapeForType(ht, s), true
 	}
+	p.CurvedInside = curvedInsideFromPrompt(sv(b.DesignPrompt))
 	p.Palette = []PaletteColor{{"Warm white", "#EDE8DF", "walls"}, {"Charcoal", "#3A3D40", "roof"},
 		{"Black frame", "#1E1E1E", "windows"}, {"Oak", "#B58B5A", "doors"}}
 	return p
@@ -185,7 +188,8 @@ type ProgramReply struct {
 	BathroomSharing                              string
 	Palette                                      []PaletteColor
 	AreaM2                                       *float64 // only when the user left brief.areaM2 to Gemma
-	Shape                                        string   // footprintShape: rectangle, round or land
+	Shape                                        string   // footprintShape: rectangle, l, u, courtyard, round or land
+	CurvedInterior                               bool     // curve a wall in the main rooms
 	Text                                         ProgramText
 }
 
@@ -248,6 +252,9 @@ func ParseProgram(text string) (ProgramReply, error) {
 	str("bathroomSharing", &pr.BathroomSharing, false)
 	str("footprintShape", &pr.Shape, false)
 	pr.Shape = normalizeShape(pr.Shape)
+	if v, ok := asBool(m["curvedInterior"]); ok {
+		pr.CurvedInterior = v
+	}
 	if v, ok := m["roofPitch"]; ok && v != nil {
 		if f, ok := asFloat(v); ok {
 			pr.RoofPitch = f
@@ -457,6 +464,7 @@ func (p Program) Merge(pr ProgramReply) Program {
 	if !p.ShapeFromUser && pr.Shape != "" {
 		p.Shape = shapeForType(p.HousingType, pr.Shape)
 	}
+	p.CurvedInside = p.CurvedInside || pr.CurvedInterior
 	if pr.GarageCars != nil && !isMulti(p.HousingType) {
 		p.GarageCars = *pr.GarageCars
 	}
@@ -497,6 +505,7 @@ const programExample = `{
  "structure": "<structure value>", "cladding": "<cladding value>", "roofing": "<roofing value>",
  "roofType": "<gable | hip | flat>", "roofPitch": 0.5,
  "footprintShape": "<rectangle | l | u | courtyard | round | land>",
+ "curvedInterior": "<true to curve a wall of the main rooms (when the description asks for curved or flowing walls inside), else false>",
  "areaM2": "<only if brief.areaM2 is null: the living area per home in m² you choose (the whole home for house/tiny-home/mansion/villa, the average for apartment/condo); otherwise null>",
  "garageCars": "<0-3 for house/tiny-home/townhouse/duplex/villa (per home), 0-4 for a mansion, else null>",
  "parkingSpaces": "<whole site, for apartment/condo/dorm/hotel, else null>",

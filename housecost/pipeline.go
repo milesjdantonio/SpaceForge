@@ -456,6 +456,27 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		}
 	}
 
+	// Curved walls inside, on a copy: kept only if the design still passes its checks.
+	if p.CurvedInside {
+		c := cloneDesign(d)
+		n, err := curveInteriorWalls(c)
+		if err == nil && n > 0 {
+			if probs := CheckShaped(c, ring, setback); len(probs) > 0 {
+				err = fmt.Errorf("%s", probs[0])
+			}
+		}
+		switch {
+		case err != nil:
+			fmt.Fprintf(log, "  kept the inside walls straight (%v)\n", err)
+			cautions = append(cautions, fmt.Sprintf("The walls inside are drawn straight: a curved one didn't fit (%v).", err))
+		case n == 0:
+			cautions = append(cautions, "The walls inside are drawn straight: no wall of the main rooms was long enough to curve.")
+		default:
+			fmt.Fprintf(log, "Curving %d wall(s) inside...\n", n)
+			*d = *c
+		}
+	}
+
 	if line := d.Exterior.Foundation.siteLine(); line != "" {
 		d.Overview.SiteResponse = append(d.Overview.SiteResponse, line)
 	}

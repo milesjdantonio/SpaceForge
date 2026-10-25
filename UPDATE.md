@@ -90,6 +90,9 @@ open `frontend/fixtures/mock-house` from My Builds.
   home. Too small for the plan: drawn straight, with a caution.
 - Roof terraces (`housecost/roofterrace.go`): the stair carries on to a stair house on a flat roof,
   and a door from its landing opens onto a railed terrace (a level marked `roof`, not a floor).
+- Curved walls inside (`housecost/interiorcurve.go`): "curved interior walls" in the description (or
+  Gemma's `curvedInterior`) bends one wall of the main rooms per floor into the larger room.
+- Fixed: the expanded plan was cut off (a CSS rule left it taller than its box).
 
 **2026-10-25 (on `FrontEnd-Refresh`, pushed, not merged into main):**
 - Cancel while generating (asks once more; the service stops the job and any Gemma call).
@@ -151,7 +154,7 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 
 **Gemma and backend (`housecost/`)**
 - Gemma following the description more strongly, and using the land better.
-- More building tools: bridges, curved walls inside a building.
+- More building tools: bridges.
 - New types: trailer park and neighborhood on `terrasim.design/3`.
 - Rive pictures for the mansion, villa and hotel cards in `types.riv`.
 - Run a full design with real Gemma end to end.
