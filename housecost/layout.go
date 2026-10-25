@@ -94,7 +94,11 @@ type Layout struct {
 	Basement   bool
 	Residents  int
 	Cautions   []string
-	nextKey    int
+	// Outline is the floor outline when it isn't the W × D rectangle (wings.go); RoofWings the
+	// pitched roofs over its wings.
+	Outline   []Pt
+	RoofWings []RoofWing
+	nextKey   int
 }
 
 func (l *Layout) key() string { l.nextKey++; return fmt.Sprintf("k%d", l.nextKey) }
@@ -124,6 +128,17 @@ var ErrNoPreset = errors.New("no more layout variants")
 func BuildLayout(p Program, variant int) (*Layout, error) {
 	if isMulti(p.HousingType) {
 		return layoutCorridor(p, variant)
+	}
+	if isWingShape(p.Shape) && wingHomeTypes(p.HousingType) {
+		l, err := layoutWings(p, variant)
+		if err != errWingTooBig {
+			return l, err
+		}
+		// Too small for the plan: a straight plan instead, and say so.
+		if l, err = layoutHomes(p, variant); err == nil {
+			l.Cautions = append(l.Cautions, fmt.Sprintf("At %.0f m² the home is too small for a %s plan, so it's drawn as one straight wing.", p.AreaM2, shapeName(p.Shape)))
+		}
+		return l, err
 	}
 	return layoutHomes(p, variant)
 }

@@ -220,8 +220,12 @@ func BuildDesign(l *Layout, p Program) (*Design, error) {
 		g.walls = append(g.walls, walls)
 		g.openings = append(g.openings, nil)
 		g.nOpen = append(g.nOpen, 0)
+		outline := Rect{0, 0, l.W, l.D}.Poly()
+		if l.Outline != nil {
+			outline = append([]Pt{}, l.Outline...)
+		}
 		dl := DLevel{Index: lv.Index, Name: lv.Name, ElevationM: r2(lv.Elev), HeightM: r2(lv.Height),
-			CeilingHeightM: r2(lv.Height - 0.3), Outline: RingOf(Rect{0, 0, l.W, l.D}.Poly()),
+			CeilingHeightM: r2(lv.Height - 0.3), Outline: RingOf(outline),
 			Balconies: []DBalcony{}, Furnishings: []DFurnishing{}}
 		for _, r := range lv.Rooms {
 			var unit *string
@@ -341,6 +345,9 @@ func BuildDesign(l *Layout, p Program) (*Design, error) {
 	}
 	t.Floors = len(l.Levels) - t.LevelsBelowGround
 	t.GrossAreaM2 = r1(l.W * l.D * float64(len(l.Levels)))
+	if l.Outline != nil {
+		t.GrossAreaM2 = r1(PolyArea(l.Outline) * float64(len(l.Levels)))
+	}
 	if p.HousingType == "hotel" {
 		// A hotel's totals count its guest rooms and their baths.
 		for _, lv := range l.Levels {

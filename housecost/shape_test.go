@@ -127,3 +127,23 @@ if (!result.ok) throw new Error(JSON.stringify(result.errors));
 		})
 	}
 }
+
+func TestWingShapeWords(t *testing.T) {
+	for text, want := range map[string]string{
+		"A home built round a courtyard":              ShapeCourt,
+		"A Spanish courtyard house":                   ShapeCourt,
+		"rooms around a central atrium":               ShapeCourt,
+		"An L-shaped farmhouse":                       ShapeL,
+		"an L shape with the garage wing":             ShapeL,
+		"A U-shaped villa round a pool garden":        ShapeU,
+		"An oval building with a calm courtyard feel": ShapeRound,
+		"Lovely garden, nothing special about shape":  "",
+	} {
+		if got := shapeFromPrompt(text); got != want {
+			t.Errorf("%q: got %q, want %q", text, got, want)
+		}
+	}
+	if shapeForType("townhouse", ShapeL) != ShapeRect || shapeForType("villa", ShapeU) != ShapeU {
+		t.Error("shapeForType")
+	}
+}

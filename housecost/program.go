@@ -139,7 +139,7 @@ func DefaultProgram(r Request) Program {
 	p.Basement = contains(p.Extras, "basement") && !isMulti(ht)
 	p.Shape = ShapeRect
 	if s := shapeFromPrompt(sv(b.DesignPrompt)); s != "" {
-		p.Shape, p.ShapeFromUser = s, true
+		p.Shape, p.ShapeFromUser = shapeForType(ht, s), true
 	}
 	p.Palette = []PaletteColor{{"Warm white", "#EDE8DF", "walls"}, {"Charcoal", "#3A3D40", "roof"},
 		{"Black frame", "#1E1E1E", "windows"}, {"Oak", "#B58B5A", "doors"}}
@@ -308,8 +308,8 @@ func ValidateProgram(pr ProgramReply, r Request, s Site, a Assessment) []string 
 		}
 	}
 	keep("style", adv.Style, pr.Style, Styles)
-	if pr.Shape != "" && !contains([]string{ShapeRect, ShapeRound, ShapeLand}, pr.Shape) {
-		add("footprintShape must be rectangle, round or land.")
+	if pr.Shape != "" && !contains([]string{ShapeRect, ShapeRound, ShapeLand, ShapeL, ShapeU, ShapeCourt}, pr.Shape) {
+		add("footprintShape must be rectangle, l, u, courtyard, round or land.")
 	}
 	if r.Brief.AreaM2 == nil && !roomsNotHomes(ht) {
 		lo, hi := areaRange(ht)
@@ -455,7 +455,7 @@ func (p Program) Merge(pr ProgramReply) Program {
 	}
 	p.RoofType, p.RoofPitch = pr.RoofType, pr.RoofPitch
 	if !p.ShapeFromUser && pr.Shape != "" {
-		p.Shape = pr.Shape
+		p.Shape = shapeForType(p.HousingType, pr.Shape)
 	}
 	if pr.GarageCars != nil && !isMulti(p.HousingType) {
 		p.GarageCars = *pr.GarageCars
@@ -491,7 +491,7 @@ const programExample = `{
  "style": "<one of the style values>", "quality": "<essential | standard | premium>",
  "structure": "<structure value>", "cladding": "<cladding value>", "roofing": "<roofing value>",
  "roofType": "<gable | hip | flat>", "roofPitch": 0.5,
- "footprintShape": "<rectangle | round | land>",
+ "footprintShape": "<rectangle | l | u | courtyard | round | land>",
  "areaM2": "<only if brief.areaM2 is null: the living area per home in m² you choose (the whole home for house/tiny-home/mansion/villa, the average for apartment/condo); otherwise null>",
  "garageCars": "<0-3 for house/tiny-home/townhouse/duplex/villa (per home), 0-4 for a mansion, else null>",
  "parkingSpaces": "<whole site, for apartment/condo/dorm/hotel, else null>",
@@ -560,7 +560,12 @@ Decide:
   description asks for round, circular, curved, oval, a tower, silo or rotunda); land to take the
   shape of the user's land (when it asks to follow or fill the lot's shape); otherwise rectangle.
   A round or land-shaped building has no porch, deck or balconies, and a pitched roof on it
-  becomes a cone. Say in the description how the shape follows the request.
+  becomes a cone. For a house, mansion or villa there are also wing plans: l (a main wing and a
+  side wing running back from one end), u (side wings at both ends round a yard) and courtyard
+  (four wings round an open court, the deck in the court); use them when the description asks
+  for an L, U, wings, a courtyard or atrium, or when a wide plan suits the land and the home is
+  large (a mansion or villa of 350 m² or more often reads best as an L or U). Say in the
+  description how the shape follows the request.
 - more than 5 floors can't be wood-frame; more than 4 can't be masonry.
 - garageCars (per home) for house/tiny-home/townhouse/duplex/villa/mansion; parkingSpaces for the
   whole site for apartment/condo/dorm/hotel (a hotel needs about 0.8 per guest room).

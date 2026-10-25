@@ -398,3 +398,40 @@ export function footprintOutside(footprint, outline) {
   if (!Array.isArray(footprint) || !Array.isArray(outline) || outline.length < 3) return 0;
   return footprint.filter(([x, y]) => !pointInPolygon(x, y, outline)).length;
 }
+
+// A courtyard plan's outline is one ring: round the outside, along a slit into the court, round
+// the court and back along the slit (contracts/FIELDS.md, "Courtyards"). outlineRings splits it
+// into the outside ring and the court rings (holes); any other outline comes back as [outline].
+export function outlineRings(outline) {
+  const same = (p, q) => Math.abs(p[0] - q[0]) < 1e-6 && Math.abs(p[1] - q[1]) < 1e-6;
+  const clean = (pts) => {
+    const out = [];
+    for (const p of pts) if (!out.length || !same(out[out.length - 1], p)) out.push(p);
+    while (out.length > 1 && same(out[0], out[out.length - 1])) out.pop();
+    return out;
+  };
+  const n = outline.length;
+  for (let i = 0; i < n; i++) {
+    const a = outline[i], b = outline[(i + 1) % n];
+    if (same(a, b)) continue;
+    for (let j = i + 1; j < n; j++) {
+      const c = outline[j], d = outline[(j + 1) % n];
+      if (same(a, d) && same(b, c)) {
+        const outer = clean([...outline.slice(0, i + 1), ...outline.slice(j + 1)]);
+        const hole = clean(outline.slice(i + 1, j + 1));
+        const rest = outlineRings(outer);
+        return hole.length >= 3 ? [...rest, ...outlineRings(hole)] : rest;
+      }
+    }
+  }
+  return [outline];
+}
+
+// The outline's edges as [a, b] pairs, without a courtyard's slit.
+export function outlineEdges(outline) {
+  const edges = [];
+  for (const ring of outlineRings(outline)) {
+    for (let i = 0; i < ring.length; i++) edges.push([ring[i], ring[(i + 1) % ring.length]]);
+  }
+  return edges;
+}

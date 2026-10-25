@@ -580,6 +580,11 @@ func finishDesign(d *Design, p Program, l *Layout, sp SitePlan, f Frame, ring []
 		if l.D > l.W {
 			axis, span = "y", l.W
 		}
+		if len(l.RoofWings) > 0 {
+			// One roof per wing, every wing as deep as the main one.
+			span = l.RoofWings[0].Y1 - l.RoofWings[0].Y0
+			roof.Wings = l.RoofWings
+		}
 		roof.RidgeAxis = &axis
 		roof.RidgeHeightM = r2(above + p.RoofPitch*(span/2+roof.EaveM))
 	}

@@ -545,6 +545,8 @@ type Roof struct {
 	EaveM        float64 `json:"eaveM"`
 	RidgeAxis    *string `json:"ridgeAxis"`
 	RidgeHeightM float64 `json:"ridgeHeightM"`
+	// Wings, on an L, U or courtyard plan, is one pitched roof per wing (wings.go).
+	Wings []RoofWing `json:"wings,omitempty"`
 }
 
 type XGarage struct {

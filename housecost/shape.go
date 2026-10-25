@@ -33,8 +33,13 @@ var shapeWords = []struct {
 	re    *regexp.Regexp
 	shape string
 }{
-	{regexp.MustCompile(`(?i)\b(circle|circular|round(ed)?|oval|elliptical|curved|cylinder|cylindrical|rotunda|dome|silo|yurt)\b`), ShapeRound},
+	// In order: the first that matches wins. "Fill the land" beats everything; a courtyard, U or L
+	// plan beats "round" (as in "round a courtyard").
 	{regexp.MustCompile(`(?i)(shape|outline|form) of (the|my|our) (land|lot|site|plot|property)|follow(s|ing)? (the|my) (land|lot|site|plot|property|boundary|outline)|fill(s|ing)? (the|my) (land|lot|site|plot)|(land|lot|site)[- ]shaped`), ShapeLand},
+	{regexp.MustCompile(`(?i)\b((a?round|about|on|with|enclos\w*|wrap\w*( a?round)?) (an? |the )?(central |inner |open |private )?(court ?yard|atrium|cloister)|(court ?yard|atrium) (house|home|plan|villa|mansion|layout|building)|(court ?yard|atrium) in the (middle|centre|center))\b`), ShapeCourt},
+	{regexp.MustCompile(`(?i)\bU[- ]?(shape|shaped|plan)\b|\bthree wings\b|\bhorseshoe\b`), ShapeU},
+	{regexp.MustCompile(`(?i)\bL[- ]?(shape|shaped|plan)\b|\btwo wings\b|\bwith a wing\b`), ShapeL},
+	{regexp.MustCompile(`(?i)\b(circle|circular|round(ed)?|oval|elliptical|curved|cylinder|cylindrical|rotunda|dome|silo|yurt)\b`), ShapeRound},
 }
 
 // shapeFromPrompt reads a shape the user asked for in their own words; "" when they didn't.
@@ -53,6 +58,12 @@ func normalizeShape(s string) string {
 	switch {
 	case low == "":
 		return ""
+	case strings.Contains(low, "court") || strings.Contains(low, "atrium"):
+		return ShapeCourt
+	case low == "l" || strings.HasPrefix(low, "l-") || strings.HasPrefix(low, "l ") || strings.HasPrefix(low, "l_"):
+		return ShapeL
+	case low == "u" || strings.HasPrefix(low, "u-") || strings.HasPrefix(low, "u ") || strings.HasPrefix(low, "u_") || strings.Contains(low, "horseshoe"):
+		return ShapeU
 	case strings.Contains(low, "rect") || strings.Contains(low, "square") || strings.Contains(low, "box"):
 		return ShapeRect
 	case regexp.MustCompile(`round|circ|oval|ellip|curv|cylind|dome|rotunda`).MatchString(low):

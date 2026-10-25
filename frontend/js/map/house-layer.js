@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { maplibregl } from './map.js';
-import { openingSegment, pointInPolygon, bounds, renderable, centroid } from '../lib/design.js';
+import { openingSegment, pointInPolygon, bounds, renderable, centroid, outlineRings, outlineEdges } from '../lib/design.js';
 
 const DEFAULTS = { walls: '#e9e4da', roof: '#4a4f55', trim: '#2b2f33', glass: '#5d7c99', accent: '#8a6a4a' };
 
@@ -45,9 +45,11 @@ export function buildHouseModel(design) {
     group.add(mesh);
     return mesh;
   };
-  // A polygon raised from z0 to z1.
+  // A polygon raised from z0 to z1 (a courtyard outline keeps its court open).
   const prism = (poly, z0, z1, m) => {
-    const shape = new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y)));
+    const [outer, ...holes] = outlineRings(poly);
+    const shape = new THREE.Shape(outer.map(([x, y]) => new THREE.Vector2(x, y)));
+    for (const h of holes) shape.holes.push(new THREE.Path(h.map(([x, y]) => new THREE.Vector2(x, y))));
     const geo = new THREE.ExtrudeGeometry(shape, { depth: z1 - z0, bevelEnabled: false });
     const mesh = new THREE.Mesh(geo, m);
     mesh.position.z = z0;
@@ -84,10 +86,7 @@ export function buildHouseModel(design) {
     prism(l.outline, z0, z1, wallMat);
     // A band at each floor line.
     if (li > 0) {
-      for (let i = 0; i < l.outline.length; i++) {
-        const a = l.outline[i], b = l.outline[(i + 1) % l.outline.length];
-        along(a, b, z0 - 0.1, z0 + 0.08, 0.08, 0.03 * outward(a, b, l.outline), trimMat);
-      }
+      for (const [a, b] of outlineEdges(l.outline)) along(a, b, z0 - 0.1, z0 + 0.08, 0.08, 0.03 * outward(a, b, l.outline), trimMat);
     }
     // Windows and doors on the outside walls.
     const walls = new Map((l.walls || []).map((w) => [w.id, w]));
@@ -140,11 +139,8 @@ export function buildHouseModel(design) {
   const tb = bounds(topLevel.outline);
   if (roof.type === 'flat' || !roof.type) {
     prism(topLevel.outline, wallTop, wallTop + 0.25, roofMat);
-    // A parapet round the edge.
-    for (let i = 0; i < topLevel.outline.length; i++) {
-      const a = topLevel.outline[i], b = topLevel.outline[(i + 1) % topLevel.outline.length];
-      along(a, b, wallTop, wallTop + 0.6, 0.2, -0.1 * outward(a, b, topLevel.outline), wallMat);
-    }
+    // A parapet round the edge (and round a court).
+    for (const [a, b] of outlineEdges(topLevel.outline)) along(a, b, wallTop, wallTop + 0.6, 0.2, -0.1 * outward(a, b, topLevel.outline), wallMat);
   } else if (roof.type === 'cone') {
     // A cone (a pyramid over straight sides) from the eaves all round up to one point over the
     // middle of the top level.
@@ -167,8 +163,13 @@ export function buildHouseModel(design) {
     g.computeVertexNormals();
     group.add(new THREE.Mesh(g, roofMat));
   } else {
-    // Gable or hip over the top level's rectangle, ridge along x or y.
-    const alongY = roof.ridgeAxis === 'y';
+    // Gable or hip over the top level's rectangle, or over each wing of an L, U or courtyard plan
+    // (roof.wings), ridge along x or y.
+    const wings = roof.wings?.length ? roof.wings : [{ x0: tb.x0, y0: tb.y0, x1: tb.x1, y1: tb.y1, ridgeAxis: roof.ridgeAxis }];
+    for (const w of wings) pitched({ x0: w.x0, y0: w.y0, x1: w.x1, y1: w.y1 }, w.ridgeAxis, roof.wings?.length > 0);
+  }
+  function pitched(tb, axis, joined) {
+    const alongY = axis === 'y';
     const L = alongY ? tb.y1 - tb.y0 : tb.x1 - tb.x0;   // length along the ridge
     const S = alongY ? tb.x1 - tb.x0 : tb.y1 - tb.y0;   // span across it
     const pitch = roof.pitch ?? 0.6;
@@ -187,6 +188,7 @@ export function buildHouseModel(design) {
       const a = P(u0, v0, zE), b = P(u1, v0, zE), c = P(u1, v1, zE), d = P(u0, v1, zE);
       const r0 = P(u0, vm, zR), r1 = P(u1, vm, zR);
       verts = [...a, ...b, ...r1, ...a, ...r1, ...r0, ...c, ...d, ...r0, ...c, ...r0, ...r1];
+      // Gable ends; on a wing that runs into another wing's roof they're hidden inside it.
       const ge = new THREE.BufferGeometry();
       ge.setAttribute('position', new THREE.Float32BufferAttribute([...P(0, 0, wallTop), ...P(0, S, wallTop), ...P(0, vm, zR - 0.15), ...P(L, 0, wallTop), ...P(L, S, wallTop), ...P(L, vm, zR - 0.15)], 3));
       ge.computeVertexNormals();
@@ -253,10 +255,7 @@ export function buildHouseModel(design) {
         for (const x of [pb.x0 + 0.2, pb.x1 - 0.2]) box(0.28, 0.28, lift, x - 0.14, pb.y0 + 0.1, 0, footMat);
       }
       // A beam round the edge under the floor.
-      for (let i = 0; i < ground.outline.length; i++) {
-        const a = ground.outline[i], c = ground.outline[(i + 1) % ground.outline.length];
-        along(a, c, lift - 0.35, lift, 0.25, 0, footMat);
-      }
+      for (const [a, c] of outlineEdges(ground.outline)) along(a, c, lift - 0.35, lift, 0.25, 0, footMat);
     } else {
       // A porch stands on the same footing.
       if (ext.porch?.polygon) prism(ext.porch.polygon, 0, lift, footMat);
@@ -267,10 +266,7 @@ export function buildHouseModel(design) {
         prism(ground.outline, 0, top, footMat);
         const lineMat = mat('#7d786f');
         for (let z = 0.6; z < top - 0.1; z += 0.6) {
-          for (let i = 0; i < ground.outline.length; i++) {
-            const a = ground.outline[i], c = ground.outline[(i + 1) % ground.outline.length];
-            along(a, c, z - 0.03, z, 0.04, 0.02 * outward(a, c, ground.outline), lineMat);
-          }
+          for (const [a, c] of outlineEdges(ground.outline)) along(a, c, z - 0.03, z, 0.04, 0.02 * outward(a, c, ground.outline), lineMat);
         }
       }
     }

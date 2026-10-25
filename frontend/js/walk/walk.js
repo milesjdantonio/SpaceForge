@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { icon } from '../ui/icons.js';
 import { buildFurnishings } from './furniture.js';
 import { buildSurroundings } from './surroundings.js';
-import { openingSegment, wallLength, wallPointAt, rectPoly, bounds, centroid, pointInPolygon, roomAt, renderable } from '../lib/design.js';
+import { openingSegment, wallLength, wallPointAt, rectPoly, bounds, centroid, pointInPolygon, roomAt, renderable, outlineRings, outlineEdges } from '../lib/design.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const EYE = 1.6;
@@ -59,8 +59,9 @@ function buildBuilding(design) {
   const top = levels.length - 1;
 
   const flat = (poly, y, mat, { walk = false, level = 0, holes = [] } = {}) => {
-    const shape = new THREE.Shape(poly.map(([x, z]) => new THREE.Vector2(x, z)));
-    for (const h of holes) shape.holes.push(new THREE.Path(h.map(([x, z]) => new THREE.Vector2(x, z))));
+    const [outer, ...courts] = outlineRings(poly);
+    const shape = new THREE.Shape(outer.map(([x, z]) => new THREE.Vector2(x, z)));
+    for (const h of [...courts, ...holes]) shape.holes.push(new THREE.Path(h.map(([x, z]) => new THREE.Vector2(x, z))));
     const geo = new THREE.ShapeGeometry(shape);
     geo.rotateX(Math.PI / 2);
     const mesh = new THREE.Mesh(geo, mat);
@@ -268,9 +269,8 @@ function buildBuilding(design) {
       }
     } else {
       // The footing's outer face: from the lowest floor down to the ground, along the outline.
-      const pts = ground.outline, verts = [];
-      for (let i = 0; i < pts.length; i++) {
-        const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
+      const verts = [];
+      for (const [[ax, ay], [bx, by]] of outlineEdges(ground.outline)) {
         const ta = Math.min(lowest, 0), ga = Math.min(ta, groundAt(ax, ay)), gb = Math.min(ta, groundAt(bx, by));
         if (ta - ga < 0.03 && ta - gb < 0.03) continue;
         verts.push(ax, ta, ay, bx, ta, by, bx, gb, by, ax, ta, ay, bx, gb, by, ax, ga, ay);

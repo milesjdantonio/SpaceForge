@@ -293,6 +293,22 @@ The design service draws round buildings with `round` and land-shaped ones with 
 `footprintShape` (rectangle is the default). The description decides it: "make it a circle" gives a
 round building.
 
+**Wing plans (L, U and courtyard)**
+
+A house, mansion or villa can also be `l`, `u` or `courtyard` ("an L-shaped house", "round a
+courtyard"). The main wing runs along the street; an L adds a side wing at one end, a U one at each
+end round a yard, and a courtyard a fourth wing across the back round an open court. The side and
+back wings of a U or courtyard are one room deep, their hall a gallery along the yard or court. A
+home too small for the plan it asks for is drawn as one straight wing, and its cautions say so.
+
+- Every level has the same `outline`, made of straight sides.
+- **Courtyards.** The outline of a level with a court is one ring: round the outside, then along a
+  slit into the court, round the court the other way, and back along the slit. The slit's two edges
+  cancel, so the ring's area is the floor's and the usual inside test (even-odd) is right. Readers
+  that draw edges or fill the floor split it into the outside ring and the court (the website's
+  `outlineRings` in `lib/design.js`); the slit is never a wall.
+- `exterior.roof.wings` holds one pitched roof per wing (below).
+
 **`balconies`**
 
 | Field | Meaning |
@@ -363,6 +379,7 @@ buildings of four or more floors, have at least one elevator.
 | `roof.eaveM` | Overhang past the walls (0.1 for flat with a parapet). |
 | `roof.ridgeAxis` | `x` or `y`: the direction the ridge runs. `null` for flat and cone. |
 | `roof.ridgeHeightM` | Ground to the top of the roof. Equals `size.heightM`. |
+| `roof.wings` | Optional, for wing plans: `[{ x0, y0, x1, y1, ridgeAxis }]`, one gable or hip per wing over that rectangle (eaves added outside it), ridge along `x` or `y`. A wing's rectangle runs into the wing it joins as far as that wing's ridge, so the roofs meet in valleys. When it's there, `ridgeAxis` describes the main wing. |
 | `garage` | `{ cars, polygon, heightM }`, or `null`. A detached or attached garage outside the main `outline` (negative x or y is fine). A garage inside a level's outline is a room of type `garage` instead, with this field still filled in for the map. |
 | `porch` | `{ polygon }`, or `null`. |
 | `parking` | Outdoor parking areas `{ polygon, spaces, covered }`, or `[]`. |
