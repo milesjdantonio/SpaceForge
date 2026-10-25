@@ -22,6 +22,11 @@ body:not(.in-space) .stars { opacity: 0; }
 .bar-nav { display: flex; gap: 4px; margin-left: auto; padding: 4px; border-radius: 999px; background: var(--panel); box-shadow: var(--shadow); }
 .bar-link { border: 0; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 999px; cursor: pointer; font-weight: 500; white-space: nowrap; }
 .bar-link:hover { color: var(--ink); background: var(--panel-2); }
+.account-error { color: var(--negative); }
+.saved-buildings { display: grid; gap: 10px; margin-bottom: 24px; }
+.saved-buildings .sites { margin: 0; }
+.saved-buildings .site-name { overflow-wrap: anywhere; }
+.saved-buildings .empty { margin: 0; }
 .units { display: inline-flex; padding: 4px; gap: 2px; background: var(--panel); border-radius: 999px; box-shadow: var(--shadow); }
 .units button { min-width: 36px; min-height: 32px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; font-weight: 500; }
 .units button[aria-pressed='true'] { background: var(--panel-3); color: var(--ink); }
@@ -381,6 +386,11 @@ tfoot td { font-weight: 600; }
 .walk-note { position: absolute; left: var(--margin); bottom: var(--margin); font-size: 0.8125rem; color: var(--muted); background: var(--panel); padding: 6px 10px; border-radius: 8px; }
 
 /* Phone */
+@media (max-width: 560px) {
+  .bar .brand-name { display: none; }
+  .bar .brand { padding: 6px; }
+  .bar .bar-nav { gap: 0; }
+}
 @media (max-width: 760px) {
   .bar { top: 10px; left: 10px; right: 10px; gap: 6px; }
   .brand-name { font-size: 1.125rem; }

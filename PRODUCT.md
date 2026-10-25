@@ -9,9 +9,10 @@ web
 ## Stack
 
 Plain HTML, CSS and JavaScript (no framework), with MapLibre GL JS (3D map), three.js (the house on the
-map and the walkthrough) and Rive (animation). Chosen by the user; see AGENT.md. The backend (Go
-accounts service, Python API, the Gemma design system) is not connected yet: the interface sends
-requests in the shape GEMMA.md defines and says plainly when the service isn't there.
+map and the walkthrough) and Rive (animation). Chosen by the user; see AGENT.md.
+Firebase login and private PostgreSQL building storage are connected through the Go API.
+The separate Gemma design service uses the contract in GEMMA.md; the interface clearly
+reports when that service is not configured.
 
 ## Users
 
@@ -55,7 +56,7 @@ the design rather than as an afterthought.
   **published listing** (builder: requires confirming the landowner's permission).
 - Inquiries go to the builder who generated the design.
 - Units toggle between imperial (sq ft, acres) and metric (m², hectares); prices in USD.
-- Open (see AGENT.md): map provider for production, data store, auth, Gemma model variant, service
+- Open (see AGENT.md): map provider for production, Gemma model variant, generation service
   boundaries, how inquiries are delivered (stored record + email, or in-app messaging).
 - No API keys, model names or provider config may be invented; placeholders are marked.
 

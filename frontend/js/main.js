@@ -4,10 +4,16 @@ import { settings, store } from './store.js';
 import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setEvening } from './map/map.js';
 import { createOutliner } from './map/draw.js';
 import { createHouseLayer } from './map/house-layer.js';
-import { measure, problemsFor, placeOnLot, inFootprint } from './lib/place.js';
+import { measure, problemsFor, placeOnLot } from './lib/place.js';
 import { fmt } from './format.js';
 import { api } from './api/client.js';
 import { config } from './config.js';
+import { auth } from './auth.js';
+import { buildings } from './api/buildings.js';
+import { savedDocument, readSavedBuilding } from './lib/saved-building.js';
+import { createBuildingSaver } from './lib/building-saver.js';
+import { loadSavedScene, sceneCamera } from './lib/saved-scene.js';
+import { mountAccount } from './ui/account.js';
 import { icon } from './ui/icons.js';
 import { toast } from './ui/toast.js';
 import { renderBriefPanel } from './panels/brief.js';
@@ -27,6 +33,8 @@ const toolbar = $('#toolbar');
 const hint = $('#draw-hint');
 const intro = $('#intro');
 const introHint = $('#intro-hint');
+const account = mountAccount($('#account-button'), $('#dialog'));
+const scopeKey = (key) => auth.user ? `${key}:${auth.user.uid}` : key;
 
 const app = {
   mode: 'globe',
@@ -36,11 +44,24 @@ const app = {
   site: null,      // { id, ring, form, mode, builder, status }
   you: null,       // visitor location [lng, lat]
   estimates: new Map(), // design id -> estimate that came with it
+  savedBuilding: null, // SQL UUID + owner, separate from the immutable Gemma design ID
+  displayVersion: 0,
+  generation: null,
+  currentDesignID: null,
+  libraryVersion: 0,
+  saving: null,
+  savers: new Map(), // One ordered writer per SQL building, independent of selection.
+  records: new Map(), // SQL UUID -> validated document for the signed-in account
+  removedRecords: new Set(),
+  sceneReady: false,
+  sceneVersion: 0,
+  navigationVersion: 0,
 };
 
 // Declared early: a share link opens the brief (and the hint) before the rest of this file runs.
 const hintPin = { el: null, rive: null, replay: false }; // the drawing hint's Rive pin
 let moving = null;                                       // a building being dragged within its land
+let selecting = false;                                  // first gesture selects; the next can drag
 
 function setMode(mode) {
   app.mode = mode;
@@ -126,36 +147,67 @@ map.on('click', (e) => {
   }
   if (app.justMoved && Date.now() - app.justMoved < 400) return;
   if (app.mode === 'house' || app.mode === 'explore' || app.mode === 'failed') {
-    const p = house.placement;
-    if (p && inFootprint([e.lngLat.lng, e.lngLat.lat], p.footprint)) openHouse();
+    const hit = house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]);
+    if (hit) selectBuilding(hit, { details: house.isSelected(hit) });
+    else {
+      house.deselect();
+      if (panel.dataset.view === 'house') closePanel();
+      setMode('explore'); rememberScene();
+    }
   }
 });
 map.on('mousemove', (e) => {
-  if (outliner.active || moving) return;
-  const p = house.placement;
-  const over = p && map.getZoom() > 14 && inFootprint([e.lngLat.lng, e.lngLat.lat], p.footprint);
-  map.getCanvas().style.cursor = over ? 'grab' : app.mode === 'globe' ? 'crosshair' : '';
+  if (outliner.active || moving || selecting) return;
+  const hit = ['house', 'explore', 'failed'].includes(app.mode) && map.getZoom() >= 15 &&
+    (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]));
+  map.getCanvas().style.cursor = hit ? (house.isSelected(hit) ? 'grab' : 'pointer') : app.mode === 'globe' ? 'crosshair' : '';
+});
+map.on('dblclick', (e) => {
+  if (house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat])) e.preventDefault();
 });
 
 // ---- moving the building within its land -------------------------------------------------------
-// Press on the building and drag: it follows the pointer, but only to spots where every corner
-// stays inside the outlined land. A press without a drag still opens the building's panel.
+// First click/tap selects the house in orange. A subsequent press can drag it,
+// but only to spots where every corner stays inside the outlined land.
+function selectBuilding(hit, { details = false } = {}) {
+  if (hit.id && (!house.design || hit.id !== app.savedBuilding?.id)) openSceneBuilding(hit.id, { focus: false, details });
+  else {
+    house.select();
+    if (details) openHouse();
+    else if (panel.dataset.view === 'house') closePanel();
+    rememberScene();
+  }
+}
 const landOf = (design) => (design.previewOn ? app.site?.ring : design.site?.outline) ?? null;
 const shift = (pts, dx, dy) => pts.map(([x, y]) => [x + dx, y + dy]);
 function startMove(e) {
-  const p = house.placement, design = house.design;
-  if (!p || !design || outliner.active || map.getZoom() < 15) return;
+  if (e.defaultPrevented || moving || selecting) return;
+  const event = e.originalEvent;
+  if (event && 'button' in event && (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey)) return;
+  if (outliner.active || map.getZoom() < 15) return;
   if (!['house', 'explore', 'failed'].includes(app.mode)) return;
-  if (!inFootprint([e.lngLat.lng, e.lngLat.lat], p.footprint)) return;
-  const land = landOf(design);
+  const hit = house.pick(e.point) ?? house.at([e.lngLat.lng, e.lngLat.lat]);
+  if (!hit) return;
+  const land = landOf(hit.design);
   if (!land) return;
   e.preventDefault();
+  map.stop();
+  if (!house.isSelected(hit)) {
+    selectBuilding(hit);
+    selecting = true;
+    map.getCanvas().style.cursor = 'pointer';
+    return; // This press selects only, even if the pointer then moves.
+  }
+  const p = house.placement, design = house.design;
+  if (!p || !design) return;
+  const panEnabled = map.dragPan.isEnabled();
   map.dragPan.disable();
-  moving = { start: e.lngLat, from: p, land, last: p, moved: false };
+  moving = { start: e.lngLat, from: p, land, last: p, moved: false, panEnabled };
   map.getCanvas().style.cursor = 'grabbing';
 }
 function dragMove(e) {
   if (!moving) return;
+  e.originalEvent?.preventDefault();
   const dx = e.lngLat.lng - moving.start.lng, dy = e.lngLat.lat - moving.start.lat;
   const footprint = shift(moving.from.footprint, dx, dy);
   if (Math.abs(dx) + Math.abs(dy) > 1e-7) moving.moved = true;
@@ -166,23 +218,49 @@ function dragMove(e) {
   house.move(moving.last);
 }
 function endMove() {
+  if (selecting) {
+    selecting = false;
+    app.justMoved = Date.now(); // Ignore the synthetic click after mouseup/touchend.
+    map.getCanvas().style.cursor = house.selected ? 'grab' : '';
+    return;
+  }
   if (!moving) return;
-  const { moved, last } = moving;
+  const { moved, from, last, panEnabled } = moving;
   moving = null;
-  map.dragPan.enable();
+  if (panEnabled) map.dragPan.enable();
   map.getCanvas().style.cursor = '';
   if (!moved) return;
-  const design = house.design;
-  design.placement = { ...design.placement, origin: last.origin, footprint: last.footprint };
-  if (!design.sample) api.keepLocal(design, design.cost ? null : app.estimates.get(design.id) ?? null);
   app.justMoved = Date.now();
+  if (last === from) return; // A drag outside the land did not change the placement.
+  const design = house.design;
+  const uid = auth.user?.uid;
+  const version = app.displayVersion;
+  const known = app.savedBuilding;
+  const saving = app.saving;
+  const saved = known?.uid === uid && known?.designID === design.id;
+  const pending = saving?.uid === uid && saving?.version === version && saving?.designID === design.id;
+  if (!uid || (!saved && !pending)) {
+    toast('Position updated. Choose Save building to keep it in your account.');
+    return;
+  }
+  // Keep Gemma's original geometry intact; persist the actual map placement beside it.
+  persistBuilding(design, app.estimates.get(design.id) ?? null, app.site, last).then(() => {
+    if (auth.user?.uid === uid && app.displayVersion === version && house.placement === last) toast('Position saved.');
+  }).catch((err) => {
+    if (auth.user?.uid === uid && app.displayVersion === version && house.placement === last) {
+      toast('Position was not saved. Choose Save changes to retry. ' + err.message);
+    }
+  });
 }
 map.on('mousedown', startMove);
-map.on('touchstart', (e) => { if (e.points?.length === 1) startMove(e); });
+map.on('touchstart', (e) => { if (e.points?.length === 1) startMove(e); else endMove(); });
 map.on('mousemove', dragMove);
 map.on('touchmove', dragMove);
 map.on('mouseup', endMove);
 map.on('touchend', endMove);
+map.on('touchcancel', endMove);
+document.addEventListener('mouseup', endMove);
+addEventListener('blur', endMove);
 
 // Space shows behind the globe whenever the map is zoomed out far enough to see it.
 const syncSpace = () => {
@@ -555,9 +633,9 @@ function onOutlineDone(ring, edited) {
   app.site = {
     id: `site-${Date.now().toString(36)}`,
     ring,
-    form: store.get('lastForm', null),
+    form: store.get(scopeKey('lastForm'), null),
     mode: 'dream',
-    builder: store.get('builder', null),
+    builder: store.get(scopeKey('builder'), null),
     status: 'draft',
     createdAt: new Date().toISOString(),
   };
@@ -568,11 +646,12 @@ function onOutlineDone(ring, edited) {
 
 function saveSite() {
   if (!app.site) return;
-  store.update('sites', [], (list) => [app.site, ...list.filter((s) => s.id !== app.site.id)].slice(0, 30));
+  store.update(scopeKey('sites'), [], (list) => [app.site, ...list.filter((s) => s.id !== app.site.id)].slice(0, 30));
 }
 
 // ---- panels ------------------------------------------------------------------------------------
-function openPanel(render) {
+function openPanel(render, view = '') {
+  panel.dataset.view = view;
   panel.hidden = false;
   panel.replaceChildren();
   render(panel);
@@ -593,12 +672,16 @@ function openBrief() {
     measure: measure(app.site.ring),
     coverage: api.coverage(measure(app.site.ring).centroid),
     onEditOutline: () => { closePanel(); outliner.load(app.site.ring); toast('Drag the corners to adjust the outline.'); setMode('explore'); },
-    onChange: (patch) => { Object.assign(app.site, patch); if (patch.form) store.set('lastForm', patch.form); if (patch.builder) store.set('builder', patch.builder); saveSite(); },
+    onChange: (patch) => { Object.assign(app.site, patch); if (patch.form) store.set(scopeKey('lastForm'), patch.form); if (patch.builder) store.set(scopeKey('builder'), patch.builder); saveSite(); },
     onSend: () => send(),
   }));
 }
 
 async function send() {
+  app.generation?.abort();
+  const generation = new AbortController();
+  app.generation = generation;
+  const owner = auth.user?.uid ?? null;
   setMode('sending');
   const request = buildRequest(app.site);
   app.site.lastRequestId = request.id;
@@ -607,16 +690,24 @@ async function send() {
   house.generating(app.site.ring);
   openPanel((el) => renderSending(el, {
     request,
-    run: (onProgress) => api.createDesign(request, { onProgress }),
-    onDone: ({ design, estimate }) => {
+    run: (onProgress) => api.createDesign(request, { onProgress, signal: generation.signal }),
+    onDone: async ({ design, estimate }) => {
+      if (generation.signal.aborted || (owner && auth.user?.uid !== owner)) return;
+      if (!drawable(design)) return;
       app.site.status = 'sent';
       app.site.designId = design.id;
       saveSite();
       api.keepLocal(design, estimate);
       house.stopGenerating();
-      showDesign(design, estimate);
+      const site = app.site;
+      showDesign(design, estimate, { site });
+      if (owner) {
+        try { await persistBuilding(design, estimate, site, design.placement); toast('Design saved to your account.'); }
+        catch (err) { toast('Design received, but it was not saved. ' + err.message); }
+      }
     },
     onFailed: (err) => {
+      if (generation.signal.aborted) return;
       app.site.status = 'not-sent';
       app.site.lastError = err.code ?? 'error';
       saveSite();
@@ -632,7 +723,9 @@ async function send() {
 // Checks a design against the contract before anything is drawn; a broken file opens a panel that
 // says what's wrong instead.
 function drawable(design) {
-  const result = checkDesign(design);
+  let result;
+  try { result = checkDesign(design); }
+  catch { result = { ok: false, errors: [{ rule: 0, message: 'The design file has an incomplete structure.' }], warnings: [] }; }
   for (const w of result.warnings) console.warn(`[design ${design?.id}] ${w.message}`);
   if (result.ok) return true;
   setMode(house.design ? 'house' : 'explore');
@@ -641,23 +734,27 @@ function drawable(design) {
 }
 
 // Shows a stored design where it stands: flies there, draws the lot and the building, opens it.
-function showDesign(design, estimate) {
+function showDesign(design, estimate, { site = null, placement = design.placement, savedBuilding = null, focus = true, camera = null, animate = true, selected = false, details = true } = {}) {
   if (!drawable(design)) return;
+  const version = ++app.displayVersion;
+  app.currentDesignID = design.id;
+  app.savedBuilding = savedBuilding;
+  app.site = site ?? { id: `site-${Date.now().toString(36)}`, ring: design.site.outline, form: null, mode: 'dream', status: 'sent', createdAt: design.createdAt };
   if (estimate) app.estimates.set(design.id, estimate);
   closePanel();
   setMode('house');
-  const placement = design.placement;
-  const c = placement.footprint[0];
-  map.flyTo({ center: c, zoom: 18.3, pitch: 60, bearing: -30, duration: 4500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
-  map.once('moveend', () => {
-    stopSpin();
-    intro.hidden = true;
-      if (design.site?.outline) outliner.load(design.site.outline);
-    house.show(design, placement);
-    frameHouse(placement);
-    setTimeout(openHouse, 2600);
-    setTimeout(() => toast('Drag the building to move it anywhere inside your land.'), 3200);
-  });
+  stopSpin(); intro.hidden = true;
+  outliner.load(app.site.ring);
+  house.show(design, placement, { id: savedBuilding?.id ?? null, animate, selected });
+  if (camera) {
+    map.jumpTo({ ...camera, padding: panelPadding() });
+    app.tilted = camera.pitch > 0;
+  } else if (focus) frameHouse(placement);
+  if (details) {
+    if (focus && !camera) setTimeout(() => { if (version === app.displayVersion) openHouse(); }, 1900);
+    else openHouse();
+  }
+  rememberScene();
 }
 
 // Opens a design file from disk: a Gemma reply ({ design, estimate }) or a bare design.
@@ -672,7 +769,10 @@ async function openDesignFile(file) {
 }
 
 async function previewSample() {
+  ++app.displayVersion;
+  app.savedBuilding = null;
   const design = await api.design('sample-0001');
+  app.currentDesignID = design.id;
   if (!drawable(design)) return;
   const placement = placeOnLot(design, app.site.ring);
   house.show({ ...design, previewOn: app.site.id }, placement);
@@ -681,7 +781,7 @@ async function previewSample() {
   setMode('house');
   closePanel();
   if (!placement.fits) toast('The sample house is bigger than this lot, so it hangs over the outline.');
-  else toast('Sample house placed on your lot. Click it for details, or drag it to move it within your land.');
+  else toast('Sample house placed on your lot. Click to select it, then drag to move it within your land.');
   frameHouse(placement);
   setTimeout(() => openHouse(), 2900);
 }
@@ -704,24 +804,68 @@ function frameHouse(placement, { duration = 1800 } = {}) {
 async function openHouse() {
   const design = house.design;
   if (!design) return;
-  // The design carries its own cost (contracts/FIELDS.md, `cost`); older files came with a separate estimate.
+  const version = app.displayVersion;
+  const owner = auth.user?.uid ?? null;
+  // New housecost designs carry their cost; older services return a separate estimate.
   let estimate = design.cost ?? app.estimates.get(design.id) ?? null;
   if (!estimate) {
     try { estimate = await api.estimate(design.id); } catch { estimate = null; }
   }
+  if (version !== app.displayVersion || house.design !== design || (auth.user?.uid ?? null) !== owner) return;
   setMode('house');
   openPanel((el) => renderHousePanel(el, {
     design,
     estimate,
     preview: !!design.previewOn,
     onWalk: () => openWalk(design),
-    shareUrl: () => (design.previewOn ? shareLink({ preview: true }) : `${location.href.split('#')[0]}#l=${design.id}`),
+    saved: app.savedBuilding?.uid === auth.user?.uid && app.savedBuilding?.designID === design.id,
+    onSave: async () => {
+      if (!(await account.require())) return false;
+      await persistBuilding(design, estimate, app.site, house.placement);
+      return true;
+    },
+    shareUrl: () => shareLink({ preview: !!design.previewOn }),
     onNight: (on) => { app.night = on; house.setNight(on); setEvening(map, on); renderToolbar(); },
-  }));
+  }), 'house');
+}
+
+async function persistBuilding(design, estimate, site, placement) {
+  const uid = auth.user?.uid;
+  const version = app.displayVersion;
+  if (!uid) throw new Error('Sign in to save your building.');
+  const known = app.savedBuilding;
+  const id = known?.uid === uid && known?.designID === design.id ? known.id : null;
+  let writer = id ? app.savers.get(id) : null;
+  if (!writer && app.saving?.uid === uid && app.saving.version === version && app.saving.designID === design.id) writer = app.saving;
+  if (!writer) {
+    const accountVersion = app.sceneVersion;
+    writer = { uid, version, designID: design.id, id, save: createBuildingSaver({
+      id,
+      save: (input) => buildings.save(input),
+      isCurrent: () => auth.user?.uid === uid && app.sceneVersion === accountVersion && !app.removedRecords.has(writer.id),
+      onSaved: (result) => {
+        writer.id = result.id;
+        app.savers.set(result.id, writer);
+        const document = readSavedBuilding(result);
+        app.records.set(result.id, { record: result, document });
+        if (app.currentDesignID === design.id && (app.displayVersion === version || app.savedBuilding?.id === result.id)) {
+          app.savedBuilding = { id: result.id, uid, designID: design.id };
+          house.remember(result.id);
+        } else if (!house.entries.some((entry) => entry.id === result.id)) house.add(result.id, document.design, document.placement);
+        app.sceneReady = true;
+        rememberScene();
+      },
+    }) };
+  }
+  app.saving = writer;
+  return writer.save({ name: design.overview.title.slice(0, 120),
+    data: savedDocument({ design, estimate, site, placement }) });
 }
 
 async function openWalk(design) {
+  const version = app.displayVersion;
   const { openWalkthrough } = await import('./walk/walk.js');
+  if (version !== app.displayVersion) return;
   openWalkthrough($('#walk'), design);
 }
 
@@ -742,10 +886,15 @@ document.querySelector('[data-open="catalog"]').addEventListener('click', async 
     onOpen: (l) => showDesign(l.design, l.estimate),
   }));
 });
-document.querySelector('[data-open="sites"]').addEventListener('click', () => {
+async function openSites() {
+  await auth.ready;
+  const version = ++app.libraryVersion;
   leaveGlobe();
-  openPanel((el) => renderSites(el, {
-    sites: store.get('sites', []),
+  const uid = auth.user?.uid ?? null;
+  let items = [], nextOffset = null, loading = !!uid, error = '';
+  const render = () => renderSites(panel, {
+    account: auth.user, buildings: items, nextOffset, loading, error,
+    sites: store.get(scopeKey('sites'), []),
     onOpen: (s) => {
       closePanel();
       app.site = s;
@@ -754,10 +903,52 @@ document.querySelector('[data-open="sites"]').addEventListener('click', () => {
       map.flyTo({ center: c, zoom: 18, pitch: 55, duration: 3500, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
       map.once('moveend', () => openBrief());
     },
-    onDelete: (s) => store.update('sites', [], (list) => list.filter((x) => x.id !== s.id)),
+    onDelete: (s) => store.update(scopeKey('sites'), [], (list) => list.filter((x) => x.id !== s.id)),
     onOpenFile: (file) => openDesignFile(file),
-  }));
-});
+    onSignIn: async () => { if (await account.require()) openSites(); },
+    onOpenBuilding: async (summary) => {
+      try {
+        const record = await buildings.get(summary.id);
+        const document = readSavedBuilding(record);
+        if (auth.user?.uid !== uid) return;
+        app.records.set(record.id, { record, document });
+        app.sceneReady = true;
+        openSceneBuilding(record.id);
+      } catch (err) { toast(err.message || 'Couldn’t open the building.'); }
+    },
+    onDeleteBuilding: async (record) => {
+      app.removedRecords.add(record.id);
+      try { await buildings.remove(record.id); }
+      catch (error) { if (auth.user?.uid === uid) app.removedRecords.delete(record.id); throw error; }
+      if (auth.user?.uid !== uid) return;
+      items = items.filter((item) => item.id !== record.id);
+      app.savers.delete(record.id);
+      house.remove(record.id); app.records.delete(record.id);
+      if (app.savedBuilding?.id === record.id) {
+        app.savedBuilding = null; app.currentDesignID = null; ++app.displayVersion;
+        outliner.clear(); setMode('explore');
+      }
+      rememberScene();
+      toast('Building deleted.');
+      if (!items.length && panel.dataset.view === 'sites') render();
+    },
+    onMore: () => load(nextOffset),
+  });
+  async function load(offset = 0) {
+    if (version !== app.libraryVersion) return;
+    loading = true; error = ''; render();
+    try {
+      const page = await buildings.list(offset);
+      if (auth.user?.uid !== uid || panel.dataset.view !== 'sites' || version !== app.libraryVersion) return;
+      items = offset ? [...items, ...page.items] : page.items;
+      nextOffset = page.next_offset;
+    } catch (err) { error = err.message || 'Couldn’t load saved buildings.'; }
+    finally { loading = false; if ((auth.user?.uid ?? null) === uid && panel.dataset.view === 'sites' && version === app.libraryVersion) render(); }
+  }
+  openPanel(render, 'sites');
+  if (uid) await load();
+}
+document.querySelector('[data-open="sites"]').addEventListener('click', openSites);
 
 function syncUnits() {
   document.querySelectorAll('[data-units]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.units === settings.units)));
@@ -787,3 +978,91 @@ document.querySelector('.brand').addEventListener('click', (e) => {
 // The brand mark is a Rive file; the text wordmark stands alone if it fails.
 const markEl = document.querySelector('[data-rive="mark"]');
 mountRive(markEl, { src: 'assets/rive/mark.riv', stateMachine: 'Mark', hoverInput: 'hover', hoverTarget: markEl.closest('a') });
+
+// ---- restore the account's saved scene ----------------------------------------------------------
+function rememberScene() {
+  const uid = auth.user?.uid;
+  if (!uid || !app.sceneReady) return;
+  const center = map.getCenter();
+  store.set(`scene:${uid}`, {
+    selectedID: house.design ? app.savedBuilding?.id ?? null : null,
+    selected: house.selected,
+    mode: app.mode === 'globe' ? 'globe' : 'map',
+    camera: { center: [center.lng, center.lat], zoom: map.getZoom(), pitch: map.getPitch(), bearing: map.getBearing() },
+  });
+}
+
+function openSceneBuilding(id, options = {}) {
+  const item = app.records.get(id);
+  if (!item) return;
+  // A house may have moved since its last response arrived; use its live placement.
+  const placement = house.entries.find((entry) => entry.id === id)?.placement ?? item.document.placement;
+  const { design, estimate } = item.document;
+  showDesign(design, estimate, { ...item.document, placement, selected: true, ...options,
+    savedBuilding: { id, uid: auth.user.uid, designID: design.id } });
+}
+
+async function restoreScene(uid) {
+  const sceneVersion = ++app.sceneVersion;
+  const displayVersion = app.displayVersion, navigationVersion = app.navigationVersion;
+  const previous = store.get(`scene:${uid}`, null);
+  const current = () => auth.user?.uid === uid && app.sceneVersion === sceneVersion;
+  try {
+    const { records, skipped } = await loadSavedScene({ client: buildings, isCurrent: current,
+      onRecord: (record, document) => {
+        if (app.records.has(record.id) || app.removedRecords.has(record.id)) return; // Preserve edits/deletions made during loading.
+        house.add(record.id, document.design, document.placement);
+        app.records.set(record.id, { record, document });
+      },
+    });
+    if (!current()) return;
+    app.sceneReady = true;
+    if (app.displayVersion === displayVersion && app.navigationVersion === navigationVersion && app.mode === 'globe' && !location.hash) {
+      const camera = sceneCamera(previous);
+      const newest = records.filter(({ record }) => app.records.has(record.id))
+        .sort((a, b) => b.record.created_at.localeCompare(a.record.created_at))[0];
+      const id = app.records.has(previous?.selectedID) ? previous.selectedID : newest?.record.id;
+      if (camera && previous.mode === 'globe') {
+        map.jumpTo({ ...camera, padding: globePadding() });
+      } else if (id) {
+        openSceneBuilding(id, { camera, animate: false, selected: previous?.selected === true });
+      } else if (camera) {
+        stopSpin(); intro.hidden = true; setMode('explore');
+        map.jumpTo({ ...camera, padding: { top: 0, bottom: 0, left: 0, right: 0 } });
+      }
+    }
+    if (skipped) toast('Some saved buildings could not be loaded. Open My sites to retry them.');
+  } catch (error) {
+    if (current()) toast('Couldn’t restore your saved houses. Open My sites to retry. ' + error.message);
+  }
+}
+
+let previousUser;
+function accountChanged(user) {
+  const uid = user?.uid ?? null;
+  if (uid === previousUser) return;
+  if (previousUser) {
+    store.set(`designs:${previousUser}`, []);
+    store.set(`sites:${previousUser}`, []);
+    store.set(`builder:${previousUser}`, null);
+    store.set(`lastForm:${previousUser}`, null);
+    app.generation?.abort();
+    moving = null; selecting = false; map.dragPan.enable(); map.stop();
+    ++app.displayVersion; ++app.sceneVersion;
+    $('#walk [data-exit]')?.click();
+    house.clear(); outliner.clear(); closePanel();
+    app.site = null; app.estimates.clear(); app.savedBuilding = null; app.currentDesignID = null;
+    app.records.clear(); app.removedRecords.clear(); app.savers.clear(); app.saving = null; app.sceneReady = false;
+    intro.hidden = false; intro.classList.remove('is-leaving');
+    setMode('globe');
+    map.jumpTo({ center: [-40, 28], zoom: 1.9, pitch: 0, bearing: 0, padding: globePadding() });
+  }
+  previousUser = uid;
+  if (uid) restoreScene(uid);
+  if (panel.dataset.view === 'sites' && !panel.hidden) openSites();
+}
+map.on('movestart', (event) => { if (event.originalEvent) ++app.navigationVersion; });
+map.on('moveend', rememberScene);
+addEventListener('pagehide', rememberScene);
+auth.onChange(accountChanged);
+auth.ready.then(() => accountChanged(auth.user));

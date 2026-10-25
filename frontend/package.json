@@ -5,6 +5,7 @@
   "description": "TerraSim web interface: plain HTML, CSS and JavaScript with MapLibre GL, three.js and Rive.",
   "type": "module",
   "scripts": {
+    "test": "node --test tests/*.test.js",
     "start": "node tools/serve.mjs",
     "vendor": "node tools/vendor.mjs",
     "rive": "node tools/rive/build.mjs",

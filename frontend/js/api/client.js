@@ -3,6 +3,7 @@
 
 import { config } from '../config.js';
 import { store } from '../store.js';
+import { auth } from '../auth.js';
 
 export class NotConnectedError extends Error {
   constructor() {
@@ -45,7 +46,8 @@ async function sample(name) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const localDesigns = () => store.get('designs', []);
+const designKey = () => auth.user ? `designs:${auth.user.uid}` : 'designs';
+const localDesigns = () => store.get(designKey(), []);
 
 export const api = {
   get connected() { return !!config.apiBaseUrl; },
@@ -92,8 +94,7 @@ export const api = {
       }
     }
     if (!design) {
-      console.warn('[TerraSim] The design service replied without a design:', res);
-      const err = new Error('The design service answered, but without a design. Its reply is in the browser console.');
+      const err = new Error('The design service answered, but without a design.');
       err.code = 'no-design';
       throw err;
     }
@@ -109,7 +110,7 @@ export const api = {
 
   // Keeps a received design in this browser (the newest 12), so it can be reopened.
   keepLocal(design, estimate) {
-    store.update('designs', [], (list) => [{ design, estimate }, ...list.filter((x) => x.design?.id !== design.id)].slice(0, 12));
+    store.update(designKey(), [], (list) => [{ design, estimate }, ...list.filter((x) => x.design?.id !== design.id)].slice(0, 12));
   },
 
   async design(id) {

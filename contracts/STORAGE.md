@@ -1,109 +1,77 @@
-# Storing designs: the plan
+# Private building storage
 
-**Status:** not built yet. This is the plan the website will be written against, so whoever builds the
-database knows exactly what to make. Until it exists, the website keeps designs in the browser only
-(see "Until the database exists" below).
+The Go backend stores rendered buildings in PostgreSQL JSONB. Firebase login is
+connected in the frontend. Generation remains a separate service using
+[GEMMA.md](../GEMMA.md) and [FIELDS.md](FIELDS.md).
 
-## What gets stored
+## Saved document
 
-The database stores files exactly as they are sent. It never changes a design; the renderer draws
-the stored file as is.
+The web client sends {name, data} to POST /api/buildings. Data uses this envelope:
 
-| Record | Contents | Key |
-|---|---|---|
-| **request** | The `request` part of [baseline.json](baseline.json), as the website sent it. | `request.id` |
-| **design** | The `design` part, as Gemma returned it. This is the render file. | `design.id` |
-| **estimate** | Optional: the cost now travels inside the design as `design.cost`; a separate `terrasim.estimate/1` is kept only for older services. | `estimate.designId` |
-| **job** | Progress of one request while Gemma works. | `jobId` |
-
-A design is never edited. A changed brief makes a new request and a new design, so a link to a
-design always shows the same building.
-
-## Tables (or collections)
-
-Any database that stores JSON documents works. The simplest fit is Postgres with `jsonb` columns
-(Supabase gives this with a free tier) or Firestore. The design file is stored whole in one column;
-the other columns are copies of a few fields so lists and the map can be searched without opening
-every file.
-
-```
-requests
-  id            text primary key        -- request.id
-  created_at    timestamptz
-  mode          text                    -- dream | build
-  housing_type  text
-  body          jsonb                   -- the whole request
-
-jobs
-  id            text primary key
-  request_id    text references requests(id)
-  status        text                    -- queued | running | done | failed
-  progress      real                    -- 0 to 1
-  message       text                    -- shown to the user, e.g. "Laying out floor 3"
-  design_id     text                    -- set when done
-  error         text                    -- set when failed, written for the user
-  updated_at    timestamptz
-
-designs
-  id            text primary key        -- design.id
-  request_id    text references requests(id)
-  schema        text                    -- "terrasim.design/2"
-  created_at    timestamptz
-  housing_type  text
-  title         text
-  lng           double precision        -- placement.origin, for finding designs on the map
-  lat           double precision
-  listed        boolean default false   -- true only for published build listings
-  body          jsonb                   -- the whole design (render file)
-
-estimates
-  design_id     text primary key references designs(id)
-  body          jsonb
+```json
+{
+  "schema": "terrasim.saved-building/1",
+  "design": {},
+  "estimate": null,
+  "site": null,
+  "placement": null
+}
 ```
 
-Builder contact details (`request.builder`) stay inside `requests.body` and are never returned by the
-public endpoints. Listings show the builder's name and company only.
+- design is the complete, validated terrasim.design/2 output, including its cost;
+  its id/requestId stay intact.
+- estimate is the matching terrasim.estimate/1 document for older services, or null.
+- site preserves the outlined land and original brief.
+- placement preserves where the renderer actually placed the building, including
+  relocated sample previews, without changing the original Gemma geometry.
 
-## Endpoints the website calls
+The database returns a separate SQL UUID, name, data, and creation/update timestamps.
+Use that UUID for later saves; it is not the Gemma design ID. JSONB preserves values,
+but can normalize whitespace, key order, and duplicate keys.
 
-Base URL goes in `frontend/js/config.js` (`apiBaseUrl`). Errors are any non-2xx with
-`{ "message": "..." }` written for the user.
+## Endpoints
 
-| Call | Does |
-|---|---|
-| `POST /designs` | Body: a request. Saves it, starts Gemma, returns `202 { "jobId": "..." }`. |
-| `GET /designs/jobs/{jobId}` | Returns the job: `{ status, progress, message, designId, error }`. The website polls it every 2 seconds. |
-| `GET /designs/{id}` | Returns the stored design file, unchanged. |
-| `GET /designs/{id}/estimate` | Returns the stored estimate. |
-| `GET /listings` | Returns `[{ design, estimate, builder: { name, company } }]` for designs with `listed = true`. |
-| `POST /designs/{id}/publish` | Body: `{ permission: true }`. Sets `listed = true` for a `build` design. |
-| `POST /designs/{id}/inquiries` | Body: `{ name, email, message }`. Forwards a buyer's message to the builder. |
+All storage API routes below require Authorization: Bearer <Firebase ID token>.
 
-## Order of events
+| Call | Result |
+| --- | --- |
+| GET /api/me | Verify identity and synchronize the local profile |
+| POST /api/buildings | Save {name, data}; return 201 and the SQL record |
+| GET /api/buildings?limit=20&offset=0 | List the caller's metadata and next_offset |
+| GET /api/buildings/{uuid} | Load the owner's full document |
+| PUT /api/buildings/{uuid} | Replace the complete name/data |
+| DELETE /api/buildings/{uuid} | Delete the owner's building; return 204 |
 
-1. The user fills the form. The website checks every required box, builds the request and sends
-   `POST /designs`.
-2. The server saves the request, creates a job (`queued`) and passes the request to Gemma.
-3. Gemma returns a design (with its cost inside). The server checks `design.schema`, saves both, and marks
-   the job `done` with the `designId`. If Gemma fails or returns a file that doesn't match the
-   contract, the job is `failed` with a plain message.
-4. The website sees `done`, loads `GET /designs/{id}`, checks the file, and draws it on the map.
-5. Later visits (My sites, share links, the catalog) load the same stored design by id and draw it
-   again. Nothing is generated twice.
+Missing/other-user records return 404. Errors use {error: {code, message, request_id}}.
+Requests are limited to 1 MiB. See [API reference](../docs/api.md).
 
-## Until the database exists
+## Frontend flow
 
-- `apiBaseUrl` stays empty, so sending fails with a clear "not connected yet" message.
-- The website saves sites, briefs and any design it has drawn in the browser (`localStorage`), so
-  My sites still works on one device. These copies use the same shapes as above, so moving them to
-  the database later is a straight copy.
-- The one sample house in `frontend/fixtures/mock-house/` stands in for a stored design, and is
-  labelled as a sample wherever it appears.
+1. Sign in or create an email/password account using the top bar. A refresh token
+   in this tab's sessionStorage restores login on reload; passwords and ID tokens
+   remain in memory. Production needs the real Firebase public key and storage URL.
+2. Signed-in users automatically save valid Gemma replies. A failed save leaves the
+   displayed building available, with Save building to retry.
+3. Imported design/estimate files and previews can be saved manually. Subsequent
+   saves PUT the existing SQL UUID, avoiding duplicate records. Dragging a saved
+   building automatically saves its actual placement when the drag ends. Saves
+   run in order so overlapping moves preserve the latest position; the original
+   design.placement stays intact. Failed saves can be retried with Save changes.
+4. My sites lists private saved buildings and local site drafts. Opening a SQL record
+   validates the design and restores the same building, estimate, site, and placement
+   without calling Gemma again. Load more follows next_offset.
+   Sign-in/session restoration also loads every page automatically and draws all
+   valid saved houses. The last selected SQL UUID and camera view are remembered
+   per account in the browser, so refresh restores the scene without My sites.
+   Selecting another saved house keeps the remaining models on the map.
+5. Owners can delete records. Signing out clears private rendered data and account
+   document caches. Switching accounts cannot display another user's delayed SQL
+   response. Deleting a record removes its map model as well as its SQL document.
 
-## Decisions for the backend team
-
-1. Which database (Postgres/Supabase or Firestore are the easy choices).
-2. Whether Gemma is called by the server in the background (the job flow above) or answers in one
-   request. The job flow is recommended because a whole apartment building takes a while.
-3. Whether accounts are needed. Without them, "My sites" stays per browser and private designs are
-   reachable only by their link.
+The frontend uses storageBaseUrl for Go storage and apiBaseUrl for the external
+Gemma service. Firebase tokens are never sent to a ?api= design-service URL.
+The separate housecost Go service provides generation at POST /api/designs,
+with job polling and design/cost retrieval on port 8000. Its jobs/results are local
+to that service; private account persistence uses the SQL routes above.
+The Go storage API does not implement generation jobs, publishing, public listings,
+or inquiries. Share site copies the outline/brief, not access to the private record.

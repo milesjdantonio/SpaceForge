@@ -1,13 +1,26 @@
-# Dependencies
+# Dependencies and build output
 node_modules/
+backend/bin/
+coverage.out
 
-# Local Claude Code settings (Impeccable's hooks live here; rerun its installer to get them)
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.key
+credentials*.json
+service-account*.json
 .claude/settings.local.json
 
-# Impeccable's engine binary downloads on first run
-.claude/skills/impeccable/scripts/bin/
+# Firebase emulator output
+.firebase/
+*-debug.log
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
 
-# Design-tool working files (screenshots, captures, local state)
+# Design tools and generated working files
+.claude/skills/impeccable/scripts/bin/
 .taste-skill/inspect/
 .taste-skill/before/
 .taste-skill/after/
@@ -17,19 +30,11 @@ node_modules/
 .impeccable/live/
 .impeccable/config.local.json
 
-# Python caches from skill scripts
+# Python caches and OS files
 __pycache__/
 *.pyc
-
-# OS and editor files
 .DS_Store
 Thumbs.db
-
-# Secrets: never commit keys
-.env
-.env.*
-*.key
-
 # Design service (housecost): the Gemini key and local outputs
 APIKey.txt
 housecost/gemma_log/

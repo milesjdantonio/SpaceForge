@@ -19,7 +19,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 
 const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['materials', 'Materials'], ['time', 'Over time']];
 
-export function renderHousePanel(el, { design, estimate, preview, onWalk, shareUrl }) {
+export function renderHousePanel(el, { design, estimate, preview, onWalk, shareUrl, onSave, saved = false }) {
   let tab = 'overview';
   let level = 0;
   // The panel element is shared; drop the listeners an earlier house left on it.
@@ -34,7 +34,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
     <header class="panel-head">
       <div>
         <h2 class="panel-title">${esc(design.overview.title)}</h2>
-        <p class="panel-sub">${design.sample ? (preview ? 'Sample house placed on your land' : 'Sample listing') : `${typeName(design.housingType)} designed for this land`}</p>
+        <p class="panel-sub">${design.sample ? (preview ? 'Sample house placed on your land' : 'Sample listing') : `${esc(typeName(design.housingType))} designed for this land`}</p>
       </div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
@@ -44,14 +44,16 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
     <dl class="facts num">
       <div><dt>Build estimate</dt><dd>${cost ? `${fmt.money(cost.low, { short: true })}–${fmt.money(cost.high, { short: true })}` : 'Not included'}</dd></div>
       <div><dt>Finished space</dt><dd>${fmt.area(design.totals.finishedAreaM2)}</dd></div>
-      <div><dt>Holds</dt><dd>${holdsLine(design)}</dd></div>
+      <div><dt>Holds</dt><dd>${esc(holdsLine(design))}</dd></div>
       <div><dt>Front faces</dt><dd>${faces}</dd></div>
     </dl>
     <div class="panel-actions">
       <button type="button" class="btn btn-primary" data-walk>${icon('walk')}<span>Walk through</span></button>
-      <button type="button" class="btn" data-share>${icon('share')}<span>Share</span></button>
+      ${onSave ? `<button type="button" class="btn" data-save>${saved ? 'Save changes' : 'Save building'}</button>` : ''}
+      <button type="button" class="btn" data-share>${icon('share')}<span>Share site</span></button>
       ${design.sample && !preview ? `<button type="button" class="btn" data-contact>${icon('mail')}<span>Contact builder</span></button>` : ''}
     </div>
+    <p class="note">Click or tap a building to select it in orange, then drag to move it. Click empty land to deselect.</p>
     <div class="tabs" role="tablist" aria-label="Details">
       ${TABS.map(([id, name]) => `<button type="button" role="tab" id="tab-${id}" aria-controls="tabpanel" aria-selected="${id === tab}" data-tab="${id}">${name}</button>`).join('')}
     </div>
@@ -94,10 +96,10 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
         <div class="range">
           <div class="range-figures num"><span>${fmt.money(cost.low)}</span><strong>${fmt.money(cost.expected)}</strong><span>${fmt.money(cost.high)}</span></div>
           <div class="range-bar" aria-hidden="true"><span style="left:${((cost.expected - cost.low) / (cost.high - cost.low) * 100).toFixed(1)}%"></span></div>
-          <p class="note">Low, expected and high. ${fmt.perArea(cost.expected / design.totals.finishedAreaM2)} · ${cost.confidence} confidence.</p>
+          <p class="note">Low, expected and high. ${fmt.perArea(cost.expected / design.totals.finishedAreaM2)} · ${esc(cost.confidence)} confidence.</p>
         </div>
         <table class="lines num">
-          <tbody>${cost.lines.map((l) => `<tr><td>${l.name}</td><td class="r">${fmt.money(l.amount)}</td><td class="bar-cell"><span style="width:${(l.amount / max * 100).toFixed(1)}%"></span></td></tr>`).join('')}</tbody>
+          <tbody>${cost.lines.map((l) => `<tr><td>${esc(l.name)}</td><td class="r">${fmt.money(l.amount)}</td><td class="bar-cell"><span style="width:${(l.amount / max * 100).toFixed(1)}%"></span></td></tr>`).join('')}</tbody>
           <tfoot><tr><td>Expected total</td><td class="r">${fmt.money(cost.expected)}</td><td></td></tr></tfoot>
         </table>
         ${breakdownBlock(estimate.breakdown)}
@@ -109,7 +111,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
       body.innerHTML = `
         <table class="materials num">
           <thead><tr><th>Material</th><th class="r">Quantity</th><th class="r">Cost</th></tr></thead>
-          <tbody>${estimate.materials.map((m) => `<tr><td>${m.name}</td><td class="r">${fmt.int(m.quantity)} <span class="unit">${m.unit}</span></td><td class="r">${fmt.money(m.cost)}</td></tr>`).join('')}</tbody>
+          <tbody>${estimate.materials.map((m) => `<tr><td>${esc(m.name)}</td><td class="r">${fmt.int(m.quantity)} <span class="unit">${esc(m.unit)}</span></td><td class="r">${fmt.money(m.cost)}</td></tr>`).join('')}</tbody>
           <tfoot><tr><td>Materials total</td><td></td><td class="r">${fmt.money(total)}</td></tr></tfoot>
         </table>
         <p class="note">Material costs are part of the build estimate, not on top of it.</p>`;
@@ -127,12 +129,25 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
         <div class="chart-box">${renderOverTime(estimate.overTime)}</div>
         <p class="note">Yearly maintenance, energy and replacements. Amber years carry a big replacement.</p>
         <h3 class="group-title">Big expenses ahead</h3>
-        <table class="lines num"><tbody>${estimate.overTime.events.map((e) => `<tr><td>Year ${e.year}</td><td>${e.name}</td><td class="r">${fmt.money(e.amount)}</td></tr>`).join('')}</tbody></table>
+        <table class="lines num"><tbody>${estimate.overTime.events.map((e) => `<tr><td>Year ${esc(e.year)}</td><td>${esc(e.name)}</td><td class="r">${fmt.money(e.amount)}</td></tr>`).join('')}</tbody></table>
         <p class="note">Assumes ${(estimate.overTime.assumptions.inflation * 100).toFixed(1)}% inflation and ${(estimate.overTime.assumptions.appreciation * 100).toFixed(1)}% yearly appreciation. Excludes land, taxes and insurance.</p>`;
     }
   };
 
   el.addEventListener('click', async (e) => {
+    const save = e.target.closest('[data-save]');
+    if (save) {
+      if (save.disabled) return;
+      const before = save.textContent;
+      save.disabled = true; save.textContent = 'Saving…';
+      try {
+        const result = await onSave();
+        save.textContent = result ? 'Save changes' : before;
+        if (result) toast('Building saved to your account.');
+      } catch (err) { save.textContent = before; toast(err.message || 'Couldn’t save this building. Please try again.'); }
+      finally { save.disabled = false; }
+      return;
+    }
     const t = e.target.closest('[data-tab]');
     if (t) { tab = t.dataset.tab; draw(); return; }
     const l = e.target.closest('[data-level]');
@@ -140,7 +155,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, shareU
     if (e.target.closest('[data-walk]')) onWalk();
     if (e.target.closest('[data-share]')) {
       const url = shareUrl ? shareUrl() : location.href;
-      try { await navigator.clipboard.writeText(url); toast('Link copied. Anyone with it sees this land and the house.'); }
+      try { await navigator.clipboard.writeText(url); toast('Site link copied. Your saved building stays private.'); }
       catch { prompt('Copy this link:', url); }
     }
     if (e.target.closest('[data-contact]')) toast('Messages to builders arrive once the TerraSim API is connected.');

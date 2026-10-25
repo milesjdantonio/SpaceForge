@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -239,6 +240,23 @@ func TestPipelineEveryHousingType(t *testing.T) {
 				t.Errorf("floor finishes not taken from the materials: %v", finishes)
 			}
 			out, _ := json.MarshalIndent(res, "", "  ")
+			t.Run("frontend-renderer", func(t *testing.T) {
+				node, err := exec.LookPath("node")
+				if err != nil {
+					t.Skip("Node.js is needed to check the actual frontend renderer contract")
+				}
+				cmd := exec.Command(node, "--input-type=module", "-e", `
+import { readFileSync } from 'node:fs';
+import { checkDesign } from './frontend/js/lib/design.js';
+const result = checkDesign(JSON.parse(readFileSync(0, 'utf8')).design);
+if (!result.ok) throw new Error(JSON.stringify(result.errors));
+`)
+				cmd.Dir = ".."
+				cmd.Stdin = bytes.NewReader(out)
+				if output, err := cmd.CombinedOutput(); err != nil {
+					t.Fatalf("generated design rejected by frontend: %v\n%s", err, output)
+				}
+			})
 			path := filepath.Join(t.TempDir(), "result.json")
 			os.WriteFile(path, out, 0o644)
 			var back map[string]any
