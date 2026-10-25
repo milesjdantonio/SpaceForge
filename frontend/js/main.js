@@ -677,21 +677,25 @@ hint.addEventListener('keydown', (e) => {
   placeHint();
 });
 
-function updateHint({ ring, closed }) {
+function updateHint({ ring, closed, problem }) {
   if (!outliner.active && !closed) return;
   const m = measure(ring);
   const n = ring.length;
   const touch = matchMedia('(pointer: coarse)').matches;
   const verb = touch ? 'Tap' : 'Click';
-  const msg = n === 0 ? `${verb} the first corner of the land.`
+  // Edges that would cross say so, and what to do instead.
+  const problemMsg = problem === 'cross' ? `That corner would make two edges cross, so it wasn’t added. ${verb} somewhere the red line doesn’t cross the outline.`
+    : problem === 'close' ? `Closing now would make two edges cross. Add a corner that untangles it, or press Undo.`
+    : problem === 'cross-ahead' ? `A corner here would cross an edge.` : null;
+  const msg = problemMsg ?? (n === 0 ? `${verb} the first corner of the land.`
     : n < 3 ? `${verb} the next corner.`
-    : touch ? 'Keep tapping corners. Tap the first corner, or Finish, when you’re done.' : 'Keep clicking corners. Click the first corner, or press Enter, to finish.';
+    : touch ? 'Keep tapping corners. Tap the pulsing first corner, or Finish, when you’re done.' : 'Keep clicking corners. Click the pulsing first corner, or press Enter, to finish.');
   // Until the first corner, a short loop shows how outlining works.
   const demo = n === 0 ? (hint.querySelector('.hint-demo') ?? null) : null;
   hint.innerHTML = `
     <div class="hint-head">
       <span class="hint-pin" aria-hidden="true"></span>
-      <p class="hint-msg">${msg}</p>
+      <p class="hint-msg${problemMsg ? ' is-problem' : ''}" ${problem === 'cross' || problem === 'close' ? 'role="alert"' : ''}>${msg}</p>
       <button type="button" class="hint-grip" data-grip aria-label="Move this box (arrow keys; Home puts it back)" title="Drag to move">${icon('grip')}</button>
     </div>
     ${n === 0 ? '<div class="hint-demo" aria-hidden="true"></div>' : ''}

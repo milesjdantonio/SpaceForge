@@ -716,3 +716,4 @@ tfoot td { font-weight: 600; }
 .estimate-note { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--warning) 50%, transparent); background: color-mix(in srgb, var(--warning) 10%, transparent); color: var(--ink); font-size: 0.9375rem; }
 .estimate-note svg { width: 18px; height: 18px; flex: none; color: var(--warning); margin-top: 2px; }
 .walk-stairs { top: auto; bottom: var(--margin); transform: none; }
+.hint-msg.is-problem { color: var(--negative); }
