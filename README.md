@@ -58,8 +58,8 @@ saved in `housecost/results/`.
 ### Test the AI (Gemma) in the website
 
 The contract between the website and Gemma is in [contracts/](contracts/): the blank
-[baseline.json](contracts/baseline.json), the [field guide](contracts/FIELDS.md), the
-[instructions for Gemma](contracts/GEMMA_PROMPT.md) and the [storage plan](contracts/STORAGE.md).
+[baseline.json](contracts/baseline.json), the [field guide](contracts/FIELDS.md) and the
+[storage plan](contracts/STORAGE.md). Gemma's prompts are built in code in `housecost/`.
 
 1. Run your design service with CORS allowing `http://localhost:5173`.
 2. Open `http://localhost:5173/?api=http://localhost:8000` (your server's address). The site remembers
@@ -74,7 +74,7 @@ The contract between the website and Gemma is in [contracts/](contracts/): the b
 4. The design is checked against the contract before it's drawn. If it breaks a rule, a panel lists
    exactly which, so the fix can go into Gemma's output.
 
-To check a design file without a server, use **My sites → Open a design file**: it takes a
+To check a design file without a server, use **My Builds → Open a design file**: it takes a
 `terrasim.design/2` JSON file (or a `{ design, estimate }` reply), checks it and draws it where it
 stands.
 

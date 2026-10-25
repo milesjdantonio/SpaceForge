@@ -2,7 +2,7 @@
 
 The Go backend stores rendered buildings in PostgreSQL JSONB. Firebase login is
 connected in the frontend. Generation remains a separate service using
-[GEMMA.md](../GEMMA.md) and [FIELDS.md](FIELDS.md).
+[FIELDS.md](FIELDS.md).
 
 ## Saved document
 
@@ -57,12 +57,12 @@ Requests are limited to 1 MiB. See [API reference](../docs/api.md).
    building automatically saves its actual placement when the drag ends. Saves
    run in order so overlapping moves preserve the latest position; the original
    design.placement stays intact. Failed saves can be retried with Save changes.
-4. My sites lists private saved buildings and local site drafts. Opening a SQL record
+4. My Builds lists private saved buildings and local site drafts. Opening a SQL record
    validates the design and restores the same building, estimate, site, and placement
    without calling Gemma again. Load more follows next_offset.
    Sign-in/session restoration also loads every page automatically and draws all
    valid saved houses. The last selected SQL UUID and camera view are remembered
-   per account in the browser, so refresh restores the scene without My sites.
+   per account in the browser, so refresh restores the scene without My Builds.
    Selecting another saved house keeps the remaining models on the map.
 5. Owners can delete records. Signing out clears private rendered data and account
    document caches. Switching accounts cannot display another user's delayed SQL
@@ -74,4 +74,5 @@ The separate housecost Go service provides generation at POST /api/designs,
 with job polling and design/cost retrieval on port 8000. Its jobs/results are local
 to that service; private account persistence uses the SQL routes above.
 The Go storage API does not implement generation jobs, publishing, public listings,
-or inquiries. Share site copies the outline/brief, not access to the private record.
+or inquiries. Share packs a copy of the building (design, placement, land) into the link itself
+(#b=..., terrasim.shared-building/1); it never grants access to the private record.

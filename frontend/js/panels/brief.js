@@ -4,6 +4,7 @@
 
 import { fmt } from '../format.js';
 import { problemsFor } from '../lib/place.js';
+import { landFit, fitMessage } from '../lib/fit.js';
 import { icon } from '../ui/icons.js';
 import { mountRive } from '../rive.js';
 import {
@@ -25,15 +26,13 @@ const num = (s) => {
   return t === '' ? null : Number(t);
 };
 
-export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange, onSend, coverage }) {
+export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange, onSend, coverage, terrain }) {
   const form = structuredClone(EMPTY_FORM);
   if (site.form) {
     form.housingType = site.form.housingType ?? null;
     Object.assign(form.answers, site.form.answers || {});
     Object.assign(form.advanced, structuredClone(site.form.advanced || {}));
   }
-  const builder = { name: '', company: '', email: '', landowner: '', permission: false, ...(site.builder || {}) };
-  let mode = site.mode || 'dream';
   let tried = false;           // after the first send attempt, every problem shows
   const touched = new Set();   // boxes the user has left, which show their own problem
   const siteProblems = problemsFor(m);
@@ -54,6 +53,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       <div><dt>Longest side</dt><dd>${fmt.len(m.longestEdgeM)}, ${fmt.bearing(m.longestEdgeBearing)}</dd></div>
     </dl>
     <p class="note">Buildable area keeps ${fmt.len(3)} back from every boundary. Local setbacks may differ.</p>
+    <div class="lie" data-lie aria-live="polite"><p class="note">Measuring the slope…</p></div>
     ${siteProblems.length ? `<p class="problem">${siteProblems[0]}</p>` : ''}
     <div class="coverage-alert" data-coverage role="alert" hidden></div>
     <button type="button" class="text-link edit-outline" data-edit>Adjust the outline</button>
@@ -92,25 +92,8 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       </section>
 
       <section class="qgroup" aria-labelledby="g-basics" data-basics></section>
+      <div class="fit-check" data-fit aria-live="polite" hidden></div>
 
-      <section class="qgroup" aria-labelledby="g-mode">
-        <h3 class="group-title" id="g-mode">Who it’s for</h3>
-        <div class="seg mode-seg" role="radiogroup" aria-label="Who it's for">
-          <label><input type="radio" name="mode" value="dream" ${mode === 'dream' ? 'checked' : ''}><span>Just me, privately</span></label>
-          <label><input type="radio" name="mode" value="build" ${mode === 'build' ? 'checked' : ''}><span>A listing I’ll build</span></label>
-        </div>
-        <p class="note mode-note"></p>
-        <div class="builder" ${mode === 'build' ? '' : 'hidden'}>
-          ${textBox('b-name', 'Your name', builder.name, { autocomplete: 'name' })}
-          ${textBox('b-company', 'Company', builder.company, { autocomplete: 'organization', optional: true })}
-          ${textBox('b-email', 'Email for inquiries', builder.email, { autocomplete: 'email', type: 'email' })}
-          ${textBox('b-owner', 'Landowner’s name', builder.landowner)}
-          <div class="qbox qbox-plain" data-field="b-permission">
-            <label class="check"><input type="checkbox" name="b-permission" ${builder.permission ? 'checked' : ''} aria-describedby="err-b-permission"><span>I have the landowner’s permission to design for this land and list the design.</span></label>
-            <p class="qerror" id="err-b-permission" role="alert"></p>
-          </div>
-        </div>
-      </section>
 
       <details class="advanced" data-advanced>
         <summary>
@@ -130,9 +113,8 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   const formEl = el.querySelector('form');
   const basics = el.querySelector('[data-basics]');
   const advBody = el.querySelector('[data-adv-body]');
-  const builderBox = el.querySelector('.builder');
-  const modeNote = el.querySelector('.mode-note');
   const summary = el.querySelector('[data-summary]');
+  const fitBox = el.querySelector('[data-fit]');
 
   // Housing type pictures: Rive when it loads, the icon otherwise.
   for (const slot of el.querySelectorAll('[data-type-art]')) {
@@ -283,25 +265,11 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       if (formEl.elements.commonSpaces || advBody.querySelector('[name="commonSpaces"]')) adv.commonSpaces = fd.getAll('commonSpaces');
     }
     a.designPrompt = String(fd.get('designPrompt') ?? '');
-    mode = fd.get('mode');
-    Object.assign(builder, {
-      name: String(fd.get('b-name') || '').trim(),
-      company: String(fd.get('b-company') || '').trim(),
-      email: String(fd.get('b-email') || '').trim(),
-      landowner: String(fd.get('b-owner') || '').trim(),
-      permission: fd.get('b-permission') === 'on',
-    });
   }
 
   function problems() {
     const p = { ...briefProblems(form.housingType, form.answers, fmt.area) };
     if (form.housingType) Object.assign(p, advancedProblems(form.housingType, form.advanced, form.answers.unitCount));
-    if (mode === 'build') {
-      if (!builder.name) p['b-name'] = 'Add your name so buyers know who they’re writing to.';
-      if (!/^\S+@\S+\.\S+$/.test(builder.email)) p['b-email'] = builder.email ? 'That email address doesn’t look complete.' : 'Add an email address for inquiries.';
-      if (!builder.landowner) p['b-owner'] = 'Add the landowner’s name.';
-      if (!builder.permission) p['b-permission'] = 'Confirm you have the landowner’s permission to list this design.';
-    }
     return p;
   }
 
@@ -326,10 +294,6 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   function sync() {
     read();
     const type = form.housingType;
-    builderBox.hidden = mode !== 'build';
-    modeNote.textContent = mode === 'build'
-      ? 'Listings appear in the catalog, and inquiries go to you.'
-      : 'Only you see it. Share it with a link if you like; it is never listed.';
     const chosen = type ? advancedFields(type).length - aiDecides(type, form.advanced).length : 0;
     el.querySelector('[data-adv-count]').textContent = chosen ? `${chosen} set` : '';
     syncTypeArt();
@@ -337,7 +301,21 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
     const n = form.answers.designPrompt.trim().length;
     el.querySelector('[data-count]').textContent = n ? `${n} / ${PROMPT_MAX}` : '';
     showProblems(problems());
-    onChange({ form: structuredClone(form), mode, builder: { ...builder } });
+    showFit();
+    onChange({ form: structuredClone(form), mode: 'dream', builder: null });
+  }
+
+  // How the building the brief describes sits on this land, before anything is sent.
+  function showFit() {
+    const fit = landFit(form.housingType, form.answers, form.advanced, m);
+    const msg = fitMessage(fit, fmt);
+    fitBox.hidden = !msg;
+    if (!msg) { fitBox.replaceChildren(); return; }
+    fitBox.dataset.level = fit.level;
+    const bar = fit.share != null
+      ? `<div class="fit-bar" role="img" aria-label="Uses ${Math.round(fit.share * 100)}% of the buildable land"><span style="width:${Math.min(100, fit.share * 100).toFixed(1)}%"></span></div>`
+      : '';
+    fitBox.innerHTML = `${icon(fit.level === 'ok' || fit.level === 'ai' ? 'check' : 'alert')}<div><strong>${msg.title}</strong><p>${msg.text}</p>${bar}</div>`;
   }
 
   // ---- events ----------------------------------------------------------------------------------
@@ -419,7 +397,7 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
       (box?.querySelector('input:not([type=hidden]):not(:disabled), select, textarea'))?.focus({ preventScroll: true });
       return;
     }
-    onChange({ form: structuredClone(form), mode, builder: { ...builder } });
+    onChange({ form: structuredClone(form), mode: 'dream', builder: null });
     onSend();
   });
   el.querySelector('[data-edit]').addEventListener('click', onEditOutline);
@@ -428,23 +406,33 @@ export function renderBriefPanel(el, { site, measure: m, onEditOutline, onChange
   renderAdvanced();
   sync();
 
+  // The lie of the land: how much it rises and falls, how steep, which way it drops (the contour
+  // lines on the map show the same).
+  const lie = el.querySelector('[data-lie]');
+  Promise.resolve(terrain).then((t) => {
+    if (!el.isConnected) return;
+    if (!t) { lie.innerHTML = '<p class="note">The slope couldn’t be measured here, so the design service will measure it.</p>'; return; }
+    const flat = t.steepness.name === 'flat';
+    lie.innerHTML = `
+      <h3 class="group-title">The lie of the land</h3>
+      <dl class="facts num">
+        <div><dt>Slope</dt><dd>${Math.round(t.slopeMeanPct)}% · ${esc(t.steepness.name)}</dd></div>
+        <div><dt>Rise and fall</dt><dd>${fmt.len(t.reliefM, { precise: t.reliefM < 10 })}</dd></div>
+        <div><dt>Falls toward</dt><dd>${flat ? 'Level' : esc(t.downhillName)}</dd></div>
+        <div><dt>Ground height</dt><dd>${fmt.len(t.lowM)}–${fmt.len(t.highM)}</dd></div>
+      </dl>
+      <p class="note">${esc(t.steepness.note)} The lines on the map join points of equal height, every ${fmt.len(t.interval)}.</p>`;
+  }).catch(() => { lie.replaceChildren(); });
+
   // Whether the design service has site data for this land; if not, say so before anything is sent.
+  // Outside the site data's coverage it can still be designed, with typical conditions assumed.
   coverage?.then((c) => {
     if (!c || c.covered !== false || !el.isConnected) return;
     const box = el.querySelector('[data-coverage]');
-    box.innerHTML = `${icon('alert')}<div><strong>No site data for this land</strong><p>${esc(c.message)}</p></div>`;
+    box.classList.add('is-note');
+    box.innerHTML = `${icon('alert')}<div><strong>Outside TerraSim’s detailed site data</strong><p>Soil, flood, earthquake and local wage data cover the US. Here the design assumes typical conditions and is marked as estimated, so it may not be perfect. Slope and climate are still measured.</p></div>`;
     box.hidden = false;
-    siteProblems.push('No site data for this land, so it can’t be designed yet.');
-    showProblems(problems());
   });
-}
-
-function textBox(id, label, value, { autocomplete, type = 'text', optional = false } = {}) {
-  return `<div class="qbox qbox-plain" data-field="${id}">
-    <label class="qlabel" for="${id}">${label}${optional ? ' <span class="optional">(optional)</span>' : ''}</label>
-    <input class="input qcontrol" id="${id}" name="${id}" type="${type}" ${autocomplete ? `autocomplete="${autocomplete}"` : ''} value="${esc(value)}" aria-describedby="err-${id}">
-    <p class="qerror" id="err-${id}" role="alert"></p>
-  </div>`;
 }
 
 // Artboard names in types.riv.

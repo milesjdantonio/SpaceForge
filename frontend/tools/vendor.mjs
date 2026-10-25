@@ -24,7 +24,12 @@ const files = [
   ['three/build/three.module.js', 'three/three.module.js'],
   ['three/build/three.core.js', 'three/three.core.js'],
   ['three/examples/jsm/controls/PointerLockControls.js', 'three/addons/PointerLockControls.js'],
+  ['three/examples/jsm/utils/BufferGeometryUtils.js', 'three/addons/utils/BufferGeometryUtils.js'],
   ['three/LICENSE', 'three/LICENSE', true],
+  ['pmtiles/dist/esm/index.js', 'pmtiles/pmtiles.mjs'],
+  ['pmtiles/LICENSE', 'pmtiles/LICENSE', true],
+  ['fflate/esm/browser.js', 'fflate/fflate.mjs'], // pmtiles imports it
+  ['fflate/LICENSE', 'fflate/LICENSE', true],
   ['motion/dist/motion.js', 'motion/motion.js'],
   ['motion/LICENSE.md', 'motion/LICENSE.md', true],
 ];
@@ -42,6 +47,8 @@ const versions = {
   '@rive-app/canvas': version('@rive-app/canvas'),
   'maplibre-gl': version('maplibre-gl'),
   three: version('three'),
+  pmtiles: version('pmtiles'),
+  fflate: version('fflate'),
   motion: version('motion'),
 };
 writeFileSync(join(out, 'VERSIONS.json'), JSON.stringify(versions, null, 2) + '\n');

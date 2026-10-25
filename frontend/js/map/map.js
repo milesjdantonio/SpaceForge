@@ -2,9 +2,12 @@
 // roads, labels and 3D buildings on top (OpenFreeMap, no key).
 
 import * as maplibregl from 'maplibre-gl';
+import { Protocol } from 'pmtiles';
 import { config } from '../config.js';
 
 maplibregl.setWorkerUrl(new URL('../../vendor/maplibre/maplibre-gl-worker.mjs', import.meta.url).href);
+// Overture's buildings come as one PMTiles archive read in ranges (pmtiles://).
+maplibregl.addProtocol('pmtiles', new Protocol().tile);
 
 // Satellite tiles go through this loader. Where Esri has no imagery it serves a grey "Map data
 // not yet available" tile; those are dropped so the street map underneath shows instead.
@@ -64,7 +67,12 @@ export async function createMap(container) {
   // Every land and water fill goes under the imagery; lines, labels and buildings stay on top.
   const under = style.layers.filter((l) => l.type === 'background' || (l.type === 'fill' && !/building/.test(l.id)));
   const over = style.layers.filter((l) => !under.includes(l));
-  style.layers = [...under, { id: 'satellite', type: 'raster', source: 'satellite', paint: { 'raster-fade-duration': 200 } }, ...over];
+  // Relief: a light hillshade from the same elevation tiles the land survey reads, so slopes show
+  // at a glance from neighbourhood zoom down.
+  style.sources.dem = { type: 'raster-dem', tiles: [`${config.map.terrain}/{z}/{x}/{y}.png`], tileSize: 256, encoding: 'terrarium', maxzoom: 15 };
+  const hillshade = { id: 'hillshade', type: 'hillshade', source: 'dem', minzoom: 10,
+    paint: { 'hillshade-exaggeration': 0.32, 'hillshade-shadow-color': '#0a1019', 'hillshade-highlight-color': '#fff7ea', 'hillshade-accent-color': '#2a2018' } };
+  style.layers = [...under, { id: 'satellite', type: 'raster', source: 'satellite', paint: { 'raster-fade-duration': 200 } }, hillshade, ...over];
   style.projection = { type: 'globe' };
   style.sky = {
     'sky-color': '#0b1a30',
@@ -87,8 +95,13 @@ export async function createMap(container) {
     attributionControl: { compact: true },
     canvasContextAttributes: { antialias: true },
   });
+  // Left-drag moves the map; Ctrl + drag turns and tilts it. (MapLibre also turns on a right-drag;
+  // that's switched off, so the right button does nothing on the map.)
   map.dragRotate.enable();
   map.touchZoomRotate.enableRotation();
+  const canvasBox = map.getCanvasContainer();
+  canvasBox.addEventListener('mousedown', (e) => { if (e.button === 2) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  canvasBox.addEventListener('contextmenu', (e) => e.preventDefault());
 
   await new Promise((ok) => map.once('load', ok));
   // Start with the attribution folded into its (i) button.
@@ -125,20 +138,108 @@ export async function createMap(container) {
   return { map, stopSpin, startSpin };
 }
 
-// OpenFreeMap's buildings as solid volumes: opaque, light stone that cools a little with height,
-// with MapLibre's vertical shading so walls and roofs read apart.
-const BUILDING_DAY = ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#e7e1d6', 12, '#dcd8d0', 40, '#cfd3d8', 120, '#b9c0c9'];
-const BUILDING_NIGHT = ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#4d5360', 40, '#434a57', 120, '#3a4150'];
+// Buildings as solid volumes: opaque, light stone that cools a little with height, with MapLibre's
+// vertical shading so walls and roofs read apart.
+//
+// They come from Overture Maps, for as many buildings as possible: every OpenStreetMap building
+// (OpenFreeMap's tiles drop most small ones at street zoom) plus Google, Microsoft and Esri
+// machine-mapped footprints where OpenStreetMap has none, so thinly mapped cities still stand in 3D.
+// Heights: the recorded height, else floors × 3.2 m, else one to two storeys (5 m). A building
+// with detailed parts (a tower on a podium) is drawn by its parts, which carry the heights.
+// OpenFreeMap's buildings stay as the fallback if Overture can't be reached.
+const STOREY_M = 3.2;
+const OVERTURE_HEIGHT = ['case', ['has', 'height'], ['get', 'height'], ['has', 'num_floors'], ['*', ['get', 'num_floors'], STOREY_M], 5];
+const OVERTURE_BASE = ['case', ['has', 'min_height'], ['get', 'min_height'], ['has', 'min_floor'], ['*', ['get', 'min_floor'], STOREY_M], 0];
+const OSM_HEIGHT = ['coalesce', ['get', 'render_height'], 6];
+const colour = (h, stops) => ['interpolate', ['linear'], h, ...stops];
+const DAY = [0, '#e7e1d6', 12, '#dcd8d0', 40, '#cfd3d8', 120, '#b9c0c9'];
+const NIGHT = [0, '#4d5360', 40, '#434a57', 120, '#3a4150'];
+export const BUILDING_LAYERS = ['buildings-world', 'buildings-world-parts'];
 
 function styleBuildings(map) {
   const b3d = map.getStyle().layers.find((l) => l.type === 'fill-extrusion');
-  if (!b3d) return;
-  map.setPaintProperty(b3d.id, 'fill-extrusion-color', BUILDING_DAY);
-  map.setPaintProperty(b3d.id, 'fill-extrusion-opacity', 1);
-  map.setPaintProperty(b3d.id, 'fill-extrusion-vertical-gradient', true);
-  map.setPaintProperty(b3d.id, 'fill-extrusion-height', ['coalesce', ['get', 'render_height'], 6]);
-  map.setPaintProperty(b3d.id, 'fill-extrusion-base', ['coalesce', ['get', 'render_min_height'], 0]);
   map.setLight({ anchor: 'map', position: [1.4, 210, 35], intensity: 0.45, color: '#ffffff' });
+  if (b3d) {
+    map.setPaintProperty(b3d.id, 'fill-extrusion-color', colour(OSM_HEIGHT, DAY));
+    map.setPaintProperty(b3d.id, 'fill-extrusion-opacity', 1);
+    map.setPaintProperty(b3d.id, 'fill-extrusion-vertical-gradient', true);
+    map.setPaintProperty(b3d.id, 'fill-extrusion-height', OSM_HEIGHT);
+    map.setPaintProperty(b3d.id, 'fill-extrusion-base', ['coalesce', ['get', 'render_min_height'], 0]);
+  }
+  if (!config.map.buildings?.url) return;
+  map.addSource('overture-buildings', { type: 'vector', url: `pmtiles://${config.map.buildings.url}`, attribution: config.map.buildings.attribution });
+  const paint = {
+    'fill-extrusion-color': colour(OVERTURE_HEIGHT, DAY), 'fill-extrusion-opacity': 1, 'fill-extrusion-vertical-gradient': true,
+    'fill-extrusion-height': OVERTURE_HEIGHT, 'fill-extrusion-base': OVERTURE_BASE,
+  };
+  const above = ['!=', ['get', 'is_underground'], true];
+  map.addLayer({ id: 'buildings-world', type: 'fill-extrusion', source: 'overture-buildings', 'source-layer': 'building', minzoom: 14,
+    filter: ['all', above, ['!=', ['get', 'has_parts'], true]], paint }, b3d?.id);
+  map.addLayer({ id: 'buildings-world-parts', type: 'fill-extrusion', source: 'overture-buildings', 'source-layer': 'building_part', minzoom: 14,
+    filter: above, paint }, b3d?.id);
+  if (b3d) map.setLayoutProperty(b3d.id, 'visibility', 'none');
+  // If Overture can't be reached, OpenFreeMap's buildings come back.
+  map.on('error', (e) => {
+    if (e.sourceId !== 'overture-buildings' || !b3d || map.getLayoutProperty(b3d.id, 'visibility') === 'visible') return;
+    console.warn('[TerraSim] Overture buildings unavailable; showing OpenStreetMap buildings.', e.error);
+    for (const id of BUILDING_LAYERS) map.setLayoutProperty(id, 'visibility', 'none');
+    map.setLayoutProperty(b3d.id, 'visibility', 'visible');
+  });
+}
+
+// Land being designed for is cleared: map buildings whose middle stands inside any of these rings
+// ([lng, lat]) are hidden, since the design takes their place. MapLibre can't filter polygons by
+// area, so the buildings are found in the loaded tiles and hidden by id, again as more tiles load.
+const baseFilters = new Map();
+const cleared = { rings: [], timer: 0, watching: false };
+export function clearLand(map, rings) {
+  cleared.rings = rings.filter((r) => r?.length >= 3);
+  applyClearing(map);
+  if (!cleared.watching) {
+    cleared.watching = true;
+    map.on('sourcedata', (e) => {
+      if (!cleared.rings.length || !e.isSourceLoaded || e.sourceDataType === 'metadata') return;
+      clearTimeout(cleared.timer);
+      cleared.timer = setTimeout(() => applyClearing(map), 250);
+    });
+  }
+}
+function applyClearing(map) {
+  const inLand = (ring) => {
+    let x = 0, y = 0;
+    for (const [px, py] of ring) { x += px; y += py; }
+    const c = [x / ring.length, y / ring.length];
+    return cleared.rings.some((r) => insideRing(c, r));
+  };
+  for (const l of map.getStyle().layers.filter((x) => x.type === 'fill-extrusion')) {
+    if (!baseFilters.has(l.id)) baseFilters.set(l.id, map.getFilter(l.id) ?? null);
+    const base = baseFilters.get(l.id);
+    const overture = BUILDING_LAYERS.includes(l.id);
+    const ids = new Set();
+    if (cleared.rings.length) {
+      for (const f of map.querySourceFeatures(l.source, { sourceLayer: l['source-layer'] })) {
+        const id = overture ? f.properties.id : f.id;
+        if (id == null) continue;
+        const rings = f.geometry.type === 'Polygon' ? [f.geometry.coordinates[0]] : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates.map((p) => p[0]) : [];
+        if (rings.some(inLand)) ids.add(id);
+      }
+    }
+    const keep = ids.size ? ['!', ['in', overture ? ['get', 'id'] : ['id'], ['literal', [...ids]]]] : null;
+    map.setFilter(l.id, keep && base ? ['all', base, keep] : keep ?? base);
+  }
+}
+function insideRing([x, y], ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+// The 3D building layers currently drawn (Overture's, or the fallback).
+export function buildingLayers(map) {
+  return map.getStyle().layers.filter((l) => l.type === 'fill-extrusion' && map.getLayoutProperty(l.id, 'visibility') !== 'none').map((l) => l.id);
 }
 
 export function setBasemap(map, mode) {
@@ -159,8 +260,9 @@ export function setEvening(map, on) {
     map.setPaintProperty('satellite', 'raster-brightness-max', on ? 0.42 : 1);
     map.setPaintProperty('satellite', 'raster-saturation', on ? -0.35 : 0);
   }
-  const b3d = map.getStyle().layers.find((l) => l.type === 'fill-extrusion');
-  if (b3d) map.setPaintProperty(b3d.id, 'fill-extrusion-color', on ? BUILDING_NIGHT : BUILDING_DAY);
+  for (const l of map.getStyle().layers.filter((x) => x.type === 'fill-extrusion')) {
+    map.setPaintProperty(l.id, 'fill-extrusion-color', colour(BUILDING_LAYERS.includes(l.id) ? OVERTURE_HEIGHT : OSM_HEIGHT, on ? NIGHT : DAY));
+  }
   const bg = map.getStyle().layers.find((l) => l.type === 'background');
   if (bg) map.setPaintProperty(bg.id, 'background-color', on ? '#1c2330' : '#f8f4f0');
 }

@@ -7,19 +7,21 @@ import { icon } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
 import { config } from '../config.js';
 import { typeName } from '../lib/housing.js';
+import { explainDesignError } from '../lib/errors.js';
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const clock = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : `${Math.round(s)}s`);
 
-export function renderSending(el, { request, run, onDone, onFailed, onRetry, onEdit, onPreview }) {
+export function renderSending(el, { request, fit, run, onDone, onFailed, onRetry, onEdit, onPreview, onOutline, onFix }) {
   el.innerHTML = `
     <header class="panel-head">
       <div>
-        <h2 class="panel-title">Designing for your land</h2>
-        <p class="panel-sub">${request.mode === 'build' ? 'As a listing' : 'Privately'} · ${typeName(request.housingType)} · ${request.brief.floors} ${request.brief.floors === 1 ? 'floor' : 'floors'}</p>
+        <h2 class="panel-title" data-title>Generating Build</h2>
+        <p class="panel-sub">${typeName(request.housingType)} · ${request.brief.floors} ${request.brief.floors === 1 ? 'floor' : 'floors'}</p>
       </div>
     </header>
+    <p class="note send-wait" data-wait>This may take a while. You can keep looking around the map; the design appears on your land when it’s ready.</p>
     <div class="forge" data-rive-slot>
       <div class="forge-fallback" aria-hidden="true"></div>
     </div>
@@ -48,7 +50,7 @@ export function renderSending(el, { request, run, onDone, onFailed, onRetry, onE
   const bar = el.querySelector('[data-bar]');
   const fill = el.querySelector('[data-fill]');
   const stepsEl = el.querySelector('[data-steps]');
-  const rive = mountRive(slot, { src: 'assets/rive/forge.riv', stateMachine: 'Forge', onLoad: (h) => h.set('state', 1) });
+  let rive = mountRive(slot, { src: 'assets/rive/forge.riv', stateMachine: 'Forge', onLoad: (h) => h.set('state', 1) });
 
   // ---- terminal ------------------------------------------------------------------------------
   const lines = [];
@@ -125,43 +127,67 @@ export function renderSending(el, { request, run, onDone, onFailed, onRetry, onE
       setProgress(1, 'Design received');
       print(`Design received: ${res.design.overview?.title ?? res.design.id}.`, { kind: 'term-ok' });
       rive?.set('state', 2);
+      el.querySelector('[data-title]').textContent = 'Build ready';
+      el.querySelector('[data-wait]').hidden = true;
       el.querySelector('.progress').classList.add('is-done');
       result.innerHTML = '<p class="ok-msg">Checking the design and raising it on your land…</p>';
       await wait(1800);
       onDone(res);
     } catch (err) {
+      if (err?.name === 'AbortError') return;
       clearInterval(ticker);
-      rive?.set('state', 3);
+      // The generation animation gives way to the failure one.
+      rive?.destroy();
       slot.classList.add('is-failed');
+      rive = mountRive(slot, { src: 'assets/rive/failed.riv', stateMachine: 'Failed' });
       el.querySelector('.progress').classList.add('is-failed');
-      const notConnected = err.code === 'not-connected';
-      labelEl.textContent = notConnected ? 'No design service is connected' : 'The design didn’t come back';
-      print(notConnected ? 'No design service is connected yet.' : err.message, { kind: 'term-fail' });
+      el.querySelector('[data-title]').textContent = 'Build not generated';
+      el.querySelector('[data-wait]').hidden = true;
+      const why = explainDesignError(err, { request, fit });
+      labelEl.textContent = why.title;
+      print(why.text, { kind: 'term-fail' });
       onFailed(err);
+      const ACTIONS = {
+        retry: ['btn', 'retry', 'Try again'],
+        edit: ['btn btn-quiet', null, 'Edit the brief'],
+        preview: config.showSample ? ['btn', 'house', 'Preview the sample house'] : null,
+        outline: ['btn', 'outline', 'Outline other land'],
+      };
+      const actions = why.actions.map((a) => [a, ACTIONS[a]]).filter(([, def]) => def);
+      // The first action is the main one, unless a suggested fix leads.
       result.innerHTML = `
-        <div class="fail-card">
-          <h3 class="fail-title">${notConnected ? 'Not sent: the design service isn’t connected yet' : 'The design didn’t come back'}</h3>
-          <p>${notConnected
-            ? 'Run the design service (cd housecost, then go run . -serve) and open the site it serves, or open this page with ?api=http://your-server. Your outline and brief are saved under My sites.'
-            : `${esc(err.message)} Your outline and brief are saved under My sites.`}</p>
+        <div class="fail-card" role="alert">
+          <h3 class="fail-title">${esc(why.title)}</h3>
+          <p>${esc(why.text)}</p>
+          <p class="fail-next"><strong>What to try:</strong> ${esc(why.next)}</p>
+          ${why.fixes.length ? `
+            <div class="fail-fixes">
+              <p class="group-title">Suggested changes</p>
+              ${why.fixes.map((f, i) => `<button type="button" class="fail-fix" data-fix="${i}"><strong>${esc(f.label)}</strong><span>${esc(f.why)}</span></button>`).join('')}
+            </div>` : ''}
           <div class="fail-actions">
-            ${config.showSample ? `<button type="button" class="btn btn-primary" data-a="preview">${icon('house')}<span>Preview with the sample house</span></button>` : ''}
-            <button type="button" class="btn" data-a="retry">${icon('retry')}<span>Try again</span></button>
-            <button type="button" class="btn btn-quiet" data-a="edit">Edit the brief</button>
+            ${actions.map(([a, [cls, ic, label]], i) => `<button type="button" class="${i === 0 && !why.fixes.length ? 'btn btn-primary' : cls}" data-a="${a}">${ic ? icon(ic) : ''}<span>${label}</span></button>`).join('')}
           </div>
           <details class="request">
-            <summary>The request${notConnected ? ' that would be sent' : ''}</summary>
+            <summary>Details for support</summary>
+            <p class="note">${esc(err.message || 'No message.')}${err.status ? ` (status ${err.status})` : ''}</p>
             <pre class="code">${esc(JSON.stringify(request, null, 2))}</pre>
-            <button type="button" class="btn btn-small" data-a="copy">${icon('copy')}<span>Copy JSON</span></button>
+            <button type="button" class="btn btn-small" data-a="copy">${icon('copy')}<span>Copy the request</span></button>
           </details>
         </div>`;
+      // What to do comes before the log, where it's seen first.
+      el.querySelector('.terminal').before(result);
+      result.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
       result.addEventListener('click', async (e) => {
+        const fix = e.target.closest('[data-fix]');
+        if (fix) { onFix?.(why.fixes[Number(fix.dataset.fix)].patch); return; }
         const a = e.target.closest('[data-a]')?.dataset.a;
         if (a === 'preview') onPreview();
         if (a === 'retry') onRetry();
         if (a === 'edit') onEdit();
+        if (a === 'outline') onOutline?.();
         if (a === 'copy') {
-          try { await navigator.clipboard.writeText(JSON.stringify(request, null, 2)); toast('Request copied.'); } catch { toast('Couldn’t copy. Select the text instead.'); }
+          try { await navigator.clipboard.writeText(JSON.stringify(request, null, 2)); toast('Request copied.'); } catch { toast('Couldn’t copy. Select the request text instead.', { kind: 'error' }); }
         }
       });
     }

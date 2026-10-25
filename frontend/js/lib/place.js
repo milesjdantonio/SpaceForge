@@ -62,6 +62,32 @@ export function placeOnLot(design, ring) {
   return { origin: toGeo([0, 0]), xAxisBearingDeg: best.b, footprint, fits };
 }
 
+// The middle of a placement's footprint, [lng, lat].
+export function placementCenter(placement) {
+  return ringCentroidLngLat(placement.footprint);
+}
+
+// A placement moved so its middle lands on `center` ([lng, lat]) and turned by `turnDeg` (compass
+// degrees, clockwise) about its middle. Every corner and the origin move together, so the building
+// keeps its exact shape; other fields on the placement are kept.
+export function transformPlacement(placement, { center, turnDeg = 0 }) {
+  const from = placementCenter(placement);
+  const proj = projection(from);
+  const [tx, ty] = proj.toLocal(center ?? from);
+  const a = (-turnDeg * Math.PI) / 180; // compass clockwise is maths counter-clockwise negated
+  const cos = Math.cos(a), sin = Math.sin(a);
+  const move = (p) => {
+    const [x, y] = proj.toLocal(p);
+    return proj.toGeo([x * cos - y * sin + tx, x * sin + y * cos + ty]);
+  };
+  return {
+    ...placement,
+    origin: move(placement.origin),
+    footprint: placement.footprint.map(move),
+    xAxisBearingDeg: (((placement.xAxisBearingDeg + turnDeg) % 360) + 360) % 360,
+  };
+}
+
 export function inFootprint(lngLat, footprint) {
   const proj = projection(ringCentroidLngLat(footprint));
   return pointInPolygon(proj.toLocal(lngLat), footprint.map(proj.toLocal));

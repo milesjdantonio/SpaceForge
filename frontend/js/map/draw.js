@@ -133,12 +133,19 @@ export function createOutliner(map, { onChange, onFinish, onCancel } = {}) {
   }
   function clear() { pts = []; closed = false; active = false; redraw(); }
   function undo() { if (!closed && pts.length) { pts.pop(); redraw(); } }
+  // Red while a building being moved is past the boundary; amber again once it's back inside.
+  function setWarning(on) {
+    const color = on ? '#ff8f8f' : '#ffb15c';
+    map.setPaintProperty('outline-line', 'line-color', color);
+    map.setPaintProperty('outline-fill', 'fill-color', color);
+    map.setPaintProperty('outline-fill', 'fill-opacity', on ? 0.22 : 0.16);
+  }
   function setVisible(v) {
     for (const id of ['outline-fill', 'outline-line', 'outline-rubber', 'outline-corner']) map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
   }
 
   return {
-    start, finish, cancel, load, clear, undo, setVisible,
+    start, finish, cancel, load, clear, undo, setVisible, setWarning,
     get ring() { return pts.slice(); },
     get closed() { return closed; },
     get active() { return active; },

@@ -1,7 +1,7 @@
-// Place search and "where am I" names, from OpenStreetMap's Nominatim (free, no key). Its usage
-// policy allows light use: search runs only when the visitor submits, and the place name only after
-// the map has settled, at most once a second and cached. Swap `config.geocoder` for a paid service
-// before heavy traffic.
+// Place search and "where am I" names, from OpenStreetMap data (free, no key). Suggestions while
+// typing come from Photon, which is made for that; Nominatim's policy forbids autocomplete, so it is
+// used only when the visitor submits and for the place name once the map has settled, at most once a
+// second and cached. Swap both for a paid service before heavy traffic.
 
 import { config } from '../config.js';
 
@@ -28,6 +28,30 @@ export async function searchPlaces(query, { signal } = {}) {
       center: [Number(p.lon), Number(p.lat)],
       bbox: bb ? [bb[2], bb[0], bb[3], bb[1]] : null,
       kind: p.addresstype || p.type,
+    };
+  });
+}
+
+// Suggestions while typing, nearest the map's centre first. Same shape as searchPlaces.
+const PHOTON_LANGS = ['en', 'de', 'fr', 'it'];
+export async function suggestPlaces(query, { signal, near } = {}) {
+  const params = new URLSearchParams({ q: query, limit: '6' });
+  const lang = (navigator.language || 'en').slice(0, 2);
+  if (PHOTON_LANGS.includes(lang)) params.set('lang', lang);
+  if (near) { params.set('lon', near[0].toFixed(3)); params.set('lat', near[1].toFixed(3)); }
+  const res = await fetch(`${config.typeahead}/api/?${params}`, { signal });
+  if (!res.ok) throw new Error(`Search answered ${res.status}`);
+  const { features = [] } = await res.json();
+  return features.map(({ properties: p, geometry }) => {
+    const name = p.name || [p.housenumber, p.street].filter(Boolean).join(' ') || p.city || p.state || p.country;
+    const e = p.extent;
+    return {
+      name,
+      detail: [p.name && p.street ? [p.housenumber, p.street].filter(Boolean).join(' ') : null, p.city, p.state, p.country]
+        .filter((x) => x && x !== name).slice(0, 3).join(', '),
+      center: geometry.coordinates,
+      bbox: e ? [e[0], e[3], e[2], e[1]] : null,
+      kind: p.osm_value || p.type,
     };
   });
 }

@@ -17,8 +17,9 @@ The renderer draws exactly what the design file says. It does not guess walls, m
 gaps: anything it needs is a field in the file. If the file breaks a rule in this guide, the website
 shows an error instead of a broken building.
 
-[GEMMA_PROMPT.md](GEMMA_PROMPT.md) is the instruction text for Gemma itself: what each user answer
-should mean for the design, and the order to work in.
+The instructions Gemma itself gets (what each user answer should mean for the design, and the order
+to work in) are built in code by the design service, in `housecost/` (for example `BuildProgramPrompt`
+in program.go).
 
 Conventions:
 
@@ -50,8 +51,8 @@ Conventions:
 | `brief` | object | The required questions (main form). Each one is its own box; the website won't send until every box that applies is filled. |
 | `advanced` | object | The optional questions (Advanced menu at the bottom of the form). `null` or `[]` means Gemma decides. |
 | `aiDecides` | string[] | Names of the `advanced` fields the user left for Gemma, for example `["quality", "roofing"]`. Same information as the nulls, listed so a prompt can say it plainly. |
-| `mode` | string | `dream` (private, never listed) or `build` (a builder's public listing). |
-| `builder` | object or null | Only for `build`. `permission` must be `true`; the website won't send a listing without it. |
+| `mode` | string | Always `dream`: every design is private and shared by link (there are no listings since 2026-10-24). |
+| `builder` | null | Kept for older requests; the website no longer collects builder details. |
 | `client.displayUnits` | string | `imperial` or `metric`. Display only. |
 | `client.createdAt` | string | ISO date and time. |
 
@@ -87,7 +88,7 @@ Conventions:
   style, feel, and anything to keep or avoid all come from here. The numbers in the other boxes
   are firm requirements; where the text and a box disagree, the box wins.
 - `areaM2` never includes garages or parking. `null` means the user ticked "Let Gemma choose the size": Gemma
-  chooses it (see GEMMA_PROMPT.md), and `aiDecides` includes `"areaM2"`.
+  chooses it (see the program prompt in housecost/program.go), and `aiDecides` includes `"areaM2"`.
 - `budgetUSD` is for the whole building. `null` here means the user ticked "No limit"; the website
   never sends an empty budget otherwise.
 
@@ -114,7 +115,7 @@ Style isn't a choice from a list: the user writes it in `designPrompt`.
 ## Part 2: `design` (Gemma → database → renderer)
 
 A complete example, the sample house, is [frontend/fixtures/mock-house/design.json](../frontend/fixtures/mock-house/design.json).
-On the website, **My sites → Open a design file** loads any design file, checks it against the rules
+On the website, **My Builds → Open a design file** loads any design file, checks it against the rules
 below and draws it where it stands, so Gemma's output can be checked before the API exists.
 
 ### How the building is described

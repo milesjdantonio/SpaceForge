@@ -1,43 +1,15 @@
-// Catalog of published listings, and the visitor's own saved sites.
+// My Builds: the visitor's saved buildings and site drafts.
 
 import { fmt } from '../format.js';
 import { measure } from '../lib/place.js';
 import { icon } from '../ui/icons.js';
-import { renderPlan } from '../render/plan.js';
 import { typeName } from '../lib/housing.js';
-import { holdsLine } from './house.js';
 
-export function renderCatalog(el, { listings, onOpen }) {
-  el.innerHTML = `
-    <header class="panel-head">
-      <div><h2 class="panel-title">Catalog</h2><p class="panel-sub">Designs builders have published</p></div>
-      <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
-    </header>
-    ${listings.length ? '' : '<p class="empty">No listings yet. When builders publish designs, they appear here.</p>'}
-    <ul class="cards"></ul>
-    <p class="note">Only the sample is listed until the TerraSim API is connected.</p>`;
-  const ul = el.querySelector('.cards');
-  for (const l of listings) {
-    const li = document.createElement('li');
-    li.innerHTML = `<button type="button" class="card">
-      <span class="card-plan"></span>
-      <span class="card-body">
-        <span class="card-title">${l.design.overview.title}</span>
-        <span class="card-meta num">${typeName(l.design.housingType)} · ${holdsLine(l.design)} · ${fmt.area(l.design.totals.finishedAreaM2)}</span>
-        <span class="card-price num">${fmt.money(l.estimate.buildCost.low, { short: true })}–${fmt.money(l.estimate.buildCost.high, { short: true })} to build</span>
-        <span class="card-by">${l.builder.company}</span>
-      </span></button>`;
-    li.querySelector('.card-plan').append(renderPlan(l.design, { labels: false, dims: false, className: 'plan plan-thumb', pad: 0.6 }));
-    li.querySelector('button').addEventListener('click', () => onOpen(l));
-    ul.append(li);
-  }
-}
-
-export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore }) {
+export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, buildings = [], loading = false, error = '', nextOffset = null, onSignIn, onOpenBuilding, onDeleteBuilding, onMore, onRetry }) {
   const statusText = { draft: 'Draft', 'not-sent': 'Not sent yet', sent: 'Sent' };
   el.innerHTML = `
     <header class="panel-head">
-      <div><h2 class="panel-title">My sites</h2><p class="panel-sub">Your buildings and site drafts</p></div>
+      <div><h2 class="panel-title">My Builds</h2><p class="panel-sub">Your buildings and site drafts</p></div>
       <button type="button" class="btn btn-quiet btn-icon" data-close aria-label="Close">${icon('close')}</button>
     </header>
     <section class="saved-buildings" aria-labelledby="saved-buildings-title">
@@ -45,6 +17,7 @@ export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, 
       <p class="note">${account ? 'Private to your account.' : 'Sign in to save buildings and open them on your next visit.'}</p>
       ${!account ? '<button type="button" class="btn btn-primary" data-library-signin>Sign in</button>' : ''}
       <p class="account-error" data-library-error role="alert" hidden></p>
+      ${error && onRetry ? `<div class="fail-actions"><button type="button" class="btn btn-small" data-library-retry>${icon('retry')}<span>Try again</span></button></div><p class="note">Site drafts below are kept in this browser and still work.</p>` : ''}
       ${loading ? '<p role="status">Loading saved buildings…</p>' : ''}
       ${account && !loading && !error && !buildings.length ? '<p class="empty">No saved buildings yet. Open a design and choose Save building.</p>' : ''}
       <ul class="sites" data-buildings></ul>
@@ -59,6 +32,7 @@ export function renderSites(el, { sites, onOpen, onDelete, onOpenFile, account, 
   el.querySelector('[data-file]').addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) onOpenFile?.(f); });
   el.querySelector('[data-library-signin]')?.addEventListener('click', onSignIn);
   el.querySelector('[data-library-more]')?.addEventListener('click', onMore);
+  el.querySelector('[data-library-retry]')?.addEventListener('click', onRetry);
   if (error) { const note = el.querySelector('[data-library-error]'); note.textContent = error; note.hidden = false; }
   for (const building of buildings) {
     const li = document.createElement('li');

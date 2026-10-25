@@ -1,4 +1,4 @@
-// Furniture for the walkthrough, built from the design's `furnishings` (GEMMA.md). Each item is
+// Furniture for the walkthrough, built from the design's `furnishings` (contracts/FIELDS.md). Each item is
 // made in its own frame: width along X, depth along Z, standing on y = 0, its front facing -Z.
 
 import * as THREE from 'three';
