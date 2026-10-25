@@ -2,6 +2,9 @@
 
 **[Try TerraSim → terrasim.house](https://terrasim.house/)**
 
+> **Sign-in is not available on the current deployed site.** To test sign-in, private saved
+> buildings and account-based generation, follow the [full local setup](#full-local-setup) below.
+
 _Formerly SpaceForge; the checkout, Compose project and storage Go module still use that name._
 
 Outline land on a 3D map, describe what you want to build, and turn the brief into a building on
