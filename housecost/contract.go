@@ -437,6 +437,8 @@ type DLevel struct {
 	HeightM        float64       `json:"heightM"`
 	CeilingHeightM float64       `json:"ceilingHeightM"`
 	Outline        Ring          `json:"outline"`
+	// Roof marks the stair house of a roof terrace: a level on the roof, not a floor.
+	Roof           bool          `json:"roof,omitempty"`
 	Rooms          []DRoom       `json:"rooms"`
 	Walls          []DWall       `json:"walls"`
 	Openings       []DOpening    `json:"openings"`

@@ -110,7 +110,7 @@ corridors, over a ground floor with the lobby and its common spaces.
 | `cladding` | `board-batten`, `lap-siding`, `brick`, `stucco`, `stone`, `fiber-cement`, `metal-panel`, `timber` | all |
 | `roofing` | `asphalt-shingle`, `metal`, `tile`, `slate`, `membrane` | all |
 | `priorities` | any of `efficiency`, `maintenance`, `light`, `privacy`, `accessible`, `quiet` | all |
-| `extras` | any of `office`, `porch`, `deck`, `basement`, `balconies`, `roof-terrace` | all |
+| `extras` | any of `office`, `porch`, `deck`, `basement`, `balconies`, `roof-terrace` (makes the roof flat and adds a stair house and a railed terrace on it) | all |
 | `unitMix` | counts of `studio`, `oneBed`, `twoBed`, `threeBed`; they add up to `unitCount` | apartment, condo |
 | `bathroomSharing` | `private`, `suite` (shared by a few rooms), `hall` (shared per floor) | dorm |
 | `commonSpaces` | any of `lobby`, `lounge`, `study`, `gym`, `laundry`, `kitchen`, `bike-storage`, `mail`, `restaurant` (a hotel's comes with its kitchen) | apartment, condo, dorm, hotel |
@@ -220,6 +220,7 @@ One item per home. A house has one. A dorm or hotel has none (`[]`); its rooms u
 | `openings` | Every door, window and opening on this level. |
 | `balconies` | Outdoor platforms on this level, or `[]`. |
 | `furnishings` | Furniture, or `[]`. |
+| `roof` | Optional, `true` on the stair house of a roof terrace: the last level, named "Roof", holding the stair up and a landing; its `outline` is just the stair house. Its balcony is the terrace, standing on the flat roof of the level below. It isn't counted in `totals.floors`. |
 
 **`rooms`**
 

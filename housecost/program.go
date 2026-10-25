@@ -477,6 +477,11 @@ func (p Program) Merge(pr ProgramReply) Program {
 	p.Basement = contains(p.Extras, "basement") && !isMulti(p.HousingType)
 	p.Palette = pr.Palette
 	p.Text = pr.Text
+	// A roof terrace stands on a flat roof.
+	if contains(p.Extras, "roof-terrace") && p.Shape != ShapeRound && p.Shape != ShapeLand && p.RoofType != "flat" {
+		p.RoofType, p.RoofPitch, p.Roofing = "flat", 0, "membrane"
+		p.Text.Cautions = append(p.Text.Cautions, "The roof is flat, with a membrane, so it can hold the roof terrace.")
+	}
 	return p
 }
 
@@ -570,7 +575,8 @@ Decide:
 - garageCars (per home) for house/tiny-home/townhouse/duplex/villa/mansion; parkingSpaces for the
   whole site for apartment/condo/dorm/hotel (a hotel needs about 0.8 per guest room).
 - extras (must include every extra the user listed; add others only if they suit the site):
-  basement only if the foundation is a basement.
+  basement only if the foundation is a basement; roof-terrace needs a flat roof (roofType flat,
+  membrane roofing), and code adds a stair house on the roof and a railed terrace.
 - unitMix for apartment/condo (adds up to unitCount; keep the user's mix if given).
 - bathroomSharing for dorms (suite if roomType is suite).
 - a colour palette with at least walls, roof and windows (hex like #A1B2C3).

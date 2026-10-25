@@ -89,7 +89,7 @@ func shapedProgram(p Program) Program {
 	q.AreaM2 = p.AreaM2 * grow
 	q.Extras = nil
 	for _, x := range p.Extras {
-		if x != "porch" && x != "deck" && x != "balconies" {
+		if x != "porch" && x != "deck" && x != "balconies" && x != "roof-terrace" {
 			q.Extras = append(q.Extras, x)
 		}
 	}

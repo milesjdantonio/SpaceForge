@@ -116,6 +116,11 @@ export function buildHouseModel(design) {
       along(a2, a, oz0, oz1, 0.1, 0.05 * dir, trimMat);
       along(b, b2, oz0, oz1, 0.1, 0.05 * dir, trimMat);
     }
+    // Under a roof terrace's stair house: this floor's own flat roof, with its parapet.
+    if (levels[li + 1]?.roof) {
+      prism(l.outline, z1, z1 + 0.25, roofMat);
+      for (const [a, b] of outlineEdges(l.outline)) along(a, b, z1, z1 + 0.6, 0.2, -0.1 * outward(a, b, l.outline), wallMat);
+    }
     // Balconies: a slab and a railing on the edges away from the building.
     for (const bal of l.balconies || []) {
       prism(bal.polygon, z0 - 0.15, z0 + 0.02, slabMat);

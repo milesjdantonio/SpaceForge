@@ -33,6 +33,7 @@ function materials(design) {
     exterior: std(paletteHex(design, 'walls', 0xe8e2d7)),
     floors,
     ceil: std(0xfbf9f5, { roughness: 1 }),
+    roofTop: std(paletteHex(design, 'roof', 0x5d6066), { roughness: 1, side: THREE.DoubleSide }),
     slab: std(0xbdb7ad),
     stair: std(0xa47b55, { roughness: 0.6 }),
     stairBody: std(0xe6e0d6),
@@ -135,6 +136,8 @@ function buildBuilding(design) {
     // Ceiling over the whole outline, open over stairs leaving this level; a slab edge below it.
     const leaving = (design.stairs || []).filter((s) => s.fromLevel === li).map(rectPoly);
     flat(level.outline, ceilY, M.ceil, { level: li, holes: leaving });
+    // Under a roof terrace's stair house: the flat roof you walk out onto, round the stair house.
+    if (levels[li + 1]?.roof) flat(level.outline, base + level.heightM - 0.01, M.roofTop, { level: li + 1, holes: [levels[li + 1].outline] });
 
     // Walls exactly as listed, with their openings cut out.
     const byWall = new Map();

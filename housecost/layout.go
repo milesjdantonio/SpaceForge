@@ -53,6 +53,10 @@ type LLevel struct {
 	Name         string
 	Elev, Height float64
 	Rooms        []*LRoom
+	// Outline, when set, is this level's own outline (the stair house on a roof); Roof marks that
+	// level, which isn't a floor of the building.
+	Outline []Pt
+	Roof    bool
 }
 
 type LStair struct {
@@ -98,6 +102,7 @@ type Layout struct {
 	// pitched roofs over its wings.
 	Outline   []Pt
 	RoofWings []RoofWing
+	RoofLevel bool // the top level is the stair house of a roof terrace (roofterrace.go)
 	nextKey   int
 }
 
@@ -266,7 +271,7 @@ func homeLevels(p Program) ([][]slot, []string) {
 	var levels [][]slot
 	var names []string
 
-	multi := F > 1 || p.Basement
+	multi := F > 1 || p.Basement || contains(p.Extras, "roof-terrace") // a roof terrace needs a stair up
 	elevator := (p.Accessible || mansion) && F >= 3
 
 	// The rooms that make a mansion or villa what it is, by level: the public floor, the ground

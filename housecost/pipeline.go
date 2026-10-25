@@ -418,7 +418,11 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		cautions = append(cautions, fin.sp.ParkingMsg)
 	}
 	if contains(p.Extras, "roof-terrace") {
-		cautions = append(cautions, "The roof terrace isn't drawn in this version; it would need a stair or elevator to the roof and a guard rail.")
+		if c := addRoofTerrace(l, p); c != "" {
+			cautions = append(cautions, c)
+		} else if p.Accessible || len(l.Elevators) > 0 {
+			cautions = append(cautions, "The roof terrace is reached by the stair only; taking the elevator to the roof needs a taller machine room, so check with the elevator supplier.")
+		}
 	}
 	fmt.Fprintf(log, "Drawing the design: %.1f × %.1f m, %d levels...\n", l.W, l.D, len(l.Levels))
 	d, err := BuildDesign(l, p)

@@ -224,8 +224,11 @@ func BuildDesign(l *Layout, p Program) (*Design, error) {
 		if l.Outline != nil {
 			outline = append([]Pt{}, l.Outline...)
 		}
+		if lv.Outline != nil {
+			outline = append([]Pt{}, lv.Outline...)
+		}
 		dl := DLevel{Index: lv.Index, Name: lv.Name, ElevationM: r2(lv.Elev), HeightM: r2(lv.Height),
-			CeilingHeightM: r2(lv.Height - 0.3), Outline: RingOf(outline),
+			CeilingHeightM: r2(lv.Height - 0.3), Outline: RingOf(outline), Roof: lv.Roof,
 			Balconies: []DBalcony{}, Furnishings: []DFurnishing{}}
 		for _, r := range lv.Rooms {
 			var unit *string
@@ -344,10 +347,21 @@ func BuildDesign(l *Layout, p Program) (*Design, error) {
 		t.LevelsBelowGround = 1
 	}
 	t.Floors = len(l.Levels) - t.LevelsBelowGround
-	t.GrossAreaM2 = r1(l.W * l.D * float64(len(l.Levels)))
-	if l.Outline != nil {
-		t.GrossAreaM2 = r1(PolyArea(l.Outline) * float64(len(l.Levels)))
+	if l.RoofLevel {
+		t.Floors-- // the stair house on the roof isn't a floor
 	}
+	t.GrossAreaM2 = 0
+	for _, lv := range l.Levels {
+		switch {
+		case lv.Outline != nil:
+			t.GrossAreaM2 += PolyArea(lv.Outline)
+		case l.Outline != nil:
+			t.GrossAreaM2 += PolyArea(l.Outline)
+		default:
+			t.GrossAreaM2 += l.W * l.D
+		}
+	}
+	t.GrossAreaM2 = r1(t.GrossAreaM2)
 	if p.HousingType == "hotel" {
 		// A hotel's totals count its guest rooms and their baths.
 		for _, lv := range l.Levels {
