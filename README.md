@@ -15,8 +15,21 @@ It supports houses, tiny homes, townhouses, duplexes, mansions, villas, apartmen
 and hotels, plus neighborhoods and trailer parks with roads and lots. The interface supports
 metric and imperial units; estimates are in USD.
 
-[Quick start](#quick-start) · [Architecture](#architecture) · [Full local setup](#full-local-setup) ·
-[Using the app](#using-the-app) · [Tests](#tests) · [Deployment](#deployment)
+[User personas](#user-personas) · [Quick start](#quick-start) · [Architecture](#architecture) ·
+[Full local setup](#full-local-setup) · [Using the app](#using-the-app) · [Tests](#tests) ·
+[Deployment](#deployment)
+
+## User personas
+
+These illustrative personas describe TerraSim's intended users, based on the
+[product goals](docs/product.md#users).
+
+| Persona | Goal and pain point | How they use TerraSim |
+|---|---|---|
+| **Homeowner planning a build** | Has a lot in mind and wants to see how a home with their rooms, style and budget could fit it. Generic plans are hard to picture on the actual land. | Outlines the lot, describes the home, explores its floor plans and walkthrough, and shares the concept and estimated costs with a builder. |
+| **Prospective land buyer** | Wants to explore what could stand on a plot before deciding whether to pursue it. A map or property photo alone leaves the building's scale and layout unclear. | Finds a plot on the map, draws its boundaries, tries a brief and reviews the building in its surroundings, together with site information and cost assumptions. |
+| **Small developer** | Is exploring a duplex, apartment building, neighborhood or trailer park and needs an early view of layout, capacity and costs. | Sets the housing type and unit requirements, generates a building or site layout, then saves concepts in private projects for later review and sharing. |
+| **Builder or landowner reviewing a concept** | Receives an idea from an owner or buyer and needs enough detail to discuss the layout, materials and estimated budget. | Opens a shared building link without an account, reviews the model, floor plans and cost breakdown, and uses them to guide a conversation with the sender. |
 
 ## Architecture
 
