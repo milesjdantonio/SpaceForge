@@ -533,6 +533,7 @@ func (g *genCtx) placeWindows(li int) {
 			}
 			small := r.Type == "bath" || r.Type == "powder" || r.Type == "shared-bath" || r.Type == "stair" ||
 				r.Type == "laundry" || r.Type == "hall" || r.Type == "corridor" || r.Type == "entry"
+			small = small && r.Name != "Bridge" // a bridge is glazed along both sides
 			// free intervals inside this seg
 			lo, hi := s.a+0.3, s.b-0.3
 			free := [][2]float64{{lo, hi}}

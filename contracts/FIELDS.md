@@ -309,6 +309,10 @@ home too small for the plan it asks for is drawn as one straight wing, and its c
   that draw edges or fill the floor split it into the outside ring and the court (the website's
   `outlineRings` in `lib/design.js`); the slit is never a wall.
 - `exterior.roof.wings` holds one pitched roof per wing (below).
+- **Bridges.** A U plan of two floors or more may have a glazed bridge on its top floor, a room named
+  "Bridge" (type `hall`) across the far end of the yard, open to both side halls. That floor's outline
+  then runs round the part of the yard the bridge doesn't cover, the same way a courtyard's does, and
+  `roof.wings` has a roof for the bridge.
 
 **`balconies`**
 

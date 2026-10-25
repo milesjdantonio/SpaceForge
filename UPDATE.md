@@ -92,6 +92,9 @@ open `frontend/fixtures/mock-house` from My Builds.
   and a door from its landing opens onto a railed terrace (a level marked `roof`, not a floor).
 - Curved walls inside (`housecost/interiorcurve.go`): "curved interior walls" in the description (or
   Gemma's `curvedInterior`) bends one wall of the main rooms per floor into the larger room.
+- Bridges: "a glass bridge between the wings" (or Gemma's `bridge`) gives a U plan a glazed bridge on
+  the top floor across the far end of the yard; a home that can have wings becomes a U for it. Left
+  out, with a caution, for one-floor homes and plans without two wings.
 - Fixed: the expanded plan was cut off (a CSS rule left it taller than its box).
 
 **2026-10-25 (on `FrontEnd-Refresh`, pushed, not merged into main):**
@@ -154,7 +157,6 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 
 **Gemma and backend (`housecost/`)**
 - Gemma following the description more strongly, and using the land better.
-- More building tools: bridges.
 - New types: trailer park and neighborhood on `terrasim.design/3`.
 - Rive pictures for the mansion, villa and hotel cards in `types.riv`.
 - Run a full design with real Gemma end to end.

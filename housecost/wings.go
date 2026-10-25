@@ -71,6 +71,7 @@ type wingPlan struct {
 	roofs   []RoofWing
 	W, D    float64 // the bounding rectangle
 	wingD   float64 // the depth of one wing
+	yard    Rect    // a U's yard, between its side wings
 }
 
 // planWings lays out the bands and halls of a winged plan: a is the main wing's length, b the side
@@ -111,6 +112,7 @@ func planWings(shape string, ps homePreset, a, b float64) wingPlan {
 			wp.D = y1
 			wp.outline = []Pt{{0, 0}, {a, 0}, {a, y1}, {a - S, y1}, {a - S, D}, {S, D}, {S, y1}, {0, y1}}
 			wp.roofs = append(wp.roofs, RoofWing{a - S, D / 2, a, y1, "y"}, RoofWing{0, D / 2, S, y1, "y"})
+			wp.yard = Rect{S, D, a - S, y1}
 			break
 		}
 		// The back wing closes the court: its hall joins both side halls.
@@ -174,8 +176,15 @@ func layoutWings(p Program, variant int) (*Layout, error) {
 		}
 	}
 	want := perFloor + garageArea
+	side := func(a float64) float64 {
+		b := wingLengths(p.Shape, ps, a)
+		if p.Bridge && p.Shape == ShapeU {
+			b = math.Max(b, ps.db+5.6) // room in the yard for the bridge and a garden under it
+		}
+		return b
+	}
 	area := func(a float64) float64 {
-		return PolyArea(planWings(p.Shape, ps, a, wingLengths(p.Shape, ps, a)).outline)
+		return PolyArea(planWings(p.Shape, ps, a, side(a)).outline)
 	}
 	// The main wing's length for the floor area asked for, then longer until every room fits.
 	lo, hi := minMainLength(p.Shape, ps), 300.0
@@ -197,7 +206,7 @@ func layoutWings(p Program, variant int) (*Layout, error) {
 		if tries > 60 {
 			return nil, fmt.Errorf("couldn't fit the rooms into a %s plan", p.Shape)
 		}
-		wp = planWings(p.Shape, ps, a, wingLengths(p.Shape, ps, a))
+		wp = planWings(p.Shape, ps, a, side(a))
 		assigned = nil
 		ok := true
 		for _, lv := range levels {
@@ -237,6 +246,7 @@ func layoutWings(p Program, variant int) (*Layout, error) {
 	}
 	const unitID = "U-1"
 	var stairRooms, elevRooms []*LRoom
+	var topHalls []*LRoom
 	entryDone := false
 	publicLvl := base
 	if p.Floors >= 3 {
@@ -260,6 +270,7 @@ func layoutWings(p Program, variant int) (*Layout, error) {
 		for _, o := range wp.open {
 			halls[o[1]].Open = append(halls[o[1]].Open, halls[o[0]].Key)
 		}
+		topHalls = halls
 		byTag := map[string]*LRoom{}
 		mainBack := map[*LRoom]bool{}
 		for bi, b := range assigned[li] {
@@ -350,6 +361,9 @@ func layoutWings(p Program, variant int) (*Layout, error) {
 	}
 	if !entryDone {
 		return nil, fmt.Errorf("no front room for the entry door")
+	}
+	if p.Bridge {
+		l.Cautions = append(l.Cautions, addBridge(l, p, wp, topHalls)...)
 	}
 	for i := 0; i+1 < len(stairRooms); i++ {
 		l.Stairs = append(l.Stairs, LStair{R: stairRooms[i].R, From: stairRooms[i].Level, To: stairRooms[i+1].Level,
@@ -522,4 +536,26 @@ func shapeName(s string) string {
 		return "courtyard"
 	}
 	return s
+}
+
+// addBridge joins a U's side wings on the top floor with a glazed bridge across the far end of
+// the yard, open to both side halls; the yard carries on under it. It returns cautions.
+func addBridge(l *Layout, p Program, wp wingPlan, halls []*LRoom) []string {
+	const bw = 2.2
+	y := wp.yard
+	top := l.Levels[len(l.Levels)-1]
+	switch {
+	case p.Shape != ShapeU || p.Floors < 2 || len(halls) < 3:
+		return []string{"The bridge was left out: it joins the two wings of a U plan on an upper floor."}
+	case y.D() < bw+3 || y.W() < 3:
+		return []string{"The bridge was left out: the yard between the wings is too small to span."}
+	}
+	r := Rect{y.X0, y.Y1 - bw, y.X1, y.Y1}
+	br := l.add(top.Index, "Bridge", "hall", "U-1", r)
+	br.Open = append(br.Open, halls[1].Key, halls[2].Key)
+	// This floor's outline: the U, plus the bridge, round the part of the yard it doesn't cover.
+	S, a, yc := y.X0, l.W, y.Y1-bw
+	top.Outline = []Pt{{S, 0}, {a, 0}, {a, y.Y1}, {0, y.Y1}, {0, 0}, {S, 0}, {S, y.Y0}, {S, yc}, {y.X1, yc}, {y.X1, y.Y0}, {S, y.Y0}}
+	l.RoofWings = append(l.RoofWings, RoofWing{y.X0, yc, y.X1, y.Y1, "x"})
+	return nil
 }

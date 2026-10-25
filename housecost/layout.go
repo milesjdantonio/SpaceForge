@@ -134,6 +134,15 @@ func BuildLayout(p Program, variant int) (*Layout, error) {
 	if isMulti(p.HousingType) {
 		return layoutCorridor(p, variant)
 	}
+	if p.Bridge && !(p.Shape == ShapeU && wingHomeTypes(p.HousingType)) {
+		// Only a U plan's wings have a bridge between them; say so once the layout is done.
+		p.Bridge = false
+		l, err := BuildLayout(p, variant)
+		if err == nil {
+			l.Cautions = append(l.Cautions, "The bridge was left out: it joins the two wings of a U plan on an upper floor.")
+		}
+		return l, err
+	}
 	if isWingShape(p.Shape) && wingHomeTypes(p.HousingType) {
 		l, err := layoutWings(p, variant)
 		if err != errWingTooBig {
@@ -142,6 +151,9 @@ func BuildLayout(p Program, variant int) (*Layout, error) {
 		// Too small for the plan: a straight plan instead, and say so.
 		if l, err = layoutHomes(p, variant); err == nil {
 			l.Cautions = append(l.Cautions, fmt.Sprintf("At %.0f m² the home is too small for a %s plan, so it's drawn as one straight wing.", p.AreaM2, shapeName(p.Shape)))
+			if p.Bridge {
+				l.Cautions = append(l.Cautions, "The bridge was left out with the wings it would have joined.")
+			}
 		}
 		return l, err
 	}

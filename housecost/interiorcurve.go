@@ -14,6 +14,10 @@ import (
 
 var curvedInsideRe = regexp.MustCompile(`(?i)\bcurv\w*\s+(interior|inside|internal|inner|feature|partition)\s+walls?\b|\b(interior|inside|internal|inner)\s+walls?\s+(that\s+)?(are\s+|is\s+)?curv\w*|\bcurv\w*\s+walls?\s+(inside|indoors|within)\b|\bcurv\w*\s+wall\s+in\s+the\s+(living|family|dining|lobby|lounge|entry|hall)`)
 
+// bridgeRe is a bridge between parts of the building ("a glass bridge", "a skybridge between the
+// wings"), not a bridge nearby.
+var bridgeRe = regexp.MustCompile(`(?i)\b(sky ?bridge|glass bridge|covered bridge|enclosed bridge|bridge (between|joining|connecting|across|linking|over the (yard|garden|courtyard|patio|pool))|(a|an|with a|and a) (glass |glazed |covered |enclosed )?(bridge|walkway) (between|joining|connecting|across|linking))\b`)
+
 // curvedInsideFromPrompt is true when the user asks for curved walls inside.
 func curvedInsideFromPrompt(text string) bool { return curvedInsideRe.MatchString(text) }
 
