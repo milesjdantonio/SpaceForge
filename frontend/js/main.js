@@ -1,7 +1,7 @@
 // TerraSim: the globe, the fly-down, outlining land, the brief, sending, and the house on its lot.
 
 import { settings, store } from './store.js';
-import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setEvening, clearLand } from './map/map.js';
+import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setEvening, clearLand, nearbyStreets } from './map/map.js';
 import { createOutliner } from './map/draw.js';
 import { createHouseLayer } from './map/house-layer.js';
 import { measure, problemsFor, placeOnLot, placementCenter } from './lib/place.js';
@@ -814,6 +814,11 @@ async function send() {
   lockLand(true);
   setMode('sending');
   const request = buildRequest(app.site);
+  // The streets near the land, from the map, so the design service can face the front to the street.
+  try {
+    const streets = nearbyStreets(map, app.site.ring);
+    if (streets.length) request.site.properties.streets = streets;
+  } catch { /* the map's tiles aren't readable: the service looks the streets up itself */ }
   app.site.lastRequestId = request.id;
   // The lot lights up while the design is made; the building grows out of it when it arrives.
   house.hide();

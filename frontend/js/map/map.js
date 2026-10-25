@@ -348,3 +348,35 @@ function fallbackStyle() {
 }
 
 export { maplibregl };
+
+// Streets near a piece of land ([lng, lat] ring), read from the map's own loaded tiles: up to eight
+// [lng, lat] lines within about 150 m of the land's middle. The design service turns the building's
+// front toward the nearest, without a slow street lookup of its own. [] when none are loaded.
+const STREET_CLASSES = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor', 'service', 'residential', 'unclassified', 'living_street']);
+export function nearbyStreets(map, ring, radiusM = 150) {
+  if (!ring?.length) return [];
+  const c = [ring.reduce((s, p) => s + p[0], 0) / ring.length, ring.reduce((s, p) => s + p[1], 0) / ring.length];
+  const kx = 111320 * Math.cos((c[1] * Math.PI) / 180), ky = 110540;
+  const local = ([lng, lat]) => [(lng - c[0]) * kx, (lat - c[1]) * ky];
+  const segDist = (a, b) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, -(a[0] * dx + a[1] * dy) / l2)) : 0;
+    return Math.hypot(a[0] + t * dx, a[1] + t * dy);
+  };
+  const found = [];
+  for (const id of Object.keys(map.getStyle()?.sources ?? {})) {
+    let feats = [];
+    try { feats = map.querySourceFeatures(id, { sourceLayer: 'transportation' }); } catch { continue; }
+    for (const f of feats) {
+      if (!STREET_CLASSES.has(f.properties?.class)) continue;
+      const g = f.geometry;
+      const lines = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : [];
+      for (const line of lines) {
+        let d = Infinity;
+        for (let i = 0; i + 1 < line.length; i++) d = Math.min(d, segDist(local(line[i]), local(line[i + 1])));
+        if (d < radiusM) found.push({ d, line: line.map(([x, y]) => [+x.toFixed(7), +y.toFixed(7)]) });
+      }
+    }
+  }
+  return found.sort((a, b) => a.d - b.d).slice(0, 8).map((x) => x.line);
+}

@@ -641,3 +641,58 @@ func onlyKnown(list, allowed []string) []string {
 	}
 	return out
 }
+
+// keepUserChoices puts back every choice the user made that Gemma's program changed (style,
+// materials, garage, parking, the unit mix, and the extras, priorities and common spaces the user
+// listed), so that doesn't cost a retry. It returns what it put back, for the log.
+func keepUserChoices(pr *ProgramReply, r Request) []string {
+	var notes []string
+	a := r.Advanced
+	str := func(field string, user *string, got *string) {
+		if user != nil && *got != *user {
+			notes = append(notes, fmt.Sprintf("%s back to the user's %q", field, *user))
+			*got = *user
+		}
+	}
+	str("style", a.Style, &pr.Style)
+	str("quality", a.Quality, &pr.Quality)
+	str("structure", a.Structure, &pr.Structure)
+	str("cladding", a.Cladding, &pr.Cladding)
+	str("roofing", a.Roofing, &pr.Roofing)
+	ht := sv(r.HousingType)
+	if a.Garage != nil && !isMulti(ht) && (pr.GarageCars == nil || *pr.GarageCars != *a.Garage) {
+		g := *a.Garage
+		pr.GarageCars = &g
+		notes = append(notes, fmt.Sprintf("garage back to the user's %d", g))
+	}
+	if a.ParkingSpaces != nil && isMulti(ht) && (pr.ParkingSpaces == nil || *pr.ParkingSpaces != *a.ParkingSpaces) {
+		n := *a.ParkingSpaces
+		pr.ParkingSpaces = &n
+		notes = append(notes, fmt.Sprintf("parking back to the user's %d", n))
+	}
+	if (ht == "apartment" || ht == "condo") && a.UnitMix.set() {
+		if pr.UnitMix == nil {
+			pr.UnitMix = map[string]int{}
+		}
+		for k, v := range a.UnitMix.counts() {
+			if pr.UnitMix[k] != v {
+				pr.UnitMix[k] = v
+				notes = append(notes, fmt.Sprintf("unit mix %s back to the user's %d", k, v))
+			}
+		}
+	}
+	include := func(field string, user []string, got *[]string) {
+		for _, x := range user {
+			if !contains(*got, x) {
+				*got = append(*got, x)
+				notes = append(notes, fmt.Sprintf("%s: added the user's %q", field, x))
+			}
+		}
+	}
+	include("extras", a.Extras, &pr.Extras)
+	include("priorities", a.Priorities, &pr.Priorities)
+	if isMulti(ht) {
+		include("commonSpaces", a.CommonSpaces, &pr.CommonSpaces)
+	}
+	return notes
+}

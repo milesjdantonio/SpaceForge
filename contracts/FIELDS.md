@@ -64,6 +64,7 @@ Conventions:
 | `properties.areaM2` | Area of the outline. |
 | `properties.perimeterM` | Length around the outline. |
 | `properties.centroid` | `[lng, lat]` of the middle of the outline. |
+| `properties.streets` | Optional. Streets within about 150 m of the land, as `[lng, lat]` lines from the website's map. The design service faces the front toward the nearest; without them it looks the streets up itself (slower). |
 | `properties.setbackM` | Distance kept clear from every boundary (currently 3). |
 
 ### `brief`: required questions, by housing type

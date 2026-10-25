@@ -38,6 +38,9 @@ type SiteFeature struct {
 		PerimeterM *float64   `json:"perimeterM"`
 		Centroid   []*float64 `json:"centroid"`
 		SetbackM   *float64   `json:"setbackM"`
+		// Streets near the land as [lng, lat] lines, from the website's own map, so the front can
+		// face the street without a slow lookup. Optional.
+		Streets [][]Pt `json:"streets,omitempty"`
 	} `json:"properties"`
 }
 

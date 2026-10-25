@@ -10,6 +10,7 @@ import (
 	"io"
 	"math"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -46,47 +47,71 @@ func (dp Deps) stopped() bool { return dp.Ctx != nil && dp.Ctx.Err() != nil }
 func LiveDeps(ask AskFunc, log io.Writer, ov map[string]Override) Deps {
 	return Deps{
 		FetchSite: FetchSiteData,
-		Roads:     func(f Frame, c Pt) ([]float64, error) { return FetchRoadBearings(f, c, 120) },
+		Roads:     func(f Frame, c Pt) ([]float64, error) { return withTimeout(roadsTimeout, func() ([]float64, error) { return FetchRoadBearings(f, c, 120) }) },
 		Suppliers: func(lat, lon float64) ([]Supplier, error) { return FetchSuppliers(lat, lon, SearchRadiusKm) },
 		Ask:       ask, Now: time.Now, Log: log, Overrides: ov,
 	}
 }
 
-// FetchSiteData pulls every free data source for the site and the building's footprint.
+// FetchSiteData pulls every free data source for the site and the building's footprint. The
+// sources are separate services, so they're asked at the same time: the slowest one sets the wait.
 func FetchSiteData(q SiteQuery) (Site, error) {
 	lat, lon := q.Footprint[1], q.Footprint[0]
 	ft := q.SetbackM / MPerFt
 	s := Site{Setbacks: Setbacks{ft, ft, ft}, LotFt: q.SiteDimsFt}
+	var mu sync.Mutex
 	warn := func(label string, err error) {
+		mu.Lock()
 		s.Warnings = append(s.Warnings, fmt.Sprintf("%s unavailable (%v); used a default.", label, err))
+		mu.Unlock()
 	}
-	var err error
-	if s.Location, err = FetchLocation(q.Centroid[1], q.Centroid[0]); err != nil {
-		warn("Location", err)
-	}
-	grid, src, err := FetchDEM(lat, lon, q.FootprintFt)
-	if err != nil {
-		return s, fmt.Errorf("elevation: %w", err)
-	}
-	s.Terrain = AnalyzeFootprint(grid)
-	s.Terrain.ElevationSource = src
-	if s.Climate, err = FetchClimate(lat, lon); err != nil {
-		return s, fmt.Errorf("climate: %w", err)
-	}
-	if s.Flood, err = FetchFlood(lat, lon); err != nil {
-		warn("FEMA flood zone", err)
-		s.Flood = Flood{"unknown", false}
-	}
-	if s.Seismic, err = FetchSeismic(lat, lon); err != nil {
-		warn("USGS seismic", err)
-		s.Seismic = Seismic{SDC: "unknown"}
-	}
-	if s.Soil, err = FetchSoil(q.SiteBox); err != nil {
-		return s, fmt.Errorf("soil: %w", err)
-	}
-	if s.Labor, err = FetchWageFactor(s.Location.StateCode); err != nil {
-		warn("BLS wages", err)
-		s.Labor = Labor{WageFactor: 1}
+	var wg sync.WaitGroup
+	var demErr, climateErr, soilErr error
+	run := func(f func()) { wg.Add(1); go func() { defer wg.Done(); f() }() }
+	run(func() {
+		var err error
+		if s.Location, err = FetchLocation(q.Centroid[1], q.Centroid[0]); err != nil {
+			warn("Location", err)
+		}
+		// Wages need the state the location lookup found.
+		if s.Labor, err = FetchWageFactor(s.Location.StateCode); err != nil {
+			warn("BLS wages", err)
+			s.Labor = Labor{WageFactor: 1}
+		}
+	})
+	run(func() {
+		grid, src, err := FetchDEM(lat, lon, q.FootprintFt)
+		if err != nil {
+			demErr = err
+			return
+		}
+		s.Terrain = AnalyzeFootprint(grid)
+		s.Terrain.ElevationSource = src
+	})
+	run(func() { s.Climate, climateErr = FetchClimate(lat, lon) })
+	run(func() {
+		var err error
+		if s.Flood, err = FetchFlood(lat, lon); err != nil {
+			warn("FEMA flood zone", err)
+			s.Flood = Flood{"unknown", false}
+		}
+	})
+	run(func() {
+		var err error
+		if s.Seismic, err = FetchSeismic(lat, lon); err != nil {
+			warn("USGS seismic", err)
+			s.Seismic = Seismic{SDC: "unknown"}
+		}
+	})
+	run(func() { s.Soil, soilErr = FetchSoil(q.SiteBox) })
+	wg.Wait()
+	switch {
+	case demErr != nil:
+		return s, fmt.Errorf("elevation: %w", demErr)
+	case climateErr != nil:
+		return s, fmt.Errorf("climate: %w", climateErr)
+	case soilErr != nil:
+		return s, fmt.Errorf("soil: %w", soilErr)
 	}
 	return s, nil
 }
@@ -232,9 +257,27 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	centre := PolyCentroid(local)
 	var warnings, cautions []string
 
+	// Nearby suppliers only need the site's position: look them up while Gemma works.
+	type supResult struct {
+		list []Supplier
+		err  error
+	}
+	supDone := make(chan supResult, 1)
+	go func() {
+		if dp.Suppliers == nil {
+			supDone <- supResult{}
+			return
+		}
+		list, err := dp.Suppliers(cLat, cLng)
+		supDone <- supResult{list, err}
+	}()
+
 	// 1. which way the front faces: toward the nearest mapped street
 	var bearings []float64
-	if dp.Roads != nil {
+	if st := r.Site.Properties.Streets; len(st) > 0 {
+		bearings = streetBearings(frame, centre, st)
+	}
+	if bearings == nil && dp.Roads != nil {
 		if b, err := dp.Roads(frame, centre); err != nil {
 			warnings = append(warnings, fmt.Sprintf("Street lookup unavailable (%v); the front faces the best-fitting site edge.", err))
 		} else {
@@ -314,7 +357,15 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	}
 	sizing := fmt.Sprintf("a first version is %.1f × %.1f m with %d levels; site %.0f m² with a %.0f m setback from every boundary",
 		f0.l.W, f0.l.D, len(f0.l.Levels), siteArea, setback)
-	pr, err := AskUntilValid(BuildProgramPrompt(rAdj, site, a, sizing), ParseProgram,
+	// The user's own choices are put back by code when Gemma changes them, instead of a retry.
+	parseProgram := func(text string) (ProgramReply, error) {
+		pr, err := ParseProgram(text)
+		for _, n := range keepUserChoices(&pr, rAdj) {
+			fmt.Fprintf(log, "  fixed: %s\n", n)
+		}
+		return pr, err
+	}
+	pr, err := AskUntilValid(BuildProgramPrompt(rAdj, site, a, sizing), parseProgram,
 		func(x ProgramReply) []string { return ValidateProgram(x, rAdj, site, a) }, dp.Ask, "design program", 8192, 3, log)
 	if err != nil {
 		out.Report.Verdict, out.Report.Problems = "error", []string{err.Error()}
@@ -386,7 +437,17 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	if dp.stopped() {
 		return out, ErrCancelled
 	}
-	mp, err := AskUntilValid(BuildMaterialsPlanPrompt(p, a, d, site), ParseMaterialPlan,
+	// Small slips in the reply are fixed by code before the checks, so they don't cost a retry.
+	parseFixed := func(text string) (MaterialPlan, error) {
+		mp, err := ParseMaterialPlan(text)
+		if err == nil {
+			for _, n := range fixMaterialPlan(&mp, d) {
+				fmt.Fprintf(log, "  fixed: %s\n", n)
+			}
+		}
+		return mp, err
+	}
+	mp, err := AskUntilValid(BuildMaterialsPlanPrompt(p, a, d, site), parseFixed,
 		func(x MaterialPlan) []string { return ValidateMaterialPlan(x, a, p, d, site) }, dp.Ask, "materials", 16384, 3, log)
 	if err != nil {
 		out.Design = d
@@ -413,10 +474,15 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 	}
 	fmt.Fprintln(log, "Pricing: nearby suppliers, quantities, labor and site work...")
 	var sups []Supplier
-	if dp.Suppliers != nil {
-		if sups, err = dp.Suppliers(cLat, cLng); err != nil {
-			warnings = append(warnings, fmt.Sprintf("Supplier search unavailable (%v).", err))
+	// The supplier search has had all of Gemma's time; give it a little more, then price without it.
+	select {
+	case res := <-supDone:
+		sups = res.list
+		if res.err != nil {
+			warnings = append(warnings, fmt.Sprintf("Supplier search unavailable (%v).", res.err))
 		}
+	case <-time.After(supplierGrace):
+		warnings = append(warnings, "The nearby supplier search took too long; prices use regional averages.")
 	}
 	take := DesignTakeoff(d, a.FoundationType, d.Exterior.Roof.EaveM)
 	lines := PriceDesign(p, mp, take, site, sups, dp.Overrides)
@@ -531,4 +597,46 @@ func soilSummary(s Site, a Assessment) *SiteSoil {
 	return &SiteSoil{Source: "USDA Soil Data Access", SoilName: name, USCS: so.GoverningUSCS, BearingPSF: so.GoverningBearing,
 		ShrinkSwell: so.ShrinkSwell, BedrockIn: so.MinBedrockIn, WaterTableIn: so.MinWaterIn,
 		Foundation: humanize(a.FoundationType), FoundationWhy: a.FoundationReason, Note: so.Note}
+}
+
+// The street lookup (OpenStreetMap Overpass) is often slow; past this the front faces the best
+// site edge instead. The website usually sends the streets itself, so it's rarely needed.
+var roadsTimeout = 8 * time.Second
+
+// How long pricing waits for the supplier search once Gemma is done.
+var supplierGrace = 10 * time.Second
+
+// withTimeout gives up on f after d (f keeps running in the background and its answer is dropped).
+func withTimeout[T any](d time.Duration, f func() (T, error)) (T, error) {
+	type res struct {
+		v   T
+		err error
+	}
+	ch := make(chan res, 1)
+	go func() { v, err := f(); ch <- res{v, err} }()
+	select {
+	case r := <-ch:
+		return r.v, r.err
+	case <-time.After(d):
+		var zero T
+		return zero, fmt.Errorf("no answer in %s", d)
+	}
+}
+
+// streetBearings faces the front toward the nearest of the streets the website sent ([lng, lat]).
+func streetBearings(f Frame, centre Pt, streets [][]Pt) []float64 {
+	bestD := math.Inf(1)
+	var bestA, bestB Pt
+	for _, line := range streets {
+		for i := 0; i+1 < len(line); i++ {
+			a, b := f.ToLocal(line[i]), f.ToLocal(line[i+1])
+			if d := distToSeg(centre, a, b); d < bestD && d < 150 {
+				bestD, bestA, bestB = d, a, b
+			}
+		}
+	}
+	if math.IsInf(bestD, 1) {
+		return nil
+	}
+	return roadFacingBearings(centre, bestA, bestB)
 }

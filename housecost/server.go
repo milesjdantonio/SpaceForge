@@ -59,7 +59,7 @@ var stepDefs = []stepDef{
 var stepExpect = struct {
 	sync.Mutex
 	s map[string]float64
-}{s: map[string]float64{"sizing": 4, "site": 25, "assessment": 35, "program": 45, "drawing": 4, "materials": 55, "pricing": 15}}
+}{s: map[string]float64{"sizing": 3, "site": 4, "assessment": 8, "program": 18, "drawing": 2, "materials": 32, "pricing": 4}}
 
 type jobStep struct {
 	ID       string  `json:"id"`
