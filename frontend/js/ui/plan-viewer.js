@@ -5,7 +5,7 @@ import { icon } from './icons.js';
 import { renderPlan } from '../render/plan.js';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const MIN = 1, MAX = 12;
+const MIN = 0.25, MAX = 12; // below 100% the whole plan sits smaller in the middle
 
 export function openPlanViewer({ design, level = 0, title, onLevel }) {
   const back = document.activeElement;
@@ -47,9 +47,10 @@ export function openPlanViewer({ design, level = 0, title, onLevel }) {
   }
   function apply() {
     const w = base[2] / zoom, h = base[3] / zoom;
-    // Keep the view over the plan.
+    // Keep the view over the plan; zoomed out past 100%, the plan stays in the middle.
     cx = Math.max(base[0] + w / 2 - base[2] * 0.4, Math.min(base[0] + base[2] - w / 2 + base[2] * 0.4, cx));
     cy = Math.max(base[1] + h / 2 - base[3] * 0.4, Math.min(base[1] + base[3] - h / 2 + base[3] * 0.4, cy));
+    if (zoom <= 1) { cx = base[0] + base[2] / 2; cy = base[1] + base[3] / 2; }
     svg.setAttribute('viewBox', `${cx - w / 2} ${cy - h / 2} ${w} ${h}`);
     el.querySelector('[data-pct]').textContent = `${Math.round(zoom * 100)}%`;
   }

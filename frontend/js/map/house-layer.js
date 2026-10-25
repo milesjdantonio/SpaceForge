@@ -257,7 +257,6 @@ export function createHouseLayer(map) {
   const empty = () => ({ id: null, design: null, model: null, placement: null, rise: 1 });
   let state = empty();
   let selection = null;
-  const orange = new THREE.Color('#ff8a2a');
   let night = false;
   const saved = new Map();
   let renderer, camera, renderMatrix;
@@ -281,12 +280,9 @@ export function createHouseLayer(map) {
       material.color.copy(original.color);
       material.emissive.copy(original.emissive);
       material.emissiveIntensity = material === entry.model.userData.glassMat ? (night ? 1.1 : 0) : original.intensity;
-      if (entry === selection) {
-        material.color.lerp(orange, 0.5);
-        material.emissive.copy(orange);
-        material.emissiveIntensity = Math.max(material.emissiveIntensity, 0.22);
-      }
     }
+    // A selected building keeps its own colours; a thin line round it on the ground shows it's chosen.
+    if (entry.ring) entry.ring.visible = entry === selection;
     entry.sun.intensity = night ? 0.5 : 2.2;
     entry.sky.intensity = night ? 0.5 : 1.6;
   }
@@ -315,8 +311,22 @@ export function createHouseLayer(map) {
       }
     });
     scene.add(sun, sky, model);
+    // The selection line: the ground floor's outline, just outside the walls.
+    const ground = renderable(design).levels.find((l) => l.elevationM >= 0)?.outline;
+    let ring = null;
+    if (ground?.length >= 3) {
+      const [gx, gy] = centroid(ground);
+      const pts = ground.map(([x, y]) => {
+        const d = Math.hypot(x - gx, y - gy) || 1;
+        return new THREE.Vector3(gx + ((x - gx) * (d + 0.6)) / d, gy + ((y - gy) * (d + 0.6)) / d, 0.06);
+      });
+      ring = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }));
+      ring.visible = false;
+      scene.add(ring);
+    }
     const moving = !!anim && !matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const entry = { id, design, placement, scene, sun, sky, model, materials, rise: moving ? 0 : 1,
+    const entry = { id, design, placement, scene, sun, sky, model, materials, ring, rise: moving ? 0 : 1,
       riseStart: performance.now() + (typeof anim === 'number' ? anim : 0) };
     if (moving) {
       entry.fx = makeRiseFx(design);

@@ -24,7 +24,7 @@ const TABS = [['overview', 'Overview'], ['plans', 'Plans'], ['cost', 'Cost'], ['
 
 // `name` is the person's own name for the building (onRename changes it); `placement` is where it
 // stands now; `onShare` shares it (a building link, or the land for the sample).
-export function renderHousePanel(el, { design, estimate, preview, onWalk, onShare, onSave, saved = false, name = null, onRename = null, placement = design.placement, shared = false }) {
+export function renderHousePanel(el, { design, estimate, preview, onWalk, onPreview, onShare, onSave, saved = false, name = null, onRename = null, placement = design.placement, shared = false }) {
   let tab = 'overview';
   let level = 0;
   // The panel element is shared; drop the listeners an earlier house left on it.
@@ -58,8 +58,12 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onShar
     </dl>
     <div class="panel-actions">
       <button type="button" class="btn btn-primary" data-walk>${icon('walk')}<span>Walk through</span></button>
+      ${onPreview ? `<button type="button" class="btn btn-primary" data-preview>${icon('orbit')}<span>Preview</span></button>` : ''}
+    </div>
+    <div class="panel-actions panel-actions-quiet">
       ${onSave ? `<button type="button" class="btn" data-save>${saved ? 'Save changes' : 'Save building'}</button>` : ''}
-      <button type="button" class="btn" data-share>${icon('share')}<span>${design.sample ? 'Share site' : 'Share'}</span></button>    </div>
+      <button type="button" class="btn" data-share>${icon('share')}<span>${design.sample ? 'Share site' : 'Share'}</span></button>
+    </div>
     <p class="note">To move or turn it, choose Move beside the building on the map.</p>
     <div class="tabs" role="tablist" aria-label="Details">
       ${TABS.map(([id, name]) => `<button type="button" role="tab" id="tab-${id}" aria-controls="tabpanel" aria-selected="${id === tab}" data-tab="${id}">${name}</button>`).join('')}
@@ -168,6 +172,7 @@ export function renderHousePanel(el, { design, estimate, preview, onWalk, onShar
     const l = e.target.closest('[data-level]');
     if (l) { level = Number(l.dataset.level); draw(); return; }
     if (e.target.closest('[data-walk]')) onWalk();
+    if (e.target.closest('[data-preview]')) onPreview?.();
     if (e.target.closest('[data-expand]')) expandPlan();
     if (e.target.closest('[data-share]')) onShare?.();
     if (e.target.closest('[data-rename]')) startRename();  }, { signal });

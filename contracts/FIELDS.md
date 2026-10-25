@@ -173,7 +173,7 @@ The roof, garage, porch, parking and materials are in `exterior`.
 | `site.areaM2` | Its area. |
 | `site.soil` | What the soil survey found under the building and the foundation chosen for it: `{ source, name, uscsClass, bearingPsf, shrinkSwell, depthToBedrockIn, depthToWaterTableIn, foundation, foundationReason, note }`. |
 | `placement.origin` | `[lng, lat]` of the building's `[0, 0]` corner on the ground (front left). |
-| `placement.xAxisBearingDeg` | Compass bearing of the building's x axis (0 = north, 90 = east). The front faces this bearing minus 90°. |
+| `placement.xAxisBearingDeg` | Compass bearing of the building's x axis (0 = north, 90 = east). The y axis is the x axis turned 90° counter-clockwise (seen from above), so the front (y = 0) faces this bearing plus 90°. For x pointing east, y points north and the front faces south. |
 | `placement.footprint` | The ground floor's outline as `[lng, lat]` points: for a rectangular building its four corners in the order (0,0), (W,0), (W,D), (0,D); for a round or shaped one, its outline with curves sampled (at most about 100 points). |
 | `size.widthM`, `size.depthM` | The rectangle every level's `outline` fits inside. |
 | `size.heightM` | Ground to the highest point of the roof. |

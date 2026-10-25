@@ -83,11 +83,13 @@ func distToPolyEdge(q Pt, p []Pt) float64 {
 }
 
 // Bearing helpers. Compass bearing b: 0 = north, 90 = east.
-// Building x axis u = (sin b, cos b); y axis (front → back) v = (cos b, −sin b),
-// so the front (y = 0 side) faces bearing b − 90.
+// Building x axis u = (sin b, cos b); y axis (front → back) v = (−cos b, sin b), x turned 90°
+// counter-clockwise, so the front (y = 0 side) faces bearing b + 90. This is how the website draws
+// a building on the map, its plans (y = 0 at the bottom, a true view from above) and the sample
+// house; contracts/FIELDS.md, placement.
 func axes(b float64) (u, v Pt) {
 	r := b * math.Pi / 180
-	return Pt{math.Sin(r), math.Cos(r)}, Pt{math.Cos(r), -math.Sin(r)}
+	return Pt{math.Sin(r), math.Cos(r)}, Pt{-math.Cos(r), math.Sin(r)}
 }
 
 func dot(a, b Pt) float64 { return a[0]*b[0] + a[1]*b[1] }

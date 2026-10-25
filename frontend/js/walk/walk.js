@@ -464,7 +464,9 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
     const hits = ray.intersectObjects(group.children, true);
-    const hit = hits.find((h) => !h.object.material?.transparent);
+    // Rugs lie on the floor: a click on one goes to the floor under it.
+    const onRug = (o) => o.parent?.userData?.furnishing === 'rug';
+    const hit = hits.find((h) => !h.object.material?.transparent && !onRug(h.object));
     if (!hit || !walkable.has(hit.object) || hit.distance > 22) return null;
     return hit;
   };

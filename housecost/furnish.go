@@ -352,8 +352,19 @@ func furnish(r *LRoom, id string, clear []Rect) ([]DFurnishing, error) {
 		wallFirst(fitem{typ: "cabinet", w: 1.6, d: 0.4, h: 1.8}, 1.2)
 	case "gym":
 		wallFirst(fitem{typ: "bench", w: 1.2, d: 0.4})
-	case "bike-storage", "storage", "garage":
+	case "garage":
 		wallFirst(fitem{typ: "shelves", w: 1.2, d: 0.45})
+	case "storage", "bike-storage", "closet", "pantry", "linen":
+		// Storage rooms are lined with shelves: as many as fit along the walls.
+		d := 0.45
+		if r.Type == "closet" || r.Type == "linen" || r.Type == "pantry" {
+			d = 0.4
+		}
+		for i := 0; i < 6; i++ {
+			if !wallFirst(fitem{typ: "shelves", w: 1.2, d: d}, 0.9, 0.6) {
+				break
+			}
+		}
 	}
 	return pl.items, nil
 }

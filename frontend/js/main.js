@@ -4,7 +4,7 @@ import { settings, store } from './store.js';
 import { createMap, setBasemap, locationMarker, flyToGround, getLocation, setEvening, clearLand } from './map/map.js';
 import { createOutliner } from './map/draw.js';
 import { createHouseLayer } from './map/house-layer.js';
-import { measure, problemsFor, placeOnLot } from './lib/place.js';
+import { measure, problemsFor, placeOnLot, placementCenter } from './lib/place.js';
 import { fmt } from './format.js';
 import { api } from './api/client.js';
 import { config } from './config.js';
@@ -73,6 +73,7 @@ const app = {
 const hintPin = { el: null, rive: null, replay: false }; // the drawing hint's Rive pin
 
 function setMode(mode) {
+  if (mode !== 'house') stopOrbit({ reopen: false });
   app.mode = mode;
   body.dataset.mode = mode;
   const compass = document.querySelector('[data-ctl="north"]');
@@ -268,7 +269,7 @@ map.on('dblclick', (e) => {
 });
 
 // ---- selecting and moving a building -----------------------------------------------------------
-// A click selects a house in orange and opens its details. The Move button beside a selected house
+// A click selects a house (a thin line round it on the ground) and opens its details. The Move button beside a selected house
 // (map/mover.js) turns on the move and turn grips.
 function selectBuilding(hit, { details = false } = {}) {
   if (hit.id && (!house.design || hit.id !== app.savedBuilding?.id)) openSceneBuilding(hit.id, { focus: false, details });
@@ -740,7 +741,7 @@ function onOutlineDone(ring, edited) {
   app.site = {
     id: `site-${Date.now().toString(36)}`,
     ring,
-    form: store.get(scopeKey('lastForm'), null),
+    form: carriedForm(store.get(scopeKey('lastForm'), null)),
     mode: 'dream',
     builder: null,
     status: 'draft',
@@ -749,6 +750,17 @@ function onOutlineDone(ring, edited) {
   if (problems.length) toast(problems[0]);
   saveSite();
   openBrief();
+}
+
+// What a new building's brief keeps from the last one: the housing type, the Advanced menu and the
+// description. The numbers (floors, size, bedrooms, budget, …) start empty and wait for the user.
+function carriedForm(last) {
+  if (!last) return null;
+  return {
+    housingType: last.housingType ?? null,
+    answers: { designPrompt: last.answers?.designPrompt ?? '' },
+    advanced: structuredClone(last.advanced ?? {}),
+  };
 }
 
 function saveSite() {
@@ -985,6 +997,7 @@ async function openHouse() {
     estimate,
     preview: !!design.previewOn,
     onWalk: () => openWalk(design),
+    onPreview: () => startOrbit(),
     saved: app.savedBuilding?.uid === auth.user?.uid && app.savedBuilding?.designID === design.id,
     onSave: async () => {
       if (!(await account.require())) return false;
@@ -1115,7 +1128,50 @@ async function persistBuilding(design, estimate, site, placement) {
     data: savedDocument({ design, estimate, site, placement }) });
 }
 
+// ---- preview: the camera circles the building ---------------------------------------------------
+// The panel slides away and the camera turns slowly round the building, until Stop, Escape, or any
+// touch of the map; then the details come back.
+var orbit = null; // var: setMode can run before this line on boot
+function startOrbit() {
+  if (!house.placement) return;
+  stopOrbit({ reopen: false });
+  closePanel();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  map.easeTo({ center: placementCenter(house.placement), zoom: Math.max(18.6, Math.min(map.getZoom(), 19.6)), pitch: 62,
+    padding: { top: 0, bottom: 0, left: 0, right: 0 }, duration: reduced ? 0 : 1000 });
+  const bar = document.createElement('div');
+  bar.className = 'orbit-bar';
+  bar.innerHTML = `<span class="orbit-label">${icon('orbit')}<span>Previewing ${esc(house.design?.overview?.title ?? 'the building')}</span></span><button type="button" class="btn btn-primary btn-small" data-stop>${icon('close')}<span>Stop</span></button>`;
+  document.body.append(bar);
+  let last = null, raf = 0;
+  const step = (t) => {
+    if (last != null) map.setBearing(map.getBearing() + Math.min(50, t - last) * 0.014); // about 26 s a lap
+    last = t;
+    raf = requestAnimationFrame(step);
+  };
+  const begin = setTimeout(() => { if (!reduced) raf = requestAnimationFrame(step); }, reduced ? 0 : 1050);
+  const canvas = map.getCanvas();
+  const onTouch = () => stopOrbit();
+  const onKey = (e) => { if (e.key === 'Escape') stopOrbit(); };
+  canvas.addEventListener('pointerdown', onTouch);
+  canvas.addEventListener('wheel', onTouch, { passive: true });
+  addEventListener('keydown', onKey);
+  bar.querySelector('[data-stop]').addEventListener('click', () => stopOrbit());
+  bar.querySelector('[data-stop]').focus();
+  orbit = { cleanup: () => {
+    clearTimeout(begin); cancelAnimationFrame(raf); bar.remove();
+    canvas.removeEventListener('pointerdown', onTouch); canvas.removeEventListener('wheel', onTouch); removeEventListener('keydown', onKey);
+  } };
+}
+function stopOrbit({ reopen = true } = {}) {
+  if (!orbit) return;
+  orbit.cleanup();
+  orbit = null;
+  if (reopen && house.design) openHouse();
+}
+
 async function openWalk(design) {
+  stopOrbit({ reopen: false });
   const version = app.displayVersion;
   const { openWalkthrough } = await import('./walk/walk.js');
   if (version !== app.displayVersion) return;
