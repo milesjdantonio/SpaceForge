@@ -11,12 +11,18 @@ Three processes, each in its own terminal (details in [BACKEND.md](BACKEND.md)):
 docker compose up -d --build --wait     # Postgres + Firebase Auth emulator (from repo root, after sourcing .env)
 cd backend && go run ./cmd/migrate && go run ./cmd/api      # sign-in + saved buildings on :8080
 cd housecost && go run . -serve -addr 127.0.0.1:8000        # Gemma design service on :8000
+cd housecost && go run . -serve -fake -addr 127.0.0.1:8000  # ...or with a stand-in for Gemma, for testing
 cd frontend && npm start                                    # website on :5173
 ```
 
 The Gemini key goes in `GEMINI_API_KEY` in `.env` or in `APIKey.txt` (both git-ignored). The site
 finds the design service on :8000 by itself. Without the storage API and emulator the site still
 works, but Sign in can't be reached (it says so and offers to carry on without an account).
+
+**Testing without waiting on Gemma:** `-fake` answers every Gemma step at once with a stand-in
+(`housecost/fake.go`): no API key, and a design takes about 30 s, mostly the real site data (slope,
+soil, flood), so foundations still follow the land. To look at a building without designing one,
+open `frontend/fixtures/mock-house` from My Builds.
 
 - `housecost/` (Gemma design service, :8000): job queue, step tracking, log streaming, cancel,
   fit check (`POST /api/fit`), coverage, results in `housecost/results/`. No accounts.
@@ -60,6 +66,21 @@ works, but Sign in can't be reached (it says so and offers to carry on without a
 - **Backend can change** when a feature needs it.
 
 ## Done
+
+**2026-10-25, later (on `FrontEnd-Refresh`):**
+- Faster designs: about 3 minutes down to about 70 seconds (site sources asked at once, streets from
+  the website's map, code fixes Gemma's small slips instead of a retry).
+- Design anywhere: outside the US, worldwide elevation (Terrarium), soil (SoilGrids) and climate,
+  with stated assumptions; the design is labelled as estimated.
+- Walkthrough: floors load as you reach them (38 to 91 fps on a six-storey building); a stairs menu.
+- Outline: the first corner pulses; crossing edges are stopped and explained.
+- Re-run when cost or materials come back missing.
+- Change a design by writing what should change (House panel, `POST /api/designs/edit`).
+- Round plans 0-32% larger than their rectangle (was 57%).
+- Sloping land: the design's `exterior.foundation` (`housecost/foundation.go`) says how the building
+  meets the ground (piers, stepped footing or walkout, from the land's fitted slope); the map raises
+  the building onto it and the walkthrough draws it down to the real terrain.
+- `-fake` test mode for the design service.
 
 **2026-10-25 (on `FrontEnd-Refresh`, pushed, not merged into main):**
 - Cancel while generating (asks once more; the service stops the job and any Gemma call).
@@ -115,22 +136,12 @@ program; `go test -c -o ../housecost.test.exe . && ../housecost.test.exe` works 
 ## What's left
 
 **Interface**
-- A stairs menu to go up or down, like the elevator's.
-- Walkthrough speed for large builds.
-- The first outline corner pulsing; a clearer error when outline edges cross.
-- Check the open front doors, curved walls and Preview in a real browser (checked headless only).
-- Spell and text check across the site; check sign-in end to end.
+- Check the open front doors, curved walls, Preview and sloped foundations in a real browser
+  (checked headless only).
+- Spell and text check across the site. (Sign-in was tested end to end by a teammate.)
 
 **Gemma and backend (`housecost/`)**
-- Elevation outside the US: fall back from USGS 3DEP to worldwide Terrarium tiles; make soil, flood,
-  seismic and wage data optional with stated assumptions; drop the 422; label the design as estimated.
-- Mountainside designs: stepped foundations, walkout levels, a floor raised on piers (pillars).
 - Gemma following the description more strongly, and using the land better.
-- Round plans smaller: clip rooms to a circle of the asked-for area instead of growing them out
-  (today a round plan is about 57% larger than its rectangle).
-- Speed: cut the materials step's retries (it took 3 tries, about 80 s lost, in the last run).
-- Edit a design by prompt (send the current JSON and the change).
-- Re-run automatically when cost or materials come back missing.
 - More building tools: pillars, bridges, roof terraces; L, U and courtyard plans; curved walls
   inside a building.
 - New types: mansion, hotel, villa; then trailer park and neighborhood on `terrasim.design/3`.

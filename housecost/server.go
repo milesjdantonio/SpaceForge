@@ -310,14 +310,30 @@ type server struct {
 	results  map[string]*Output
 	queue    chan func()
 	resDir   string
+	// fake is -fake: no Gemma calls, see fake.go.
+	fake bool
 	// deps builds the pipeline's connections for one design; tests swap it for stand-ins.
 	deps func(ctx context.Context, log io.Writer, raw []byte) (Deps, error)
 }
 
-func serve(addr, siteDir, model, keyFile string, newGemma func() (*Gemma, error)) error {
+func serve(addr, siteDir, model, keyFile string, newGemma func() (*Gemma, error), fake bool) error {
 	s := &server{newGemma: newGemma, keyFile: keyFile, model: model, jobs: map[string]*job{}, results: map[string]*Output{},
-		queue: make(chan func(), 64), resDir: "results"}
+		queue: make(chan func(), 64), resDir: "results", fake: fake}
 	s.deps = func(ctx context.Context, log io.Writer, raw []byte) (Deps, error) {
+		if fake {
+			// -fake: the stand-in answers every Gemma step at once (fake.go); the site data is real.
+			var r Request
+			if err := json.Unmarshal(raw, &r); err != nil {
+				return Deps{}, err
+			}
+			ov, err := LoadOverrides("prices.csv")
+			if err != nil {
+				return Deps{}, err
+			}
+			d := LiveDeps((&fakeGemma{r: r}).ask, log, ov)
+			d.Ctx = ctx
+			return d, nil
+		}
 		g, err := s.newGemma()
 		if err != nil {
 			return Deps{}, err
@@ -399,6 +415,10 @@ func (s *server) handler(siteDir string) http.Handler {
 
 func (s *server) health(w http.ResponseWriter, r *http.Request) {
 	_, _, err := loadKey(s.keyFile)
+	if s.fake {
+		writeJSON(w, 200, map[string]any{"ok": true, "service": "housecost", "model": "stand-in (-fake)", "key": true, "fake": true})
+		return
+	}
 	writeJSON(w, 200, map[string]any{"ok": true, "service": "housecost", "model": s.model, "key": err == nil})
 }
 

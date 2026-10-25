@@ -1111,7 +1111,7 @@ func CheckShaped(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 
 // shapeDesign applies the program's shape to a finished design in place, or leaves it as it is and
 // says why. sp, f and local place the building on the land; ring is the land as [lng, lat].
-func shapeDesign(d *Design, p Program, sp SitePlan, f Frame, local []Pt, setback float64, ring []Pt) error {
+func shapeDesign(d *Design, p Program, sp SitePlan, f Frame, local []Pt, setback float64, ring []Pt, site Site, foundation string) error {
 	c := cloneDesign(d)
 	u, v := axes(sp.Bearing)
 	if p.Shape == ShapeLand && len(sp.Parking) == 0 {
@@ -1179,6 +1179,8 @@ func shapeDesign(d *Design, p Program, sp SitePlan, f Frame, local []Pt, setback
 			RidgeHeightM: r2(above + pitch*(reach+c.Exterior.Roof.EaveM))}
 		c.Size.HeightM = c.Exterior.Roof.RidgeHeightM
 	}
+	// How it meets sloping ground, worked out on its new shape and spot.
+	c.Exterior.Foundation = foundationFor(c, site.ground, foundation, at)
 	if probs := CheckShaped(c, ring, setback); len(probs) > 0 {
 		return fmt.Errorf("%s", probs[0])
 	}

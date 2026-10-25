@@ -181,6 +181,7 @@ func fetchWorldSite(q SiteQuery, s Site) (Site, error) {
 		if err == nil {
 			s.Terrain = AnalyzeFootprint(grid)
 			s.Terrain.ElevationSource = src
+			s.ground = fitGround(grid, lat, lon)
 		}
 		demErr = err
 		done <- struct{}{}

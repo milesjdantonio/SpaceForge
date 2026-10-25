@@ -244,6 +244,46 @@ function buildBuilding(design) {
     }
   }
 
+  // On a slope (exterior.foundation): what holds the ground floor up on the downhill side, down to
+  // the ground, whose height under the building comes from the design's corner heights.
+  const fnd = design.exterior?.foundation;
+  if (fnd && fnd.dropM >= 0.4 && ['piers', 'stepped', 'walkout'].includes(fnd.type)) {
+    const W = design.size.widthM, D = design.size.depthM, [g00, gW0, gWD, g0D] = fnd.groundM;
+    const groundAt = (x, y) => { const u = x / W, v = y / D; return (g00 * (1 - u) + gW0 * u) * (1 - v) + (g0D * (1 - u) + gWD * u) * v; };
+    const ground = levels.find((l) => l.elevationM >= 0) ?? levels[0];
+    const lowest = Math.min(0, ...levels.map((l) => l.elevationM));
+    const foot = new THREE.MeshStandardMaterial({ color: 0x9c968c, roughness: 0.95 });
+    if (fnd.type === 'piers') {
+      const b = bounds(ground.outline);
+      const nx = Math.max(2, Math.ceil((b.x1 - b.x0 - 0.6) / 3) + 1), ny = Math.max(2, Math.ceil((b.y1 - b.y0 - 0.6) / 3) + 1);
+      for (let i = 0; i < nx; i++) {
+        for (let j = 0; j < ny; j++) {
+          const x = b.x0 + 0.3 + ((b.x1 - b.x0 - 0.6) * i) / (nx - 1), y = b.y0 + 0.3 + ((b.y1 - b.y0 - 0.6) * j) / (ny - 1);
+          const h = -groundAt(x, y);
+          if (h < 0.05 || !pointInPolygon(x, y, ground.outline)) continue;
+          const m = new THREE.Mesh(new THREE.BoxGeometry(0.32, h, 0.32), foot);
+          m.position.set(x, -h / 2 - 0.02, y);
+          group.add(m);
+        }
+      }
+    } else {
+      // The footing's outer face: from the lowest floor down to the ground, along the outline.
+      const pts = ground.outline, verts = [];
+      for (let i = 0; i < pts.length; i++) {
+        const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
+        const ta = Math.min(lowest, 0), ga = Math.min(ta, groundAt(ax, ay)), gb = Math.min(ta, groundAt(bx, by));
+        if (ta - ga < 0.03 && ta - gb < 0.03) continue;
+        verts.push(ax, ta, ay, bx, ta, by, bx, gb, by, ax, ta, ay, bx, gb, by, ax, ga, ay);
+      }
+      if (verts.length) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        geo.computeVertexNormals();
+        group.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x9c968c, roughness: 0.95, side: THREE.DoubleSide })));
+      }
+    }
+  }
+
   // Stairs, each built in its own frame (entered from local low y) and turned to its access side.
   for (const s of design.stairs || []) {
     const from = levels[s.fromLevel], to = levels[s.toLevel];
@@ -437,7 +477,7 @@ export function openWalkthrough(host, design, { map = null, placement = null } =
   const outside = new AbortController();
   let surroundings = null;
   if (map && placement) {
-    buildSurroundings({ map, placement, W: design.size.widthM, D: design.size.depthM, signal: outside.signal })
+    buildSurroundings({ map, placement, W: design.size.widthM, D: design.size.depthM, foundation: design.exterior?.foundation, signal: outside.signal })
       .then((s) => {
         if (outside.signal.aborted) return;
         surroundings = s;

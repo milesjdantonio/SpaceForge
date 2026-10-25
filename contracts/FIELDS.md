@@ -360,6 +360,7 @@ buildings of four or more floors, have at least one elevator.
 | `garage` | `{ cars, polygon, heightM }`, or `null`. A detached or attached garage outside the main `outline` (negative x or y is fine). A garage inside a level's outline is a room of type `garage` instead, with this field still filled in for the map. |
 | `porch` | `{ polygon }`, or `null`. |
 | `parking` | Outdoor parking areas `{ polygon, spaces, covered }`, or `[]`. |
+| `foundation` | How the building meets the ground, filled in by the design service from the land's slope: `{ type, groundM, dropM, downhill }`, or missing when there's no elevation data. `type` is `slab`, `crawlspace`, `basement`, `stepped` (a footing that steps down the slope), `walkout` (a lower level open to the downhill side) or `piers` (the floor raised on pillars). `groundM` is the ground's height at the corners of the `size` rectangle, (0,0), (W,0), (W,D), (0,D), in metres from the ground floor's floor (0 on the uphill side, negative below it). `dropM` is how far the ground falls across the building; `downhill` is `front`, `back`, `left` or `right` (empty under 0.3 m). With `dropM` of 0.4 or more, the map raises the building by `dropM` onto its piers or footing, and the walkthrough draws them down to the real ground. |
 | `materials.structure`, `cladding`, `roofing` | One of the advanced values each. |
 | `materials.palette` | `{ name, hex, use }` items. `use` is one of `walls`, `roof`, `trim`, `windows`, `doors`, `accent`, `interior-walls`, `floors`. The renderer needs at least `walls`, `roof` and `windows`. |
 

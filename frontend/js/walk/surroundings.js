@@ -34,7 +34,7 @@ const smooth = (t) => t * t * (3 - 2 * t);
 // Builds the surroundings for a building placed at `placement` with footprint W x D metres.
 // Resolves to a THREE.Group in building metres (x -> X, y -> Z, up -> Y), to be added beside the
 // building itself.
-export async function buildSurroundings({ map, placement, W, D, signal }) {
+export async function buildSurroundings({ map, placement, W, D, foundation = null, signal }) {
   const frame = buildingFrame(placement);
   const cx = W / 2, cy = D / 2;
   const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => frame.toGeo([cx + a * RADIUS, cy + b * RADIUS]));
@@ -43,10 +43,15 @@ export async function buildSurroundings({ map, placement, W, D, signal }) {
     mosaic(corners, IMAGERY_Z, (z, x, y) => config.map.satellite.url.replace('{z}/{y}/{x}', `${z}/${y}/${x}`), signal)
       .catch((e) => { if (e.name === 'AbortError') throw e; return null; }),
   ]);
-  const h0 = heightAt ? heightAt(frame.toGeo([cx, cy])) : 0;
-  // Ground height in the walkthrough: real terrain, flattened into a pad round the building.
+  // On a slope the design says how the ground meets the building (foundation.groundM, from the
+  // ground floor's floor); the real terrain is lined up with that and left as it is. Elsewhere it's
+  // flattened into a pad round the building.
+  const sloped = foundation && foundation.dropM >= 0.4;
+  const groundMid = sloped ? foundation.groundM.reduce((s, v) => s + v, 0) / 4 : 0;
+  const h0 = (heightAt ? heightAt(frame.toGeo([cx, cy])) : 0) - groundMid;
   const groundAt = (x, y) => {
-    if (!heightAt) return 0;
+    if (!heightAt) return sloped ? groundMid : 0;
+    if (sloped) return heightAt(frame.toGeo([x, y])) - h0;
     const t = smooth(Math.min(1, Math.max(0, (rectDistance(x, y, W, D) - PAD_M) / BLEND_M)));
     return (heightAt(frame.toGeo([x, y])) - h0) * t;
   };

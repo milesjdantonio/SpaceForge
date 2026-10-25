@@ -340,6 +340,8 @@ func siteForPrompt(s Site) string {
 }
 
 const foundationRules = `- pad slope over 15%: no slab_on_grade; over 30%: only pier_and_beam or helical_piles
+- on slopes over 15% the building follows the land rather than a levelled pad: prefer stepped_footing,
+  walkout_basement (where basements are allowed) or pier_and_beam
 - high or very high shrink-swell: no slab_on_grade
 - basements need bedrock AND water table deeper than 96 in; no basement in FEMA A or V zones
 - FEMA V zones: only pier_and_beam or helical_piles

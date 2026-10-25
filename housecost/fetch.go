@@ -640,6 +640,8 @@ type Site struct {
 	Warnings []string   `json:"warnings"`
 	// Estimated is set outside the US, where worldwide sources and assumptions stand in (world.go).
 	Estimated bool `json:"estimated,omitempty"`
+	// ground is the plane fitted to the elevation under the building (foundation.go).
+	ground groundPlane
 }
 
 func GatherSite(cfg Config, log io.Writer) (Site, error) {

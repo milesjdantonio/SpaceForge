@@ -220,14 +220,62 @@ export function buildHouseModel(design) {
     for (const t of [0, 1]) box(0.18, 0.18, 2.5, pb.x0 + t * (pw - 0.18), pb.y0, 0.2, accentMat);
   }
   for (const p of ext.parking || []) {
-    prism(p.polygon, 0, 0.04, asphaltMat);
+    prism(p.polygon, 0, 0.04, asphaltMat).userData.onGround = true;
     if (p.covered) {
       const pb = bounds(p.polygon);
-      box(pb.x1 - pb.x0, pb.y1 - pb.y0, 0.2, pb.x0, pb.y0, 2.6, roofMat);
+      box(pb.x1 - pb.x0, pb.y1 - pb.y0, 0.2, pb.x0, pb.y0, 2.6, roofMat).userData.onGround = true;
     }
   }
 
-  group.userData = { glassMat, glassPanes, W: design.size.widthM, D: design.size.depthM, height: zTop(group) };
+  // On sloping land (exterior.foundation) the map, which is flat, shows the building raised by the
+  // ground's fall, standing on what the design stands on: piers, a stepped footing, or its walkout
+  // lower level.
+  const fnd = design.exterior?.foundation;
+  const lift = fnd && ['piers', 'stepped', 'walkout'].includes(fnd.type) && fnd.dropM >= 0.4 ? fnd.dropM : 0;
+  if (lift) {
+    for (const child of [...group.children]) if (!child.userData.onGround) child.position.z += lift; // parking stays on the ground
+    const ground = levels.find((l) => l.elevationM >= 0) ?? levels[0];
+    const footMat = mat('#9c968c', { roughness: 0.95 });
+    if (fnd.type === 'piers') {
+      // Pillars on a grid under the floor, no more than 3 m apart, inside the outline.
+      const b = bounds(ground.outline);
+      const nx = Math.max(2, Math.ceil((b.x1 - b.x0 - 0.6) / 3) + 1), ny = Math.max(2, Math.ceil((b.y1 - b.y0 - 0.6) / 3) + 1);
+      for (let i = 0; i < nx; i++) {
+        for (let j = 0; j < ny; j++) {
+          const x = b.x0 + 0.3 + ((b.x1 - b.x0 - 0.6) * i) / (nx - 1), y = b.y0 + 0.3 + ((b.y1 - b.y0 - 0.6) * j) / (ny - 1);
+          if (!pointInPolygon(x, y, ground.outline)) continue;
+          box(0.32, 0.32, lift, x - 0.16, y - 0.16, 0, footMat);
+        }
+      }
+      // A porch stands on two pillars at its outer corners.
+      if (ext.porch?.polygon) {
+        const pb = bounds(ext.porch.polygon);
+        for (const x of [pb.x0 + 0.2, pb.x1 - 0.2]) box(0.28, 0.28, lift, x - 0.14, pb.y0 + 0.1, 0, footMat);
+      }
+      // A beam round the edge under the floor.
+      for (let i = 0; i < ground.outline.length; i++) {
+        const a = ground.outline[i], c = ground.outline[(i + 1) % ground.outline.length];
+        along(a, c, lift - 0.35, lift, 0.25, 0, footMat);
+      }
+    } else {
+      // A porch stands on the same footing.
+      if (ext.porch?.polygon) prism(ext.porch.polygon, 0, lift, footMat);
+      // A solid footing up to the floor (or to the walkout level's floor), with a line at each step.
+      const lowest = Math.min(0, ...levels.map((l) => l.elevationM));
+      const top = lift + lowest + 0.3;
+      if (top > 0.05) {
+        prism(ground.outline, 0, top, footMat);
+        const lineMat = mat('#7d786f');
+        for (let z = 0.6; z < top - 0.1; z += 0.6) {
+          for (let i = 0; i < ground.outline.length; i++) {
+            const a = ground.outline[i], c = ground.outline[(i + 1) % ground.outline.length];
+            along(a, c, z - 0.03, z, 0.04, 0.02 * outward(a, c, ground.outline), lineMat);
+          }
+        }
+      }
+    }
+  }
+  group.userData = { glassMat, glassPanes, W: design.size.widthM, D: design.size.depthM, height: zTop(group), lift };
   return group;
 }
 

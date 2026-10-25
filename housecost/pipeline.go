@@ -91,6 +91,7 @@ func FetchSiteData(q SiteQuery) (Site, error) {
 		}
 		s.Terrain = AnalyzeFootprint(grid)
 		s.Terrain.ElevationSource = src
+		s.ground = fitGround(grid, lat, lon)
 	})
 	run(func() { s.Climate, climateErr = FetchClimate(lat, lon) })
 	run(func() {
@@ -433,12 +434,20 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		out.Report.Verdict, out.Report.Problems = "error", probs
 		return out, fmt.Errorf("the generated design breaks %d renderer rules", len(probs))
 	}
+	// How the building meets sloping ground (a shaped building works this out as it's shaped).
+	if p.Shape != ShapeRound && p.Shape != ShapeLand {
+		d.Exterior.Foundation = foundationFor(d, site.ground, a.FoundationType, func(q Pt) Pt { return BuildingToLngLat(frame, fin.sp, q) })
+	}
 	if p.Shape == ShapeRound || p.Shape == ShapeLand {
 		fmt.Fprintf(log, "Shaping the building: %s...\n", p.Shape)
-		if err := shapeDesign(d, p, fin.sp, frame, local, setback, ring); err != nil {
+		if err := shapeDesign(d, p, fin.sp, frame, local, setback, ring, site, a.FoundationType); err != nil {
 			fmt.Fprintf(log, "  kept it rectangular (%v)\n", err)
 			cautions = append(cautions, fmt.Sprintf("The building is drawn rectangular: the %s shape couldn't be fitted here (%v).", p.Shape, err))
 		}
+	}
+
+	if line := d.Exterior.Foundation.siteLine(); line != "" {
+		d.Overview.SiteResponse = append(d.Overview.SiteResponse, line)
 	}
 
 	// 7. Gemma: materials

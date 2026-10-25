@@ -487,7 +487,9 @@ type Exterior struct {
 	Garage    *XGarage   `json:"garage"`
 	Porch     *XPorch    `json:"porch"`
 	Parking   []XParking `json:"parking"`
-	Materials XMaterials `json:"materials"`
+	// Foundation is how the building meets the ground, from the slope under it (foundation.go).
+	Foundation *XFoundation `json:"foundation,omitempty"`
+	Materials  XMaterials   `json:"materials"`
 }
 
 type Roof struct {

@@ -122,6 +122,7 @@ func run() error {
 	serveMode := flag.Bool("serve", false, "run the TerraSim website and design API (see server.go)")
 	addr := flag.String("addr", ":8000", "address for -serve")
 	siteDir := flag.String("site", filepath.Join("..", "frontend"), "the website folder for -serve")
+	fake := flag.Bool("fake", false, "with -serve: answer every Gemma step at once with a stand-in (no API key, no wait), for testing the website")
 	flag.Parse()
 
 	newGemma := func() (*Gemma, error) {
@@ -139,7 +140,7 @@ func run() error {
 		return g, nil
 	}
 	if *serveMode {
-		return serve(*addr, *siteDir, *model, *keyFile, newGemma)
+		return serve(*addr, *siteDir, *model, *keyFile, newGemma, *fake)
 	}
 	if *request != "" {
 		return runRequestFile(*request, *outPath, newGemma)
