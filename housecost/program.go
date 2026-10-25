@@ -38,6 +38,10 @@ type Program struct {
 	BathroomSharing string
 	Accessible      bool
 	Basement        bool
+	// Shape of the footprint: rectangle, round or land (shape.go). ShapeFromUser is set when the
+	// user's own description asked for it, which Gemma's choice doesn't override.
+	Shape         string
+	ShapeFromUser bool
 	Palette         []PaletteColor
 	Text            ProgramText
 }
@@ -111,6 +115,10 @@ func DefaultProgram(r Request) Program {
 	}
 	p.Accessible = contains(p.Priorities, "accessible")
 	p.Basement = contains(p.Extras, "basement") && !isMulti(ht)
+	p.Shape = ShapeRect
+	if s := shapeFromPrompt(sv(b.DesignPrompt)); s != "" {
+		p.Shape, p.ShapeFromUser = s, true
+	}
 	p.Palette = []PaletteColor{{"Warm white", "#EDE8DF", "walls"}, {"Charcoal", "#3A3D40", "roof"},
 		{"Black frame", "#1E1E1E", "windows"}, {"Oak", "#B58B5A", "doors"}}
 	return p
@@ -155,6 +163,7 @@ type ProgramReply struct {
 	BathroomSharing                              string
 	Palette                                      []PaletteColor
 	AreaM2                                       *float64 // only when the user left brief.areaM2 to Gemma
+	Shape                                        string   // footprintShape: rectangle, round or land
 	Text                                         ProgramText
 }
 
@@ -215,6 +224,8 @@ func ParseProgram(text string) (ProgramReply, error) {
 		str(f.k, f.dst, true)
 	}
 	str("bathroomSharing", &pr.BathroomSharing, false)
+	str("footprintShape", &pr.Shape, false)
+	pr.Shape = normalizeShape(pr.Shape)
 	if v, ok := m["roofPitch"]; ok && v != nil {
 		if f, ok := asFloat(v); ok {
 			pr.RoofPitch = f
@@ -275,6 +286,9 @@ func ValidateProgram(pr ProgramReply, r Request, s Site, a Assessment) []string 
 		}
 	}
 	keep("style", adv.Style, pr.Style, Styles)
+	if pr.Shape != "" && !contains([]string{ShapeRect, ShapeRound, ShapeLand}, pr.Shape) {
+		add("footprintShape must be rectangle, round or land.")
+	}
 	if r.Brief.AreaM2 == nil && ht != "dorm" {
 		lo, hi := areaRange(ht)
 		if pr.AreaM2 == nil {
@@ -418,6 +432,9 @@ func (p Program) Merge(pr ProgramReply) Program {
 		p.AreaM2 = *pr.AreaM2
 	}
 	p.RoofType, p.RoofPitch = pr.RoofType, pr.RoofPitch
+	if !p.ShapeFromUser && pr.Shape != "" {
+		p.Shape = pr.Shape
+	}
 	if pr.GarageCars != nil && !isMulti(p.HousingType) {
 		p.GarageCars = *pr.GarageCars
 	}
@@ -452,6 +469,7 @@ const programExample = `{
  "style": "<one of the style values>", "quality": "<essential | standard | premium>",
  "structure": "<structure value>", "cladding": "<cladding value>", "roofing": "<roofing value>",
  "roofType": "<gable | hip | flat>", "roofPitch": 0.5,
+ "footprintShape": "<rectangle | round | land>",
  "areaM2": "<only if brief.areaM2 is null: the living area per home in m² you choose (the whole home for house/tiny-home, the average for apartment/condo); otherwise null>",
  "garageCars": "<0-3 for house/tiny-home/townhouse/duplex (per home), else null>",
  "parkingSpaces": "<whole site, for apartment/condo/dorm, else null>",
@@ -507,6 +525,11 @@ Decide:
 - roofType and roofPitch (rise over run). flat → 0. gable/hip 0.17–1.0. Asphalt shingles need
   ≥ 0.17, tile and slate ≥ 0.33, metal ≥ 0.08; membrane only for flat roofs. Heavy snow favours
   steeper pitches. Apartments, condos and dorms are usually flat.
+- footprintShape: round for a circular or oval building with curved outer walls (when the
+  description asks for round, circular, curved, oval, a tower, silo or rotunda); land to take the
+  shape of the user's land (when it asks to follow or fill the lot's shape); otherwise rectangle.
+  A round or land-shaped building has no porch, deck or balconies, and a pitched roof on it
+  becomes a cone. Say in the description how the shape follows the request.
 - more than 5 floors can't be wood-frame; more than 4 can't be masonry.
 - garageCars (per home) for house/tiny-home/townhouse/duplex; parkingSpaces for the whole site
   for apartment/condo/dorm.

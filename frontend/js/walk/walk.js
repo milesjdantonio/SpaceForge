@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { icon } from '../ui/icons.js';
 import { buildFurnishings } from './furniture.js';
 import { buildSurroundings } from './surroundings.js';
-import { openingSegment, wallLength, rectPoly, bounds, centroid, pointInPolygon, roomAt } from '../lib/design.js';
+import { openingSegment, wallLength, wallPointAt, rectPoly, bounds, centroid, pointInPolygon, roomAt, renderable } from '../lib/design.js';
 
 const EYE = 1.6;
 
@@ -65,13 +65,27 @@ function buildBuilding(design) {
     return mesh;
   };
 
-  // A slab of a wall between two points along it (t0..t1), from height y0 to y1.
+  // A slab of a wall between two points along it (t0..t1), from height y0 to y1. A curved wall is
+  // built from short straight slabs that follow its curve, each a little longer so they meet.
   const piece = (w, t0, t1, y0, y1, mat, thick) => {
+    if (w.arc) {
+      const len = wallLength(w);
+      const n = Math.max(1, Math.ceil(((t1 - t0) * len) / 0.35));
+      let last = null;
+      for (let i = 0; i < n; i++) {
+        const a = wallPointAt(w, (t0 + ((t1 - t0) * i) / n) * len), b = wallPointAt(w, (t0 + ((t1 - t0) * (i + 1)) / n) * len);
+        last = slab(a, b, y0, y1, mat, thick, i < n - 1 ? 0.02 : 0);
+      }
+      return last;
+    }
     const ax = w.x1 + (w.x2 - w.x1) * t0, az = w.y1 + (w.y2 - w.y1) * t0;
     const bx = w.x1 + (w.x2 - w.x1) * t1, bz = w.y1 + (w.y2 - w.y1) * t1;
+    return slab([ax, az], [bx, bz], y0, y1, mat, thick);
+  };
+  const slab = ([ax, az], [bx, bz], y0, y1, mat, thick, extra = 0) => {
     const len = Math.hypot(bx - ax, bz - az);
     if (len < 0.02 || y1 - y0 < 0.02) return null;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(len, y1 - y0, thick), mat);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(len + extra, y1 - y0, thick), mat);
     m.position.set((ax + bx) / 2, (y0 + y1) / 2, (az + bz) / 2);
     m.rotation.y = -Math.atan2(bz - az, bx - ax);
     group.add(m);
@@ -310,6 +324,7 @@ function startSpot(design) {
 
 // `map` and `placement` (where the building stands) let the view outside show the real surroundings.
 export function openWalkthrough(host, design, { map = null, placement = null } = {}) {
+  design = renderable(design); // curved edges as short straight pieces
   host.hidden = false;
   const title = design.overview?.title ?? 'Walkthrough';
   host.innerHTML = `

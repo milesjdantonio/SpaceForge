@@ -383,7 +383,7 @@ type DLevel struct {
 	ElevationM     float64       `json:"elevationM"`
 	HeightM        float64       `json:"heightM"`
 	CeilingHeightM float64       `json:"ceilingHeightM"`
-	Outline        []Pt          `json:"outline"`
+	Outline        Ring          `json:"outline"`
 	Rooms          []DRoom       `json:"rooms"`
 	Walls          []DWall       `json:"walls"`
 	Openings       []DOpening    `json:"openings"`
@@ -396,7 +396,7 @@ type DRoom struct {
 	Name        string  `json:"name"`
 	Type        string  `json:"type"`
 	UnitID      *string `json:"unitId"`
-	Polygon     []Pt    `json:"polygon"`
+	Polygon     Ring    `json:"polygon"`
 	AreaM2      float64 `json:"areaM2"`
 	FloorFinish string  `json:"floorFinish"`
 }
@@ -408,10 +408,17 @@ type DWall struct {
 	Y1         float64 `json:"y1"`
 	X2         float64 `json:"x2"`
 	Y2         float64 `json:"y2"`
+	// Arc, when set, curves the wall along an ellipse from (x1, y1) to (x2, y2) (curve.go).
+	Arc        *Arc    `json:"arc,omitempty"`
 	ThicknessM float64 `json:"thicknessM"`
 }
 
-func (w DWall) Length() float64 { return math.Hypot(w.X2-w.X1, w.Y2-w.Y1) }
+func (w DWall) Length() float64 {
+	if w.Arc == nil {
+		return math.Hypot(w.X2-w.X1, w.Y2-w.Y1)
+	}
+	return PolyPerimeter(w.wallPath()) - math.Hypot(w.X2-w.X1, w.Y2-w.Y1) // open path: drop the closing side
+}
 
 type DOpening struct {
 	ID       string    `json:"id"`

@@ -138,8 +138,9 @@ type fitted struct {
 
 func fitLayout(p Program, local []Pt, setback float64, bearings []float64) (fitted, error) {
 	var lastErr error
+	q := shapedProgram(p)
 	for v := 0; ; v++ {
-		l, err := BuildLayout(p, v)
+		l, err := BuildLayout(q, v)
 		if err == ErrNoPreset {
 			break
 		}
@@ -147,7 +148,14 @@ func fitLayout(p Program, local []Pt, setback float64, bearings []float64) (fitt
 			lastErr = err
 			continue
 		}
-		sp, err := FitBuilding(local, setback, l.Needs(p.ParkingSpaces), bearings)
+		nd := l.Needs(p.ParkingSpaces)
+		if p.Shape == ShapeRound {
+			// The round building reaches past the planned rectangle on every side.
+			mx, my := roundMargins(l.W, l.D)
+			nd.Left, nd.Right = math.Max(nd.Left, mx), math.Max(nd.Right, mx)
+			nd.Front, nd.Back = math.Max(nd.Front, my), math.Max(nd.Back, my)
+		}
+		sp, err := FitBuilding(local, setback, nd, bearings)
 		if err != nil {
 			lastErr = err
 			continue
@@ -366,6 +374,13 @@ func RunRequest(raw []byte, dp Deps) (*Output, error) {
 		out.Report.Verdict, out.Report.Problems = "error", probs
 		return out, fmt.Errorf("the generated design breaks %d renderer rules", len(probs))
 	}
+	if p.Shape == ShapeRound || p.Shape == ShapeLand {
+		fmt.Fprintf(log, "Shaping the building: %s...\n", p.Shape)
+		if err := shapeDesign(d, p, fin.sp, frame, local, setback, ring); err != nil {
+			fmt.Fprintf(log, "  kept it rectangular (%v)\n", err)
+			cautions = append(cautions, fmt.Sprintf("The building is drawn rectangular: the %s shape couldn't be fitted here (%v).", p.Shape, err))
+		}
+	}
 
 	// 7. Gemma: materials
 	if dp.stopped() {
@@ -481,7 +496,7 @@ func finishDesign(d *Design, p Program, l *Layout, sp SitePlan, f Frame, ring []
 		for _, lv := range d.Levels {
 			for _, r := range lv.Rooms {
 				if r.Type == "garage" && d.Exterior.Garage == nil {
-					d.Exterior.Garage = &XGarage{Cars: l.GarageCars, Polygon: r.Polygon, HeightM: lv.HeightM}
+					d.Exterior.Garage = &XGarage{Cars: l.GarageCars, Polygon: r.Polygon.Flat(), HeightM: lv.HeightM}
 				}
 			}
 		}

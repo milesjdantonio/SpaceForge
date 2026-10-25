@@ -92,7 +92,7 @@ func CheckDesign(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 	// 2. outlines inside size; rooms fill the outline without gaps or overlaps
 	W, D := d.Size.WidthM, d.Size.DepthM
 	for _, lv := range d.Levels {
-		for _, p := range lv.Outline {
+		for _, p := range lv.Outline.Flat() {
 			if p[0] < -eps || p[1] < -eps || p[0] > W+eps || p[1] > D+eps {
 				add("level %d outline point %v is outside size %.2f × %.2f", lv.Index, p, W, D)
 			}
@@ -100,8 +100,8 @@ func CheckDesign(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 		total := 0.0
 		var rects []Rect
 		for _, r := range lv.Rooms {
-			rr, ok := polyRect(r.Polygon)
-			if !ok {
+			rr, ok := polyRect(r.Polygon.Pts)
+			if !ok || r.Polygon.Curved() {
 				add("room %s is not a rectangle (checker only handles rectangles)", r.ID)
 				continue
 			}
@@ -111,7 +111,7 @@ func CheckDesign(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 			}
 			rects = append(rects, rr)
 		}
-		if out := PolyArea(lv.Outline); math.Abs(total-out) > 0.05 {
+		if out := lv.Outline.Area(); math.Abs(total-out) > 0.05 {
 			add("level %d: rooms cover %.2f m² of a %.2f m² outline (gap or overlap)", lv.Index, total, out)
 		}
 		for i := range rects {
@@ -170,7 +170,7 @@ func CheckDesign(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 			if rr.level != level {
 				continue
 			}
-			if r, ok := polyRect(rr.room.Polygon); ok && near(r.X0, x) && near(r.Y0, y) && near(r.W(), w) && near(r.D(), dd) {
+			if r, ok := polyRect(rr.room.Polygon.Pts); ok && near(r.X0, x) && near(r.Y0, y) && near(r.W(), w) && near(r.D(), dd) {
 				return id
 			}
 		}
@@ -273,7 +273,7 @@ func CheckDesign(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 	}
 
 	// 8. footprint inside the site outline, with the setback
-	if len(sitePolyLngLat) >= 3 && len(d.Placement.Footprint) == 4 {
+	if len(sitePolyLngLat) >= 3 && len(d.Placement.Footprint) >= 3 {
 		f := NewFrame(sitePolyLngLat[0][1], sitePolyLngLat[0][0])
 		var site []Pt
 		for _, p := range sitePolyLngLat {
@@ -292,7 +292,7 @@ func CheckDesign(d *Design, sitePolyLngLat []Pt, setback float64) []string {
 		byRoom := map[string][]DFurnishing{}
 		for _, f := range lv.Furnishings {
 			byRoom[f.RoomID] = append(byRoom[f.RoomID], f)
-			rr, ok := polyRect(rooms[f.RoomID].room.Polygon)
+			rr, ok := polyRect(rooms[f.RoomID].room.Polygon.Pts)
 			if !ok {
 				continue
 			}
@@ -375,7 +375,7 @@ func wallsCross(a, b DWall) bool {
 func sharedOpenEdges(lv DLevel) [][2]string {
 	var rects []Rect
 	for _, r := range lv.Rooms {
-		rr, _ := polyRect(r.Polygon)
+		rr, _ := polyRect(r.Polygon.Pts)
 		rects = append(rects, rr)
 	}
 	covered := func(horiz bool, c, a, b float64) float64 {

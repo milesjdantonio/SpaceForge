@@ -36,9 +36,9 @@ func (w *wallLine) length() float64 { return w.b - w.a }
 func (w *wallLine) toDWall() DWall {
 	t := map[string]float64{"exterior": 0.3, "party": 0.25, "interior": 0.12}[w.kind]
 	if w.horiz {
-		return DWall{w.id, w.kind, rd(w.a), rd(w.c), rd(w.b), rd(w.c), t}
+		return DWall{ID: w.id, Kind: w.kind, X1: rd(w.a), Y1: rd(w.c), X2: rd(w.b), Y2: rd(w.c), ThicknessM: t}
 	}
-	return DWall{w.id, w.kind, rd(w.c), rd(w.a), rd(w.c), rd(w.b), t}
+	return DWall{ID: w.id, Kind: w.kind, X1: rd(w.c), Y1: rd(w.a), X2: rd(w.c), Y2: rd(w.b), ThicknessM: t}
 }
 
 // deriveWalls builds the walls of one level from its rooms. open says whether
@@ -221,7 +221,7 @@ func BuildDesign(l *Layout, p Program) (*Design, error) {
 		g.openings = append(g.openings, nil)
 		g.nOpen = append(g.nOpen, 0)
 		dl := DLevel{Index: lv.Index, Name: lv.Name, ElevationM: r2(lv.Elev), HeightM: r2(lv.Height),
-			CeilingHeightM: r2(lv.Height - 0.3), Outline: Rect{0, 0, l.W, l.D}.Poly(),
+			CeilingHeightM: r2(lv.Height - 0.3), Outline: RingOf(Rect{0, 0, l.W, l.D}.Poly()),
 			Balconies: []DBalcony{}, Furnishings: []DFurnishing{}}
 		for _, r := range lv.Rooms {
 			var unit *string
@@ -230,7 +230,7 @@ func BuildDesign(l *Layout, p Program) (*Design, error) {
 				unit = &u
 			}
 			dl.Rooms = append(dl.Rooms, DRoom{ID: g.ids[r.Key], Name: r.Name, Type: r.Type, UnitID: unit,
-				Polygon: r.R.Poly(), AreaM2: r2(r.R.Area()), FloorFinish: defaultFinish(r.Type)})
+				Polygon: RingOf(r.R.Poly()), AreaM2: r2(r.R.Area()), FloorFinish: defaultFinish(r.Type)})
 		}
 		g.levels = append(g.levels, dl)
 	}

@@ -485,7 +485,7 @@ func DesignTakeoff(d *Design, foundation string, roofEave float64) Takeoff {
 	var extWall, drywall float64
 	windows, extDoors, intDoors, garageCars := 0.0, 0.0, 0.0, 0.0
 	for _, lv := range d.Levels {
-		area := PolyArea(lv.Outline)
+		area := lv.Outline.Area()
 		gross += area
 		if lv.ElevationM >= -0.01 {
 			top = area
@@ -576,8 +576,7 @@ func DesignTakeoff(d *Design, foundation string, roofEave float64) Takeoff {
 	}
 	for _, lv := range d.Levels {
 		for _, r := range lv.Rooms {
-			rr, _ := polyRect(r.Polygon)
-			per := 2 * (rr.W() + rr.D())
+			per := r.Polygon.Perimeter()
 			k := "rt:" + r.Type
 			t[k+":wall"] += math.Round(m2(per * lv.CeilingHeightM))
 			if r.Type == "kitchen" || r.Type == "shared-kitchen" {

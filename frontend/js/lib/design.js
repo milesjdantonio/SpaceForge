@@ -4,15 +4,102 @@
 
 export const SCHEMA = 'terrasim.design/2';
 
+// ---- curves --------------------------------------------------------------------------------------
+// An outline or room edge, or a wall, may follow an ellipse { cx, cy, rx, ry } (axes along x and y)
+// from one end to the other, the short way round (FIELDS.md, "Curved walls"). A curved polygon edge
+// is a third item on the vertex it starts from: [x, y, { cx, cy, rx, ry }].
+
+const ARC_STEP = 0.25; // longest straight piece when a curve is drawn or measured
+
+// Points along the curve from a to b, both ends included.
+export function arcPoints(a, b, arc) {
+  const t0 = Math.atan2((a[1] - arc.cy) / arc.ry, (a[0] - arc.cx) / arc.rx);
+  let d = Math.atan2((b[1] - arc.cy) / arc.ry, (b[0] - arc.cx) / arc.rx) - t0;
+  while (d > Math.PI) d -= 2 * Math.PI;
+  while (d < -Math.PI) d += 2 * Math.PI;
+  const n = Math.max(2, Math.ceil((Math.abs(d) * Math.max(arc.rx, arc.ry)) / ARC_STEP));
+  const out = [[a[0], a[1]]];
+  for (let i = 1; i < n; i++) { const t = t0 + (d * i) / n; out.push([arc.cx + arc.rx * Math.cos(t), arc.cy + arc.ry * Math.sin(t)]); }
+  out.push([b[0], b[1]]);
+  return out;
+}
+
+const isArc = (a) => a && typeof a === 'object' && !Array.isArray(a) && [a.cx, a.cy, a.rx, a.ry].every((v) => typeof v === 'number') && a.rx > 0 && a.ry > 0;
+
+// A polygon with every curved edge sampled into short straight pieces (the same array when none).
+export function flatPoly(poly) {
+  if (!Array.isArray(poly) || !poly.some((q) => isArc(q?.[2]))) return poly;
+  const out = [];
+  poly.forEach((q, i) => {
+    out.push([q[0], q[1]]);
+    if (isArc(q[2])) out.push(...arcPoints(q, poly[(i + 1) % poly.length], q[2]).slice(1, -1));
+  });
+  return out;
+}
+
+// A wall's centre line as points: its two ends, or its curve sampled.
+export const wallPath = (w) => (isArc(w.arc) ? arcPoints([w.x1, w.y1], [w.x2, w.y2], w.arc) : [[w.x1, w.y1], [w.x2, w.y2]]);
+
+const lengths = new WeakMap();
+export function wallLength(w) {
+  if (!isArc(w.arc)) return Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+  if (!lengths.has(w)) {
+    const p = wallPath(w);
+    let s = 0;
+    for (let i = 1; i < p.length; i++) s += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]);
+    lengths.set(w, s);
+  }
+  return lengths.get(w);
+}
+
+// The point s metres along a wall from its (x1, y1) end.
+export function wallPointAt(w, s) {
+  const p = wallPath(w);
+  for (let i = 1; i < p.length; i++) {
+    const l = Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]);
+    if (s <= l || i === p.length - 1) {
+      const t = l ? Math.max(0, Math.min(1, s / l)) : 0;
+      return [p[i - 1][0] + (p[i][0] - p[i - 1][0]) * t, p[i - 1][1] + (p[i][1] - p[i - 1][1]) * t];
+    }
+    s -= l;
+  }
+  return p[p.length - 1];
+}
+
+// The design with every curved polygon sampled, for drawing and checking. Walls keep their curves
+// (openings are measured along them). The file itself is never changed, so saving and sharing keep
+// the exact curves. Designs without curves come back as they are.
+const views = new WeakMap();
+export function renderable(design) {
+  if (!design?.levels) return design;
+  if (views.has(design)) return views.get(design);
+  const curved = design.levels.some((l) => flatPoly(l.outline) !== l.outline || (l.rooms || []).some((r) => flatPoly(r.polygon) !== r.polygon));
+  const view = !curved ? design : {
+    ...design,
+    levels: design.levels.map((l) => ({
+      ...l,
+      outline: flatPoly(l.outline),
+      rooms: (l.rooms || []).map((r) => ({ ...r, polygon: flatPoly(r.polygon) })),
+      balconies: (l.balconies || []).map((b) => ({ ...b, polygon: flatPoly(b.polygon) })),
+    })),
+  };
+  views.set(design, view);
+  if (view !== design) views.set(view, view);
+  return view;
+}
+
 // ---- geometry helpers ---------------------------------------------------------------------------
 
-export const wallLength = (w) => Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
-
-// The segment an opening occupies, worked out from its wall, offset and width.
+// The segment an opening occupies, worked out from its wall, offset and width. On a curved wall it
+// is the straight line between its two ends along the curve.
 export function openingSegment(wall, o) {
   const len = wallLength(wall) || 1;
-  const ux = (wall.x2 - wall.x1) / len, uy = (wall.y2 - wall.y1) / len;
   const a = o.offsetM, b = o.offsetM + o.widthM;
+  if (isArc(wall.arc)) {
+    const p = wallPointAt(wall, a), q = wallPointAt(wall, b);
+    return { x1: p[0], y1: p[1], x2: q[0], y2: q[1], t0: a / len, t1: b / len };
+  }
+  const ux = (wall.x2 - wall.x1) / len, uy = (wall.y2 - wall.y1) / len;
   return { x1: wall.x1 + ux * a, y1: wall.y1 + uy * a, x2: wall.x1 + ux * b, y2: wall.y1 + uy * b, t0: a / len, t1: b / len };
 }
 
@@ -94,8 +181,10 @@ export function checkDesign(d) {
   const need = [['overview.title', d.overview?.title], ['size.widthM', d.size?.widthM], ['size.depthM', d.size?.depthM], ['placement.origin', d.placement?.origin], ['placement.xAxisBearingDeg', d.placement?.xAxisBearingDeg]];
   for (const [path, v] of need) if (v == null) err(0, `The design is missing ${path}.`);
   if (!Array.isArray(d.levels) || !d.levels.length) err(0, 'The design has no levels.');
-  if (!isPoly(d.placement?.footprint)) err(0, 'placement.footprint needs four [lng, lat] corners.');
+  if (!isPoly(d.placement?.footprint)) err(0, 'placement.footprint needs the building’s [lng, lat] outline (at least three points).');
   if (errors.length) return { ok: false, errors, warnings };
+  // Curved edges are checked as the short straight pieces they're drawn with.
+  d = renderable(d);
 
   // Rule 1: ids are unique and references resolve.
   const seen = new Map();

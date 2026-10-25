@@ -124,7 +124,7 @@ A building is a stack of **levels**. Each level is drawn from four lists, all in
 
 - **`outline`**: the outer edge of the floor slab. The floor and ceiling fill it.
 - **`rooms`**: the named spaces, each a polygon, each tagged with the home it belongs to.
-- **`walls`**: every wall to draw, as straight segments. Nothing else becomes a wall.
+- **`walls`**: every wall to draw, as straight or curved segments. Nothing else becomes a wall.
 - **`openings`**: doors, windows and openings, each placed on one wall.
 
 Stairs and elevators are listed once for the whole building, because they connect levels.
@@ -174,7 +174,7 @@ The roof, garage, porch, parking and materials are in `exterior`.
 | `site.soil` | What the soil survey found under the building and the foundation chosen for it: `{ source, name, uscsClass, bearingPsf, shrinkSwell, depthToBedrockIn, depthToWaterTableIn, foundation, foundationReason, note }`. |
 | `placement.origin` | `[lng, lat]` of the building's `[0, 0]` corner on the ground (front left). |
 | `placement.xAxisBearingDeg` | Compass bearing of the building's x axis (0 = north, 90 = east). The front faces this bearing minus 90°. |
-| `placement.footprint` | The four corners of the `size` rectangle as `[lng, lat]`, in the order (0,0), (W,0), (W,D), (0,D). |
+| `placement.footprint` | The ground floor's outline as `[lng, lat]` points: for a rectangular building its four corners in the order (0,0), (W,0), (W,D), (0,D); for a round or shaped one, its outline with curves sampled (at most about 100 points). |
 | `size.widthM`, `size.depthM` | The rectangle every level's `outline` fits inside. |
 | `size.heightM` | Ground to the highest point of the roof. |
 
@@ -206,7 +206,7 @@ One item per home. A house has one. A dorm has none (`[]`); its rooms use `unitI
 | `elevationM` | Floor level relative to the ground floor's floor (0 for the ground floor, negative for a basement). |
 | `heightM` | Floor to the next floor, usually 2.8–3.2 for homes and 3.5–4.5 for a ground-floor lobby. |
 | `ceilingHeightM` | Floor to ceiling, usually `heightM` − 0.3. |
-| `outline` | Polygon of the outer edge of this level's floor. Rectangle or any shape made of straight sides (an L, a U, a courtyard). Upper levels may be smaller than lower ones. |
+| `outline` | Polygon of the outer edge of this level's floor. Rectangle, any shape made of straight sides (an L, a U, a courtyard), or with curved edges (see "Curved walls"). Upper levels may be smaller than lower ones. |
 | `rooms` | Every space on this level. |
 | `walls` | Every wall on this level. |
 | `openings` | Every door, window and opening on this level. |
@@ -225,7 +225,7 @@ neighbouring rooms share an edge exactly.
 | `name` | "Kitchen", "Bedroom 2", "Corridor", "Stair A". |
 | `type` | One of the room types below. |
 | `unitId` | The home it belongs to, or `null` for shared space (corridors, lobby, stairs, common rooms, every dorm room). |
-| `polygon` | Corners in building metres. Straight sides only, not self-crossing. |
+| `polygon` | Corners in building metres, not self-crossing. Sides are straight unless a corner carries a curve (see "Curved walls"). |
 | `areaM2` | Area of the polygon. |
 | `floorFinish` | `wood`, `tile`, `carpet`, `concrete`, `stone` or `vinyl`. |
 
@@ -248,6 +248,7 @@ kitchen and living room), leave the wall out.
 | `id` | For example `"L2-W14"`. |
 | `kind` | `exterior` (outer wall), `party` (between two homes, or a home and a corridor, stair or lobby; thick for sound and fire), `interior` (inside a home or a shared area). |
 | `x1`, `y1`, `x2`, `y2` | The centre line of the wall, end to end. |
+| `arc` | Optional. `{ cx, cy, rx, ry }`: the wall curves along this ellipse from (x1, y1) to (x2, y2) (see "Curved walls"). Leave it out for a straight wall. |
 | `thicknessM` | `exterior` 0.3, `party` 0.25, `interior` 0.12 are good defaults. |
 
 Walls run along room edges. Exterior walls run along the level's `outline`. A wall stops where
@@ -260,10 +261,29 @@ another wall meets it; walls don't cross each other.
 | `id` | For example `"L2-O5"`. |
 | `kind` | `window`; `door` (ordinary door inside); `entry` (the front door of the building or of a home); `patio` (glass door to the outside or a balcony); `garage` (garage door); `passage` (opening with no door); `cased` (wide opening with no door, 1.2 m or more). |
 | `wallId` | The wall it sits in. |
-| `offsetM` | Distance from the wall's (x1, y1) end to the near edge of the opening. |
+| `offsetM` | Distance from the wall's (x1, y1) end to the near edge of the opening, measured along the wall (along the curve for a curved wall). |
 | `widthM` | Width. `offsetM + widthM` is no more than the wall's length. Doors 0.8–0.9 (0.9 for `accessible`), entries 0.9–1.0, building entries 1.8, garage doors 2.5 per car. |
 | `sillM`, `headM` | Windows: bottom and top above the floor (for example 0.8 and 2.2). Doors and other kinds: `null` for sill, `headM` 2.1 (2.4 for building entries and garage doors). |
 | `connects` | The two sides: two room ids, or a room id and `"outside"`. Every room that isn't open to a neighbour through a missing wall needs at least one door, passage or cased opening. |
+
+**Curved walls**
+
+A round or curved building is described with curved edges. An ellipse is `{ "cx", "cy", "rx", "ry" }`
+in building metres: its centre, and its radius along x and along y (`rx` = `ry` for a circle). A curve
+runs from one end to the other along the ellipse the short way round (less than half way), and both
+ends lie on the ellipse.
+
+- In an `outline` or room `polygon`, a curved side is written as a third item on the corner it starts
+  from: `[x, y, { "cx": 8, "cy": 6, "rx": 8, "ry": 6 }]` means the side from this corner to the next
+  one follows that ellipse. Corners without it start straight sides, so straight-sided files are
+  unchanged.
+- A curved wall has the same ellipse in `arc`.
+- Areas, lengths and `offsetM` are measured along the curve. The website draws a curve as short
+  straight pieces (a quarter of a metre or less), and checks it the same way.
+
+The design service draws round buildings with `round` and land-shaped ones with `land` as the program's
+`footprintShape` (rectangle is the default). The description decides it: "make it a circle" gives a
+round building.
 
 **`balconies`**
 
@@ -330,10 +350,10 @@ buildings of four or more floors, have at least one elevator.
 
 | Field | Meaning |
 |---|---|
-| `roof.type` | `gable`, `hip` or `flat`. Apartments, condos and dorms are usually `flat`. |
+| `roof.type` | `gable`, `hip`, `flat` or `cone`. Apartments, condos and dorms are usually `flat`. `cone` rises from the eaves all round to one point over the middle of the top level's outline: a cone over a round plan, a pyramid over a straight-sided one. |
 | `roof.pitch` | Rise over run (0 for flat). |
 | `roof.eaveM` | Overhang past the walls (0.1 for flat with a parapet). |
-| `roof.ridgeAxis` | `x` or `y`: the direction the ridge runs. `null` for flat. |
+| `roof.ridgeAxis` | `x` or `y`: the direction the ridge runs. `null` for flat and cone. |
 | `roof.ridgeHeightM` | Ground to the top of the roof. Equals `size.heightM`. |
 | `garage` | `{ cars, polygon, heightM }`, or `null`. A detached or attached garage outside the main `outline` (negative x or y is fine). A garage inside a level's outline is a room of type `garage` instead, with this field still filled in for the map. |
 | `porch` | `{ polygon }`, or `null`. |
@@ -355,7 +375,7 @@ The website rejects a design that breaks these, and shows the user which rule fa
 6. Stairs connect neighbouring levels and line up at the same rectangle, and their stair rooms exist
    on both levels. Elevators are rooms on every level they serve.
 7. `totals` matches the `units` and `rooms` (bedroom, bathroom and area counts).
-8. `placement.footprint` lies inside the site outline.
+8. `placement.footprint` lies inside the site outline (every point of it).
 
 ---
 

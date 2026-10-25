@@ -3,7 +3,7 @@
 // bottom of the sheet.
 
 import { fmt } from '../format.js';
-import { openingSegment, bounds, centroid, rectPoly } from '../lib/design.js';
+import { openingSegment, bounds, centroid, rectPoly, renderable, wallPath, flatPoly } from '../lib/design.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -15,6 +15,7 @@ function el(name, attrs = {}, parent) {
 }
 
 export function levelBounds(design) {
+  design = renderable(design);
   const pts = [];
   for (const l of design.levels) {
     pts.push(...l.outline);
@@ -30,6 +31,7 @@ export function levelBounds(design) {
 const TINTS = ['rgba(255,177,92,0.07)', 'rgba(120,180,255,0.07)', 'rgba(140,220,170,0.07)', 'rgba(230,150,220,0.07)'];
 
 export function renderPlan(design, { level = 0, labels = true, dims = true, pad = 2.2, className = 'plan', title } = {}) {
+  design = renderable(design); // curved edges as short straight pieces
   const lvl = design.levels[level] ?? design.levels[0];
   const b = levelBounds(design);
   const flip = ([x, y]) => [x, b.maxY - y + b.minY];
@@ -62,6 +64,12 @@ export function renderPlan(design, { level = 0, labels = true, dims = true, pad 
   // Walls, as drawn lines at their thickness.
   const walls = el('g', { class: 'plan-walls' }, g);
   for (const w of lvl.walls || []) {
+    if (w.arc) {
+      // A curved wall follows its curve.
+      const d = 'M' + wallPath(w).map((p) => flip(p).map((v) => v.toFixed(3)).join(' ')).join(' L');
+      el('path', { d, class: `plan-wall plan-wall-${w.kind}`, fill: 'none', 'stroke-width': w.thicknessM ?? 0.12 }, walls);
+      continue;
+    }
     const [x1, y1] = flip([w.x1, w.y1]), [x2, y2] = flip([w.x2, w.y2]);
     el('line', { x1, y1, x2, y2, class: `plan-wall plan-wall-${w.kind}`, 'stroke-width': w.thicknessM ?? 0.12 }, walls);
   }

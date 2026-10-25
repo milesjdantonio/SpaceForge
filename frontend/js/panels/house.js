@@ -8,6 +8,7 @@ import { toast } from '../ui/toast.js';
 import { typeName } from '../lib/housing.js';
 import { explainSaveError } from '../lib/errors.js';
 import { openPlanViewer } from '../ui/plan-viewer.js';
+import { flatPoly } from '../lib/design.js';
 
 // One line saying what the building holds.
 export function holdsLine(design) {
@@ -230,7 +231,8 @@ function roomsTable(level) {
   return `<table class="rooms num">
     <thead><tr><th>Room</th><th class="r">Size</th><th class="r">Area</th></tr></thead>
     <tbody>${level.rooms.filter((r) => !['hall', 'stair', 'elevator', 'corridor'].includes(r.type)).map((r) => {
-      const xs = r.polygon.map((p) => p[0]), ys = r.polygon.map((p) => p[1]);
+      const poly = flatPoly(r.polygon);
+      const xs = poly.map((p) => p[0]), ys = poly.map((p) => p[1]);
       const w = Math.max(...xs) - Math.min(...xs), d = Math.max(...ys) - Math.min(...ys);
       return `<tr><td>${esc(r.name)}</td><td class="r">${fmt.len(w, { precise: true })} × ${fmt.len(d, { precise: true })}</td><td class="r">${fmt.area(r.areaM2)}</td></tr>`;
     }).join('')}</tbody>

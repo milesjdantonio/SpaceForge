@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { maplibregl } from './map.js';
-import { openingSegment, pointInPolygon, bounds } from '../lib/design.js';
+import { openingSegment, pointInPolygon, bounds, renderable, centroid } from '../lib/design.js';
 
 const DEFAULTS = { walls: '#e9e4da', roof: '#4a4f55', trim: '#2b2f33', glass: '#5d7c99', accent: '#8a6a4a' };
 
@@ -24,6 +24,7 @@ function paletteColors(design) {
 // z up. Each level is its outline raised to its height; windows and doors come from the exterior
 // walls' openings; balconies, garage, porch, parking and roof from the file.
 export function buildHouseModel(design) {
+  design = renderable(design); // curved edges as short straight pieces
   const group = new THREE.Group();
   const colors = paletteColors(design);
   const levels = design.levels;
@@ -144,6 +145,27 @@ export function buildHouseModel(design) {
       const a = topLevel.outline[i], b = topLevel.outline[(i + 1) % topLevel.outline.length];
       along(a, b, wallTop, wallTop + 0.6, 0.2, -0.1 * outward(a, b, topLevel.outline), wallMat);
     }
+  } else if (roof.type === 'cone') {
+    // A cone (a pyramid over straight sides) from the eaves all round up to one point over the
+    // middle of the top level.
+    const pts = topLevel.outline;
+    const [cx, cy] = centroid(pts);
+    const pitch = roof.pitch ?? 0.5;
+    const reach = pts.reduce((s, [x, y]) => s + Math.hypot(x - cx, y - cy), 0) / pts.length;
+    const zE = wallTop - eave * pitch, zR = wallTop + pitch * reach;
+    const out = pts.map(([x, y]) => {
+      const d = Math.hypot(x - cx, y - cy) || 1;
+      return [cx + ((x - cx) * (d + eave)) / d, cy + ((y - cy) * (d + eave)) / d];
+    });
+    const verts = [];
+    for (let i = 0; i < out.length; i++) {
+      const a = out[i], b = out[(i + 1) % out.length];
+      verts.push(a[0], a[1], zE, b[0], b[1], zE, cx, cy, zR);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    g.computeVertexNormals();
+    group.add(new THREE.Mesh(g, roofMat));
   } else {
     // Gable or hip over the top level's rectangle, ridge along x or y.
     const alongY = roof.ridgeAxis === 'y';
@@ -182,8 +204,13 @@ export function buildHouseModel(design) {
     const gb = bounds(ext.garage.polygon);
     const gh = ext.garage.heightM ?? 3;
     prism(ext.garage.polygon, 0, gh, wallMat);
-    box(gb.x1 - gb.x0 + 0.4, gb.y1 - gb.y0 + 0.4, 0.35, gb.x0 - 0.2, gb.y0 - 0.2, gh, roofMat);
-    box((gb.x1 - gb.x0) * 0.8, 0.06, 2.3, gb.x0 + (gb.x1 - gb.x0) * 0.1, gb.y0 - 0.04, 0.05, trimMat);
+    if (ext.garage.polygon.length > 4) {
+      // A garage shaped by a curved plan: its roof follows its shape; its door is an opening.
+      prism(ext.garage.polygon, gh, gh + 0.35, roofMat);
+    } else {
+      box(gb.x1 - gb.x0 + 0.4, gb.y1 - gb.y0 + 0.4, 0.35, gb.x0 - 0.2, gb.y0 - 0.2, gh, roofMat);
+      box((gb.x1 - gb.x0) * 0.8, 0.06, 2.3, gb.x0 + (gb.x1 - gb.x0) * 0.1, gb.y0 - 0.04, 0.05, trimMat);
+    }
   }
   if (ext.porch?.polygon) {
     const pb = bounds(ext.porch.polygon);
@@ -417,7 +444,7 @@ export function createHouseLayer(map) {
 
     // The seam: a glowing band round the ground floor's outline, brightest at the ground, that the
     // building rises through.
-    const outline = design.levels.find((l) => l.elevationM >= 0)?.outline ?? [[0, 0], [W, 0], [W, D], [0, D]];
+    const outline = renderable(design).levels.find((l) => l.elevationM >= 0)?.outline ?? [[0, 0], [W, 0], [W, D], [0, D]];
     const SEAM = 2.4;
     // Pushed a little outside the walls, so the building doesn't hide it as it comes up.
     const ccw = outline.reduce((a, [x1, y1], i) => { const [x2, y2] = outline[(i + 1) % outline.length]; return a + x1 * y2 - x2 * y1; }, 0) > 0;
