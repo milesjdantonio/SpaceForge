@@ -605,6 +605,8 @@ tfoot td { font-weight: 600; }
 
 /* Designing: progress from the service's own steps, and its log */
 .forge { max-height: 190px; }
+/* A failure gets room to be seen: its story is the panel's main picture. */
+.forge.is-failed { max-height: 300px; }
 .progress { display: grid; gap: 10px; }
 .progress-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .progress-label { font-weight: 600; }

@@ -339,9 +339,12 @@ class Layer {
       if (s.cls === 'AnimationState') out.raw('AnimationState', { animationId: s.animation.index, speed: s.speed });
       else out.raw(s.cls, {});
       for (const t of s.transitions) {
+        // Rive's transition flags: 1 << 1 duration is a percentage, 1 << 2 exit time on,
+        // 1 << 3 exit time is a percentage. `percent` is about the exit time ("after 100% of the
+        // animation"); with 1 << 1 instead, an exit time of 100 meant 100 ms and states were cut short.
         let flags = 0;
-        if (t.percent) flags |= 1 << 1;
         if (t.exitTime != null) flags |= 1 << 2;
+        if (t.percent && t.exitTime != null) flags |= 1 << 3;
         const props = { stateToId: t.to.index, flags, duration: t.duration };
         if (t.exitTime != null) props.exitTime = t.exitTime;
         out.raw('StateTransition', props);
