@@ -17,9 +17,9 @@ It supports houses, tiny homes, townhouses, duplexes, mansions, villas, apartmen
 and hotels, plus neighborhoods and trailer parks with roads and lots. The interface supports
 metric and imperial units; estimates are in USD.
 
-[Who TerraSim is for](#who-terrasim-is-for) · [Quick start](#quick-start) · [Architecture](#architecture) ·
-[Full local setup](#full-local-setup) · [Using the app](#using-the-app) · [Tests](#tests) ·
-[Deployment](#deployment)
+[Who TerraSim is for](#who-terrasim-is-for) · [Responsible AI](#responsible-ai-and-development) · [Scalability](#scalability) ·
+[Sustainability](#sustainability) · [Feasibility](#feasibility) · [Quick start](#quick-start) ·
+[Architecture](#architecture) · [Full local setup](#full-local-setup) · [Using the app](#using-the-app) · [Tests](#tests) · [Deployment](#deployment)
 
 ## Who TerraSim is for
 
@@ -44,6 +44,91 @@ These illustrative personas describe TerraSim's intended users, based on the
 | **Prospective land buyer** | Wants to explore what could stand on a plot before deciding whether to pursue it. A map or property photo alone leaves the building's scale and layout unclear. | Finds a plot on the map, draws its boundaries, tries a brief and reviews the building in its surroundings, together with site information and cost assumptions. |
 | **Small developer** | Is exploring a duplex, apartment building, neighborhood or trailer park and needs an early view of layout, capacity and costs. | Sets the housing type and unit requirements, generates a building or site layout, then saves concepts in private projects for later review and sharing. |
 | **Builder or landowner reviewing a concept** | Receives an idea from an owner or buyer and needs enough detail to discuss the layout, materials and estimated budget. | Opens a shared building link without an account, reviews the model, floor plans and cost breakdown, and uses them to guide a conversation with the sender. |
+
+## Responsible AI and development
+
+AI is used to accelerate the design process, not to replace human judgment. During development,
+AI-assisted tools can help explore implementation approaches, draft and refine code, explain
+complex systems, and identify edge cases. Generated code and suggestions still need to be reviewed,
+integrated with the actual application, and checked through tests and hands-on behavior; an AI
+output is not treated as correct just because it sounds confident. TerraSim's core value comes
+from combining AI-assisted ideas with a real map-based interface, site information, structured
+design outputs and cost-estimation logic.
+
+At runtime, **Gemma 4 is a concept-generation and recommendation aid**. It helps turn a user's
+housing brief into a possible design; it does not make a final decision about whether a property
+should be developed or whether a project is safe, legal, financeable or ready to build. People
+remain in control of the brief, can compare alternatives, and can take a concept to qualified
+builders and professionals for validation.
+
+TerraSim's responsible-use approach is to:
+- **Keep people in charge.** AI-generated designs are suggestions to explore, not instructions or
+  approvals. Users decide what to pursue.
+- **Be honest about uncertainty.** Cost and site outputs are estimates based on available data and
+  assumptions, not guaranteed quotes or promises of feasibility.
+- **Separate concepts from professional sign-off.** Designs still require appropriate checks for
+  zoning, building codes, structural safety, utilities, environmental constraints, permits and
+  local conditions.
+- **Protect credentials and private projects.** Provider keys and service tokens belong on the
+  server, not in public frontend code. Account-based designs are private by default and are shared
+  intentionally through a building link or file.
+- **Use AI as one part of a broader workflow.** Site data, application rules, geometry, structured
+  outputs and human review help make results more useful than an unverified block of generated text.
+
+These are product and development safeguards, not a claim that any AI model is inherently unbiased
+or always correct.
+
+## Scalability
+
+TerraSim is structured so that the interactive website, design pipeline and account storage can
+evolve independently. The standalone design service supports lightweight testing and demos, while
+the full-stack architecture separates the account API, design worker and PostgreSQL/PostGIS storage.
+That separation provides a path to scale the components that become bottlenecks instead of
+redesigning the entire application.
+
+For account-based generation, design requests are recorded as durable jobs, claimed by workers
+with renewable leases, and saved with their completed building. This lets accepted work continue
+if a browser closes and allows interrupted jobs to be reclaimed. The worker count is configurable,
+and additional worker capacity can be considered as demand grows. Structured design contracts also
+make it easier to improve or replace the generation pipeline without rebuilding the whole frontend.
+
+Scaling responsibly still requires measurement: model-provider rate limits and costs, generation
+latency, site-data availability, database load, worker capacity and failure rates need to be tested
+before promising a particular number of users or throughput. The current Render standalone
+deployment is a starting point, not proof of production-scale capacity.
+
+## Sustainability
+
+TerraSim's sustainability contribution is its potential to help people evaluate opportunities to
+add housing on available or underused land. By visualizing a proposal early, users can compare
+different housing types, sizes and layouts before committing to a design process or construction
+budget. Material quantities and cost estimates can also help make the trade-offs between design
+options more visible.
+
+The aim is to support better-informed housing decisions: a small home, duplex or multi-unit concept
+may suit a site differently, and early comparison can help users avoid pursuing an unsuitable idea.
+TerraSim does **not** currently certify a design as environmentally sustainable or calculate a
+complete carbon footprint. Real environmental outcomes depend on factors such as land conditions,
+transport access, energy performance, material sourcing, water, infrastructure, local ecology and
+the final design. Those considerations need professional and location-specific assessment.
+
+## Feasibility
+
+TerraSim is designed to make the first feasibility questions easier to investigate: **What could fit
+on this lot? What might it look like? What materials could it use? What could it cost, and is the
+idea worth investigating further?**
+
+The workflow links a site outline and user brief to a visual building concept, floor plans, site
+information, material quantities and estimated costs. This gives landowners, prospective buyers
+and small developers a shared starting point for comparing options and discussing a proposal with
+builders. It can expose obvious mismatches between an idea, the site and a target budget earlier
+than waiting for a fully developed plan.
+
+A TerraSim estimate is an early screening tool—not a bankable pro forma, contractor bid, permit,
+engineering review or guarantee that the project is viable. Actual feasibility depends on local
+zoning and density rules, setbacks, easements, utilities, geotechnical conditions, labor and
+material prices, financing, schedule and other site-specific requirements. Users should verify
+these before making purchase, investment or construction decisions.
 
 ## Architecture
 
